@@ -1,0 +1,58 @@
+id: F-30
+source: FinOps Foundation FOCUS 1.4
+title: Forecast cashflow month over month based on historical trends by service
+category: Budgeting & Forecasting
+module: budgets
+business_question: What cash outflow should we expect by service in coming months?
+personas:
+- finance_controller
+- fpa_analyst
+catalog_persona: Finance
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Billing Period
+- Invoice Detail
+description: Finance needs to perform month over month forecasting of cashflow by extrapolating from historical cash costs.
+columns: Service Provider Name, Billing Period Start, Service Category, Service Name, Billed Cost, Billing Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/forecast-cashflow-month-over-month-based-on-historical-trends-by-service-2/
+published_sql: |-
+  SELECT
+    MONTH(BillingPeriodStart),
+    ServiceProviderName,
+    ServiceCategory,
+    ServiceName,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE BillingPeriodStart >= ? AND BillingPeriodEnd < ?
+  GROUP BY
+    MONTH(BillingPeriodStart),
+    ServiceProviderName,
+    ServiceCategory,
+    ServiceName
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    MONTH(BillingPeriodStart),
+    ServiceProviderName,
+    ServiceCategory,
+    ServiceName,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE BillingPeriodStart >= :period_start AND BillingPeriodEnd < :period_end
+  GROUP BY
+    MONTH(BillingPeriodStart),
+    ServiceProviderName,
+    ServiceCategory,
+    ServiceName
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

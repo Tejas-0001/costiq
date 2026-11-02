@@ -1,0 +1,77 @@
+id: F-22
+source: FinOps Foundation FOCUS 1.4
+title: Track contract commitment burn-down over time
+category: Budgeting & Forecasting
+module: budgets
+business_question: How much of each contract commitment have we burned down, and are we on pace?
+personas:
+- finance_controller
+- fpa_analyst
+- cfo
+- tech_exec
+- finops_analyst
+catalog_persona: Finance, Leadership, Procurement
+datasets:
+- Billing Period
+- Cost and Usage
+- Invoice Detail
+- Contract Commitment
+description: Monitor the consumption of contract commitments across billing periods to track progress toward fulfilling them.
+columns: Billing Period Start, Service Provider Name, Billing Account ID, Contract Applied, Effective Cost
+keywords:
+- burn down
+- burndown
+- edp
+- macc
+- commit drawdown
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/track-contract-commitment-burn-down-over-time/
+published_sql: |-
+  SELECT
+    CU.BillingPeriodStart,
+    CU.ServiceProviderName,
+    CU.BillingAccountId,
+    JSON_VALUE(CA, '$.ContractCommitmentID') AS ContractCommitmentId,
+    SUM(CAST(JSON_VALUE(CA, '$.ContractCommitmentAppliedCost') AS FLOAT64)) AS AppliedCost,
+    SUM(CU.EffectiveCost) AS TotalEffectiveCost
+   FROM focus_data_table CU
+   CROSS JOIN
+    UNNEST(JSON_EXTRACT_ARRAY(CU.ContractApplied, '$.Elements')) AS CA
+   WHERE JSON_VALUE(CA, '$.ContractCommitmentID') IS NOT NULL
+    AND BillingPeriodStart >= ? AND BillingPeriodStart < ?
+   GROUP BY
+    CU.BillingPeriodStart,
+    CU.ServiceProviderName,
+    CU.BillingAccountId,
+    JSON_VALUE(CA, '$.ContractCommitmentID')
+   ORDER BY BillingPeriodStart, ContractCommitmentId
+adaptation: Rewritten for portability (see notes)
+sql: |-
+  SELECT
+    CU.BillingPeriodStart,
+    CU.ServiceProviderName,
+    CU.BillingAccountId,
+    json_extract_string(CA.value, '$.ContractCommitmentID') AS ContractCommitmentId,
+    SUM(CAST(json_extract_string(CA.value, '$.ContractCommitmentAppliedCost') AS DOUBLE)) AS AppliedCost,
+    SUM(CU.EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table CU
+  CROSS JOIN json_each(CU.ContractApplied -> 'Elements') AS CA
+  WHERE json_extract_string(CA.value, '$.ContractCommitmentID') IS NOT NULL
+    AND CU.BillingPeriodStart >= :period_start AND CU.BillingPeriodStart < :period_end
+  GROUP BY
+    CU.BillingPeriodStart,
+    CU.ServiceProviderName,
+    CU.BillingAccountId,
+    json_extract_string(CA.value, '$.ContractCommitmentID')
+  ORDER BY CU.BillingPeriodStart, ContractCommitmentId
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The query uses BigQuery-style syntax (`JSON_VALUE`, `JSON_EXTRACT_ARRAY`, `UNNEST`, `FLOAT64`) to unpack the ContractApplied
+  JSON `Elements` array. - Previous use case: "Compare billed cost per subaccount to budget". Next: "Update budgets for each
+  application".'

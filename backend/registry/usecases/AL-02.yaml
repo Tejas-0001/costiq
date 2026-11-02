@@ -1,0 +1,36 @@
+id: AL-02
+source: MM CostIQ AI extension
+title: Allocate Claude API spend by workspace and API key
+category: Allocation
+module: allocation
+business_question: Which Claude workspaces and API keys drive spend?
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: FinOps Practitioner, Engineering
+datasets:
+- Cost and Usage
+description: 'Anthropic''s Cost API groups cost by workspace and description, and the Usage API groups tokens by API key,
+  workspace, model and service tier. This use case lands both in FOCUS and breaks spend down to the API key. Two buckets are
+  labelled explicitly: usage in the Default Workspace (`workspace_id` = null) and usage with no API key (Console playground).'
+columns: 'FOCUS columns: BillingPeriodStart, ServiceProviderName, ServiceName, EffectiveCost · AI extension: x_WorkspaceName,
+  x_ApiKeyName, x_ModelName, x_InputTokens, x_OutputTokens, x_CacheReadTokens, x_CacheWriteTokens'
+keywords: []
+products: Claude API, Claude Code (API-billed)
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m')                     AS BillingMonth,
+    COALESCE(x_WorkspaceName, 'Default Workspace')            AS Workspace,
+    COALESCE(x_ApiKeyName, '(no API key: Console/playground)') AS ApiKey,
+    x_ModelName,
+    SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens) AS InputTokensAll,
+    SUM(x_OutputTokens)                                       AS OutputTokens,
+    ROUND(SUM(EffectiveCost), 2)                              AS EffectiveCost
+  FROM CostAndUsage
+  WHERE ServiceProviderName = 'Anthropic'
+    AND ServiceName = 'Claude API'
+    AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  ORDER BY BillingMonth, EffectiveCost DESC
+params: []
+notes: ''

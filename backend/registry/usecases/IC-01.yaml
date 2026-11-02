@@ -1,0 +1,43 @@
+id: IC-01
+source: MM CostIQ AI extension
+title: Reconcile AI charges to Invoice Detail
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: Does every AI invoice line match the charges behind it?
+personas:
+- finance_controller
+- fpa_analyst
+catalog_persona: Finance, Accounts Payable
+datasets:
+- Cost and Usage
+- Invoice Detail
+description: Adds up BilledCost in Cost and Usage for each invoice line (InvoiceDetailId) and compares it with the amount
+  on the Invoice Detail. Any variance over $1 needs investigation before the invoice is approved.
+columns: 'FOCUS columns: InvoiceId, InvoiceDetailId, BilledCost, ChargeCategory, InvoiceIssueStatus, InvoiceIssuerName'
+keywords:
+- ai invoice reconcile
+- invoice variance
+products: All
+sql: |-
+  WITH cu AS (
+    SELECT InvoiceId, InvoiceDetailId, SUM(BilledCost) AS ChargeDetailTotal
+    FROM CostAndUsage
+    GROUP BY ALL
+  )
+  SELECT
+    i.InvoiceIssuerName,
+    i.InvoiceId,
+    i.InvoiceDetailId,
+    i.ChargeCategory,
+    strftime(i.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    i.InvoiceIssueStatus,
+    ROUND(i.BilledCost, 2)              AS InvoicedAmount,
+    ROUND(cu.ChargeDetailTotal, 2)      AS ChargeDetailTotal,
+    ROUND(i.BilledCost - cu.ChargeDetailTotal, 2) AS Variance
+  FROM InvoiceDetail i
+  LEFT JOIN cu USING (InvoiceId, InvoiceDetailId)
+  WHERE ABS(i.BilledCost - COALESCE(cu.ChargeDetailTotal, 0)) > 1
+  ORDER BY ABS(Variance) DESC
+params: []
+notes: Vendors that don't deliver FOCUS Invoice Detail (Anthropic, GitHub) get it built from their invoice PDFs or billing
+  APIs during ingestion. That keeps the reconciliation the same for every vendor.

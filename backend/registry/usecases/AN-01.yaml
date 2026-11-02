@@ -1,0 +1,44 @@
+id: AN-01
+source: MM CostIQ AI extension
+title: Daily spend spikes by API key
+category: Anomaly Management
+module: anomalies
+business_question: Has any API key spiked far above its normal daily spend?
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: FinOps Practitioner, Engineering On-call
+datasets:
+- Cost and Usage
+description: 'Flags API keys whose daily cost is far above their own recent baseline: more than 3 standard deviations above
+  the trailing 14-day mean, and over $25. This catches runaway retry loops, leaked keys and load tests left running.'
+columns: 'FOCUS columns: ChargePeriodStart, EffectiveCost · AI extension: x_ApiKeyName, x_WorkspaceName'
+keywords:
+- runaway key
+- api key spike
+- leaked key
+products: Claude API, Claude Code
+sql: |-
+  WITH daily AS (
+    SELECT CAST(ChargePeriodStart AS DATE) AS UsageDate, x_WorkspaceName, COALESCE(x_ApiKeyName, '(no key)') AS ApiKey,
+           SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage
+    WHERE ServiceProviderName = 'Anthropic' AND ChargeCategory = 'Usage'
+    GROUP BY ALL
+  ),
+  scored AS (
+    SELECT *,
+      AVG(Cost)         OVER w AS Baseline,
+      STDDEV_SAMP(Cost) OVER w AS StdDev
+    FROM daily
+    WINDOW w AS (PARTITION BY x_WorkspaceName, ApiKey ORDER BY UsageDate ROWS BETWEEN 14 PRECEDING AND 1 PRECEDING)
+  )
+  SELECT UsageDate, x_WorkspaceName, ApiKey,
+         ROUND(Cost, 2) AS Cost, ROUND(Baseline, 2) AS Trailing14DayAvg,
+         ROUND((Cost - Baseline) / NULLIF(StdDev, 0), 1) AS ZScore
+  FROM scored
+  WHERE Cost > 25 AND (Cost - Baseline) / NULLIF(StdDev, 0) > 3
+  ORDER BY UsageDate DESC, Cost DESC
+params: []
+notes: For near-real-time alerting, run the same logic on the Usage API with `bucket_width=1h`. Data typically appears within
+  about 5 minutes.

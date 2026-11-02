@@ -1,0 +1,38 @@
+id: GV-01
+source: MM CostIQ AI extension
+title: Usage of non-approved models
+category: Governance, Policy & Risk
+module: governance
+business_question: Who is using models that aren’t approved, and what does it cost?
+personas:
+- auditor
+- ai_program_owner
+catalog_persona: AI Governance, Security
+datasets:
+- Cost and Usage
+- ai_model_catalog
+description: Lists usage of models that aren't on the approved list, or aren't in the catalog at all, with who used them and
+  what it cost.
+columns: 'FOCUS columns: EffectiveCost, ChargePeriodStart · AI extension: x_ModelName, x_AIProduct, x_UserPrincipal, x_ApiKeyName
+  · Supporting: ai_model_catalog'
+keywords:
+- unapproved model
+- non approved model
+- shadow ai
+products: All token-billed products
+sql: |-
+  SELECT
+    c.x_AIProduct,
+    c.x_ModelName,
+    COALESCE(c.x_UserPrincipal, c.x_ApiKeyName, c.x_WorkspaceName) AS UsedBy,
+    CASE WHEN m.ModelName IS NULL THEN 'Not in catalog' ELSE 'Not approved' END AS Finding,
+    MIN(CAST(c.ChargePeriodStart AS DATE)) AS FirstUsed,
+    MAX(CAST(c.ChargePeriodStart AS DATE)) AS LastUsed,
+    ROUND(SUM(c.EffectiveCost), 2) AS EffectiveCost
+  FROM CostAndUsage c
+  LEFT JOIN ai_model_catalog m ON m.ModelName = c.x_ModelName
+  WHERE c.x_ModelName IS NOT NULL AND (m.ModelName IS NULL OR NOT m.Approved)
+  GROUP BY ALL
+  ORDER BY EffectiveCost DESC
+params: []
+notes: ''

@@ -1,0 +1,33 @@
+id: RO-04
+source: MM CostIQ AI extension
+title: 'GitHub Copilot: gross, included and net by month'
+category: Rate Optimization
+module: rates
+business_question: What does GitHub Copilot cost after included allowances?
+personas:
+- finance_controller
+- fpa_analyst
+- tech_exec
+catalog_persona: Finance, Engineering Leadership
+datasets:
+- Cost and Usage
+description: 'A monthly summary of GitHub Copilot cost: seats, gross AI-credit usage, the part covered by included allowances,
+  and net overage. It tells you whether the included credits are enough for the organization.'
+columns: 'FOCUS columns: BillingPeriodStart, ChargeCategory, ListCost, EffectiveCost, BilledCost · AI extension: x_CreditQuantity'
+keywords: []
+products: GitHub Copilot
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    ROUND(SUM(BilledCost) FILTER (WHERE ChargeCategory = 'Purchase'), 2)                 AS SeatCost,
+    ROUND(SUM(x_CreditQuantity) FILTER (WHERE ChargeCategory = 'Usage'), 0)              AS AICreditsUsed,
+    ROUND(SUM(ListCost) FILTER (WHERE ChargeCategory = 'Usage'), 2)                      AS GrossUsage,
+    ROUND(SUM(ListCost - EffectiveCost) FILTER (WHERE ChargeCategory = 'Usage'), 2)      AS IncludedAllowanceApplied,
+    ROUND(SUM(BilledCost) FILTER (WHERE ChargeCategory = 'Usage'), 2)                    AS NetOverage,
+    ROUND(SUM(BilledCost), 2)                                                            AS TotalBilled
+  FROM CostAndUsage
+  WHERE x_AIProduct = 'github_copilot'
+  GROUP BY ALL
+  ORDER BY BillingMonth
+params: []
+notes: ''

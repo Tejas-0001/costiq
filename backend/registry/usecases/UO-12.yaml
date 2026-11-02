@@ -1,0 +1,58 @@
+id: UO-12
+source: MM CostIQ Utilities extension
+title: 'Context bloat and truncated responses'
+category: 'Optimization · AI'
+module: optimization
+business_question: 'Which LLM applications are sending ever-larger prompts, or hitting their output cap?'
+personas:
+- ai_program_owner
+- finops_analyst
+catalog_persona: 'AI Program Owner, Engineering'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Compares each application''s average input tokens in the first and last two weeks, and the share of responses truncated at max_tokens. Growing context usually means conversation history or retrieval results are never trimmed; caching the stable prefix and retrieving fewer chunks cut cost without losing quality.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'context'
+- 'prompt size'
+- 'input tokens'
+- 'truncated'
+- 'max tokens'
+- 'context window'
+- 'bloat'
+products: Any provider
+sql: |-
+  WITH w AS (
+    SELECT Application, MAX(ModelName) AS ModelName,
+           AVG(CASE WHEN UsageDate < CAST(:window_start AS DATE) + INTERVAL '14' DAY THEN AvgInputTokens END) AS FirstTwoWeeksInput,
+           AVG(CASE WHEN UsageDate > CAST(:window_end AS DATE) - INTERVAL '14' DAY THEN AvgInputTokens END) AS LastTwoWeeksInput,
+           SUM(TruncatedResponses) AS Truncated, SUM(Requests) AS Requests, MAX(MaxTokensSetting) AS MaxTokens,
+           AVG(AvgOutputTokens) AS AvgOutput
+    FROM ai_app_telemetry_daily
+    WHERE UsageDate >= :window_start AND UsageDate <= :window_end
+    GROUP BY Application
+  )
+  SELECT
+    Application, ModelName,
+    ROUND(FirstTwoWeeksInput, 0) AS FirstTwoWeeksAvgInput,
+    ROUND(LastTwoWeeksInput, 0) AS LastTwoWeeksAvgInput,
+    ROUND(100 * (LastTwoWeeksInput - FirstTwoWeeksInput) / NULLIF(FirstTwoWeeksInput, 0), 1) AS InputGrowthPct,
+    ROUND(100.0 * Truncated / NULLIF(Requests, 0), 1) AS TruncatedPct,
+    MaxTokens,
+    ROUND(AvgOutput, 0) AS AvgOutputTokens,
+    CASE WHEN LastTwoWeeksInput > 1.5 * FirstTwoWeeksInput THEN 'Context growing: trim history, retrieve less, cache the stable prefix'
+         WHEN 100.0 * Truncated / NULLIF(Requests, 0) > 5 THEN 'Responses truncated at max_tokens'
+         ELSE 'Stable' END AS Finding
+  FROM w
+  ORDER BY InputGrowthPct DESC
+params:
+- name: window_start
+  type: date
+  default: '2026-07-01'
+  label: 'Window start'
+- name: window_end
+  type: date
+  default: '2026-10-22'
+  label: 'Window end'
+notes: ''

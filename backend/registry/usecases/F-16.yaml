@@ -1,0 +1,60 @@
+id: F-16
+source: FinOps Foundation FOCUS 1.4
+title: Identify anomalous daily spending by subaccount
+category: Anomaly Management
+module: anomalies
+business_question: Is any subaccount spending abnormally today?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: FinOps Practitioners need to track daily spend from several angles so anomalous cost trends are easy to catch.
+columns: Service Provider Name, Sub Account ID, Contract Period Start (as listed on the page; the query uses Charge Period
+  Start), Contract Period End (as listed on the page; the query uses Charge Period End), Effective Cost
+keywords:
+- daily spike
+- anomaly
+- unusual spend
+- spend jump
+- abnormal
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/identify-anomalous-daily-spending-by-subaccount/
+published_sql: |-
+  SELECT
+    DATE(ChargePeriodStart) AS Day,
+    ServiceProviderName,
+    SubAccountId,
+    SUM(EffectiveCost) AS DailyEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  GROUP BY
+    DATE(ChargePeriodStart) AS StartDay,
+    ServiceProviderName,
+    SubAccountId
+adaptation: Rewritten for portability (see notes)
+sql: |-
+  SELECT
+    CAST(ChargePeriodStart AS DATE) AS Day,
+    ServiceProviderName,
+    SubAccountId,
+    SUM(EffectiveCost) AS DailyEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+  GROUP BY
+    CAST(ChargePeriodStart AS DATE),
+    ServiceProviderName,
+    SubAccountId
+  ORDER BY Day, DailyEffectiveCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- As published, the GROUP BY clause contains an alias (`AS StartDay`), which most SQL engines reject. Remove it to
+  run the query. - Previous use case: "Compare resource usage month over month". Next: "Identify anomalous daily spending
+  by subaccount and region".'

@@ -1,0 +1,52 @@
+id: UT-11
+source: MM CostIQ Utilities extension
+title: 'AI used in grid-operations contexts without an approved review'
+category: 'Utilities · Operations & AI'
+module: utilities
+business_question: 'Which AI applications used in grid operations are running without an approved review?'
+personas:
+- cip_compliance
+- ai_program_owner
+- tech_exec
+- auditor
+catalog_persona: 'AI Governance, NERC CIP Compliance'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Joins the AI use register (ut_ai_use) to AI spend. Grid-operations AI should stay out of control paths and have an approved review with human sign-off for consequential actions; applications without one are flagged with the spend they are already incurring.'
+columns: 'FOCUS columns plus ut_* reference tables and ut_allocated_cost'
+keywords:
+- 'ai governance'
+- 'grid operations'
+- 'ot'
+- 'review'
+- 'saferai'
+- 'agent'
+- 'control room'
+products: Any provider
+sql: |-
+  WITH spend AS (
+    SELECT json_extract_string(Tags, '$.application') AS Application, SUM(EffectiveCost) AS AISpend
+    FROM CostAndUsage
+    WHERE x_AIProduct IS NOT NULL OR ServiceCategory = 'AI and Machine Learning'
+    GROUP BY json_extract_string(Tags, '$.application')
+  )
+  SELECT
+    u.Application,
+    u.UseCase,
+    u.ReviewStatus,
+    u.ApprovedOn,
+    ROUND(COALESCE(s.AISpend, 0), 2) AS AISpend,
+    CASE WHEN u.ReviewStatus <> 'Approved' THEN 'Grid-ops AI without approved review' ELSE 'Approved' END AS Status
+  FROM ut_ai_use u
+  LEFT JOIN spend s ON s.Application = u.Application
+  WHERE u.GridOpsContext
+  ORDER BY CASE WHEN u.ReviewStatus <> 'Approved' THEN 0 ELSE 1 END, AISpend DESC
+params: []
+notes: 'The AI use register is maintained by the AI program office with the CIP team.'
+compliance:
+  area: 'Operations & AI'
+  reference: 'EPRI SAFERai.power · CISA AI-in-OT principles (Dec 2025)'
+  unit: 'AI applications'
+  flag: 'Status = ''Grid-ops AI without approved review'''
+  amount: AISpend

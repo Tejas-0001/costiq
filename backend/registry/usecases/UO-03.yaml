@@ -1,0 +1,37 @@
+id: UO-03
+source: MM CostIQ AI extension
+title: Batch API candidates
+category: Usage Optimization
+module: anomalies
+business_question: Which workloads could move to the 50%-cheaper Batch API?
+personas:
+- cloud_ops
+- finops_analyst
+catalog_persona: Engineering, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: The Batch API halves token prices for work that doesn't need a real-time response. This use case lists standard-tier
+  spend by application with the saving it would get at batch rates. Engineers can then confirm which workloads can tolerate
+  asynchronous processing.
+columns: 'FOCUS columns: Tags, EffectiveCost · AI extension: x_ServiceTier, x_Speed'
+keywords:
+- batch api
+- batch savings
+products: Claude API
+sql: |-
+  SELECT
+    json_extract_string(Tags, '$.application') AS Application,
+    json_extract_string(Tags, '$.environment') AS Environment,
+    x_ModelName,
+    ROUND(SUM(EffectiveCost), 2)               AS StandardTierCost,
+    ROUND(SUM(EffectiveCost) * 0.5, 2)         AS PotentialBatchSavings
+  FROM CostAndUsage
+  WHERE x_AIProduct = 'claude_api'
+    AND x_ServiceTier = 'standard'
+    AND COALESCE(x_Speed, 'standard') = 'standard'
+    AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  ORDER BY PotentialBatchSavings DESC
+params: []
+notes: Interactive applications such as chatbots and triage don't qualify. Report generation, enrichment, classification backfills
+  and evaluations usually do.

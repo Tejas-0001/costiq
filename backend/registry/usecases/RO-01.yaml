@@ -1,0 +1,56 @@
+id: RO-01
+source: MM CostIQ AI extension
+title: Copilot Credit pack utilization and pay-as-you-go overage
+category: Rate Optimization
+module: rates
+business_question: How much of each Copilot Credit pack do we use, and what spills to pay-as-you-go?
+personas:
+- finops_analyst
+- cfo
+catalog_persona: FinOps Practitioner, Procurement
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: Copilot Credit packs give a fixed number of credits each month, and unused credits expire at month end. This
+  use case compares each month's allowance with credits drawn from the pack, credits left unused, and credits that spilled
+  into pay-as-you-go. That tells you whether to resize the pack.
+columns: 'FOCUS columns: ContractCommitmentId, ContractCommitmentQuantity, ContractCommitmentUnit, ContractCommitmentCost,
+  ContractCommitmentPeriodStart/End, ContractApplied, PricingCategory, BilledCost · AI extension: x_CreditQuantity'
+keywords:
+- copilot credits
+- credit pack
+- pay as you go overage
+products: Copilot Studio (and other Copilot Credit consumers)
+sql: |-
+  WITH cc AS (
+    SELECT ContractCommitmentId, ContractCommitmentQuantity, ContractCommitmentCost,
+           date_diff('month', ContractCommitmentPeriodStart, ContractCommitmentPeriodEnd) AS TermMonths
+    FROM ContractCommitment
+    WHERE ContractCommitmentUnit = 'Copilot Credits'
+  ),
+  usage AS (
+    SELECT BillingPeriodStart,
+           json_extract_string(ContractApplied, '$.Elements[0].ContractCommitmentID') AS AppliedCommitment,
+           PricingCategory, SUM(x_CreditQuantity) AS Credits, SUM(BilledCost) AS BilledCost
+    FROM CostAndUsage
+    WHERE x_CreditUnit = 'Copilot Credits' AND ChargeCategory = 'Usage'
+    GROUP BY ALL
+  )
+  SELECT
+    strftime(u.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    cc.ContractCommitmentId,
+    cc.ContractCommitmentQuantity / cc.TermMonths                                     AS MonthlyAllowance,
+    SUM(u.Credits) FILTER (WHERE u.AppliedCommitment = cc.ContractCommitmentId)       AS CreditsFromPack,
+    ROUND(100.0 * SUM(u.Credits) FILTER (WHERE u.AppliedCommitment = cc.ContractCommitmentId)
+          / (cc.ContractCommitmentQuantity / cc.TermMonths), 1)                       AS PackUtilizationPct,
+    cc.ContractCommitmentQuantity / cc.TermMonths
+      - COALESCE(SUM(u.Credits) FILTER (WHERE u.AppliedCommitment = cc.ContractCommitmentId), 0) AS UnusedCredits,
+    COALESCE(SUM(u.Credits) FILTER (WHERE u.PricingCategory = 'Standard'), 0)         AS PaygCredits,
+    ROUND(COALESCE(SUM(u.BilledCost) FILTER (WHERE u.PricingCategory = 'Standard'), 0), 2) AS PaygCost
+  FROM usage u CROSS JOIN cc
+  GROUP BY u.BillingPeriodStart, cc.ContractCommitmentId, cc.ContractCommitmentQuantity, cc.TermMonths
+  ORDER BY BillingMonth
+params: []
+adaptation: ContractApplied path uses the FOCUS 1.4 Elements structure
+notes: The current month is partial, so UnusedCredits will be high until month end. Use BF-03 to project whether the pack
+  will run out.

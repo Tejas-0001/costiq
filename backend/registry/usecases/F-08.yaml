@@ -1,0 +1,50 @@
+id: F-08
+source: FinOps Foundation FOCUS 1.4
+title: Identify resources with shared cost allocation
+category: Allocation
+module: allocation
+business_question: Which resources are shared across teams, and how is their cost split?
+personas:
+- finance_controller
+- fpa_analyst
+- finops_analyst
+catalog_persona: Finance, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: Find resources whose costs are split across multiple workloads or consumers, such as shared Kubernetes clusters
+  or multi-tenant databases, so chargeback is accurate.
+columns: Resource ID, Resource Name, Allocated Method ID, Allocated Resource ID, Effective Cost, Charge Period Start, Charge
+  Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/identify-resources-with-shared-cost-allocation/
+published_sql: |-
+  SELECT
+    DISTINCT ResourceId,
+    ResourceName,
+    AllocatedMethodId
+   FROM focus_data_table
+   WHERE ChargeCategory='Usage'
+    AND ChargePeriodStart >= ? AND ChargePeriodEnd <= ?
+    AND AllocatedMethodId IS NOT NULL
+   ORDER BY ResourceId
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    DISTINCT ResourceId,
+    ResourceName,
+    AllocatedMethodId
+   FROM focus_data_table
+   WHERE ChargeCategory='Usage'
+    AND ChargePeriodStart >= :period_start AND ChargePeriodEnd <= :period_end
+    AND AllocatedMethodId IS NOT NULL
+   ORDER BY ResourceId
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- Allocated Resource ID and Effective Cost are in the column list but not in the query.'

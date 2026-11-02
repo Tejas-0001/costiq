@@ -1,0 +1,36 @@
+id: UO-07
+source: MM CostIQ AI extension
+title: GitHub Copilot users exceeding their included AI credits
+category: Usage Optimization
+module: anomalies
+business_question: Which developers exceed their included GitHub Copilot AI credits?
+personas:
+- tech_exec
+- finops_analyst
+catalog_persona: Engineering Leadership, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: Under usage-based billing, each Copilot seat includes a monthly AI-credit allowance, and anything above it is
+  billed as overage. This use case shows each developer's credits used, allowance applied and overage cost by month. It highlights
+  the heavy users to coach, or to move to a plan with more credits.
+columns: 'FOCUS columns: BillingPeriodStart, ListCost, EffectiveCost, BilledCost, ListUnitPrice · AI extension: x_UserPrincipal,
+  x_CreditQuantity'
+keywords: []
+products: GitHub Copilot
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    x_UserPrincipal,
+    ROUND(SUM(x_CreditQuantity), 0)                                   AS CreditsUsed,
+    ROUND(SUM((ListCost - EffectiveCost) / ListUnitPrice), 0)         AS IncludedCreditsApplied,
+    ROUND(SUM(EffectiveCost / ListUnitPrice), 0)                      AS OverageCredits,
+    ROUND(SUM(BilledCost), 2)                                         AS OverageCost,
+    string_agg(DISTINCT x_ModelName, ', ')                            AS ModelsUsed
+  FROM CostAndUsage
+  WHERE x_AIProduct = 'github_copilot' AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  HAVING SUM(BilledCost) > 0
+  ORDER BY BillingMonth, OverageCost DESC
+params: []
+notes: In the GitHub AI usage report, `gross_amount` maps to ListCost, `discount_amount` to ListCost minus EffectiveCost,
+  and `net_amount` to BilledCost. Allowances and credit prices in the sample are illustrative.

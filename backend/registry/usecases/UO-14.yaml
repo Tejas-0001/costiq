@@ -1,0 +1,60 @@
+id: UO-14
+source: MM CostIQ Utilities extension
+title: 'Model routing what-if: same workload on a cheaper approved model'
+category: 'Optimization · AI'
+module: optimization
+business_question: 'What would each LLM application cost on a cheaper approved model from the same vendor?'
+personas:
+- ai_program_owner
+- finops_analyst
+- cfo
+catalog_persona: 'AI Program Owner, FinOps Practitioner'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Re-prices each application''s actual token mix at the list prices of cheaper approved models from the same vendor. Short outputs (extraction, summaries, classification) usually route well; validate quality on a sample first.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'model routing'
+- 'cheaper model'
+- 'haiku'
+- 'downgrade model'
+- 'what if'
+- 'right size model'
+products: Any provider
+sql: |-
+  WITH t AS (
+    SELECT Application, ModelName, SUM(Requests * AvgInputTokens) AS InTok, SUM(Requests * AvgOutputTokens) AS OutTok,
+           AVG(AvgOutputTokens) AS AvgOut
+    FROM ai_app_telemetry_daily
+    WHERE UsageDate >= :period_start AND UsageDate < :period_end
+    GROUP BY Application, ModelName
+  ),
+  cur AS (
+    SELECT t.*, m.ModelVendor, m.ModelTier, m.InputPricePerM AS CurIn,
+           (t.InTok * m.InputPricePerM + t.OutTok * m.OutputPricePerM) / 1000000 AS CurrentCost
+    FROM t JOIN ai_model_catalog m ON m.ModelName = t.ModelName
+  )
+  SELECT
+    c.Application, c.ModelName AS CurrentModel, c.ModelTier AS CurrentTier,
+    ROUND(c.AvgOut, 0) AS AvgOutputTokens,
+    a.ModelName AS CandidateModel, a.ModelTier AS CandidateTier,
+    ROUND(c.CurrentCost, 2) AS CurrentCost,
+    ROUND((c.InTok * a.InputPricePerM + c.OutTok * a.OutputPricePerM) / 1000000, 2) AS CandidateCost,
+    ROUND(c.CurrentCost - (c.InTok * a.InputPricePerM + c.OutTok * a.OutputPricePerM) / 1000000, 2) AS Savings,
+    ROUND(100 * (c.CurrentCost - (c.InTok * a.InputPricePerM + c.OutTok * a.OutputPricePerM) / 1000000) / NULLIF(c.CurrentCost, 0), 1) AS SavingsPct,
+    CASE WHEN c.AvgOut < 500 THEN 'Short outputs: strong routing candidate (validate quality on a sample)'
+         ELSE 'Long outputs: evaluate quality before routing' END AS Guidance
+  FROM cur c
+  JOIN ai_model_catalog a ON a.ModelVendor = c.ModelVendor AND a.Approved AND a.ModelName <> c.ModelName AND a.InputPricePerM < c.CurIn
+  ORDER BY Savings DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-23'
+  label: 'End of the period (exclusive)'
+notes: 'List prices from ai_model_catalog; Provisioned deployments are excluded from savings in practice.'

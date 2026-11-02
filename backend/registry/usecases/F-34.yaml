@@ -1,0 +1,55 @@
+id: F-34
+source: FinOps Foundation FOCUS 1.4
+title: Reconcile Multi-Currency Settlement using Lineage IDs
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: Do billing-currency and payment-currency amounts reconcile across settlements?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+catalog_persona: FinOps Practitioner, Finance
+datasets:
+- Cost and Usage
+- Invoice Detail
+- Contract Commitment
+description: Demonstrates how to use the Payment Currency Invoice Detail ID to match granular records in the billing currency
+  against the aggregated records used for payment in the payment currency, solving the Divergent Grain problem where the two
+  cu
+columns: Billed Cost, Invoice ID, Invoice Detail ID, Payment Currency Billed Cost, Payment Currency Invoice Detail ID, Billing
+  Currency, Charge Category, Invoice Issue Status, Payment Currency, Service Category
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/reconcile-multi-currency-settlement-using-lineage-ids/
+published_sql: |-
+  SELECT
+    PaymentCurrencyInvoiceDetailId,
+    SUM(BilledCost) AS TotalBilled_BillingCurrency,
+    SUM(PaymentCurrencyBilledCost) AS TotalBilled_PaymentCurrency,
+    SUM(PaymentCurrencyBilledCost) / NULLIF(SUM(BilledCost), 0) AS EffectiveExchangeRate
+  FROM InvoiceDetail
+  WHERE
+    InvoiceId = ?
+  GROUP BY
+    PaymentCurrencyInvoiceDetailId
+  ORDER BY
+    PaymentCurrencyInvoiceDetailId
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    PaymentCurrencyInvoiceDetailId,
+    SUM(BilledCost) AS TotalBilled_BillingCurrency,
+    SUM(PaymentCurrencyBilledCost) AS TotalBilled_PaymentCurrency,
+    SUM(PaymentCurrencyBilledCost) / NULLIF(SUM(BilledCost), 0) AS EffectiveExchangeRate
+  FROM InvoiceDetail
+  WHERE
+    InvoiceId = :invoice_id
+  GROUP BY
+    PaymentCurrencyInvoiceDetailId
+  ORDER BY
+    PaymentCurrencyInvoiceDetailId
+params:
+- name: invoice_id
+  type: string
+  default: INV-MICROSOFT-ms-mca-eu-1002-202609
+  label: Invoice ID
+notes: ''

@@ -1,0 +1,41 @@
+id: GV-02
+source: MM CostIQ AI extension
+title: Data-residency policy violations
+category: Governance, Policy & Risk
+module: governance
+business_question: Is any regulated workload running inference outside the approved region?
+personas:
+- auditor
+- ai_program_owner
+catalog_persona: AI Governance, Privacy, Compliance
+datasets:
+- Cost and Usage
+description: Workloads tagged with a regulated data class, CEII (Critical Energy Infrastructure Information) in the sample, must run inference in the US. This use case
+  finds usage of those workloads served from any other geography, using the `inference_geo` dimension from Anthropic's Usage
+  API.
+columns: 'FOCUS columns: Tags, ChargePeriodStart, EffectiveCost · AI extension: x_InferenceGeo, x_WorkspaceName, x_ApiKeyName'
+keywords:
+- data residency
+- ceii
+- region policy
+- inference outside us
+products: Claude API (inference_geo), any provider with region data
+sql: |-
+  SELECT
+    json_extract_string(Tags, '$.application') AS Application,
+    x_WorkspaceName,
+    x_ApiKeyName,
+    x_InferenceGeo,
+    MIN(CAST(ChargePeriodStart AS DATE)) AS FirstSeen,
+    MAX(CAST(ChargePeriodStart AS DATE)) AS LastSeen,
+    COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) AS DaysInViolation,
+    SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens + x_OutputTokens) AS Tokens,
+    ROUND(SUM(EffectiveCost), 2) AS EffectiveCost
+  FROM CostAndUsage
+  WHERE json_extract_string(Tags, '$.data_class') = 'ceii'
+    AND COALESCE(x_InferenceGeo, 'unknown') <> 'us'
+  GROUP BY ALL
+  ORDER BY DaysInViolation DESC
+params: []
+notes: 'The fix is to send `inference_geo: "us"` on requests from these workloads, or to enforce US routing at the workspace
+  level. Models released before February 2026 report `not_available`, which this query flags.'

@@ -1,0 +1,38 @@
+id: AN-02
+source: MM CostIQ AI extension
+title: Copilot Studio agent credit surges
+category: Anomaly Management
+module: anomalies
+business_question: Has any Copilot Studio agent surged in credit use?
+personas:
+- ai_program_owner
+- finops_analyst
+catalog_persona: Business Application Owner, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: Flags days when an agent consumed at least three times its trailing 7-day average of credits. A redesigned topic,
+  a looping agent flow or an unexpected rollout can quickly use up a credit pack.
+columns: 'FOCUS columns: ChargePeriodStart, EffectiveCost · AI extension: x_AgentName, x_CreditQuantity'
+keywords:
+- agent surge
+- copilot studio spike
+products: Copilot Studio
+sql: |-
+  WITH daily AS (
+    SELECT CAST(ChargePeriodStart AS DATE) AS UsageDate, x_AgentName,
+           SUM(x_CreditQuantity) AS Credits, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage
+    WHERE x_AIProduct = 'copilot_studio' AND ChargeCategory = 'Usage'
+    GROUP BY ALL
+  ),
+  scored AS (
+    SELECT *, AVG(Credits) OVER (PARTITION BY x_AgentName ORDER BY UsageDate ROWS BETWEEN 7 PRECEDING AND 1 PRECEDING) AS Trailing7DayAvg
+    FROM daily
+  )
+  SELECT UsageDate, x_AgentName, Credits, ROUND(Trailing7DayAvg, 0) AS Trailing7DayAvg,
+         ROUND(Credits / NULLIF(Trailing7DayAvg, 0), 1) AS Multiple, ROUND(Cost, 2) AS Cost
+  FROM scored
+  WHERE Credits >= 3 * Trailing7DayAvg
+  ORDER BY UsageDate DESC
+params: []
+notes: ''

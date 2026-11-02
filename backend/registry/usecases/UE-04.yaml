@@ -1,0 +1,44 @@
+id: UE-04
+source: MM CostIQ AI extension
+title: 'Coding assistant comparison: GitHub Copilot vs. Claude Code'
+category: Unit Economics
+module: ai
+business_question: How do GitHub Copilot and Claude Code compare on cost and output per developer?
+personas:
+- tech_exec
+- finops_analyst
+- cfo
+catalog_persona: Engineering Leadership, Procurement
+datasets:
+- Cost and Usage
+- ai_user_activity
+description: 'Compares the two coding assistants by month: active developers, total cost (seats plus usage), cost per active
+  developer, lines added per developer and tool acceptance rate.'
+columns: ''
+keywords: []
+products: GitHub Copilot, Claude Code
+sql: |-
+  WITH cost AS (
+    SELECT BillingPeriodStart, x_AIProduct, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage WHERE x_AIProduct IN ('github_copilot', 'claude_code') GROUP BY ALL
+  ),
+  act AS (
+    SELECT date_trunc('month', ActivityDate)::TIMESTAMP AS BillingPeriodStart, x_AIProduct,
+           COUNT(DISTINCT UserPrincipal) AS ActiveDevelopers, SUM(LinesAdded) AS LinesAdded,
+           SUM(ToolAccepted) AS Accepted, SUM(ToolRejected) AS Rejected
+    FROM ai_user_activity WHERE x_AIProduct IN ('github_copilot', 'claude_code') GROUP BY ALL
+  )
+  SELECT
+    strftime(c.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    c.x_AIProduct,
+    a.ActiveDevelopers,
+    ROUND(c.Cost, 2) AS TotalCost,
+    ROUND(c.Cost / a.ActiveDevelopers, 2) AS CostPerActiveDeveloper,
+    ROUND(a.LinesAdded / a.ActiveDevelopers) AS LinesAddedPerDeveloper,
+    ROUND(100.0 * a.Accepted / NULLIF(a.Accepted + a.Rejected, 0), 1) AS ToolAcceptanceRatePct
+  FROM cost c
+  JOIN act a USING (BillingPeriodStart, x_AIProduct)
+  ORDER BY BillingMonth, c.x_AIProduct
+params: []
+notes: The two products measure activity differently, so treat this as a directional comparison. Developers who use both tools
+  appear in both rows.

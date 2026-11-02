@@ -1,0 +1,40 @@
+id: UO-08
+source: MM CostIQ AI extension
+title: Fast mode premium
+category: Usage Optimization
+module: anomalies
+business_question: What premium are we paying for fast mode?
+personas:
+- cloud_ops
+- finops_analyst
+catalog_persona: Engineering, FinOps Practitioner
+datasets:
+- Cost and Usage
+- ai_model_catalog
+description: Fast mode returns output faster at a higher price. This use case calculates, per workspace and day range, what
+  was paid for fast mode compared with the same tokens at standard speed. The team can then decide whether the latency gain
+  is worth the premium.
+columns: 'FOCUS columns: ChargePeriodStart, EffectiveCost, ListUnitPrice · AI extension: x_Speed, x_TokenType, x_WorkspaceName'
+keywords: []
+products: Claude API
+sql: |-
+  SELECT
+    x_WorkspaceName,
+    x_ModelName,
+    MIN(CAST(ChargePeriodStart AS DATE)) AS FirstDay,
+    MAX(CAST(ChargePeriodStart AS DATE)) AS LastDay,
+    SUM(ConsumedQuantity)                AS Tokens,
+    ROUND(SUM(EffectiveCost), 2)         AS FastModeCost,
+    ROUND(SUM(EffectiveCost * CASE x_TokenType
+          WHEN 'input' THEN m.InputPricePerM WHEN 'output' THEN m.OutputPricePerM
+          WHEN 'cache_read' THEN m.CacheReadPricePerM ELSE m.CacheWritePricePerM END / ListUnitPrice), 2) AS StandardSpeedEquivalent,
+    ROUND(SUM(EffectiveCost) - SUM(EffectiveCost * CASE x_TokenType
+          WHEN 'input' THEN m.InputPricePerM WHEN 'output' THEN m.OutputPricePerM
+          WHEN 'cache_read' THEN m.CacheReadPricePerM ELSE m.CacheWritePricePerM END / ListUnitPrice), 2) AS FastModePremium
+  FROM CostAndUsage c
+  JOIN ai_model_catalog m ON m.ModelName = c.x_ModelName
+  WHERE c.x_Speed = 'fast' AND c.ChargeCategory = 'Usage'
+  GROUP BY ALL
+  ORDER BY FastModePremium DESC
+params: []
+notes: ''

@@ -1,0 +1,51 @@
+id: F-55
+source: FinOps Foundation FOCUS 1.4
+title: Calculate unit economics
+category: Reporting & Analytics
+module: explorer
+business_question: What does a unit of output cost (per GB, per transaction, per user)?
+personas:
+- finance_controller
+- fpa_analyst
+- cloud_ops
+- finops_analyst
+- cfo
+- tech_exec
+catalog_persona: Finance, Engineering, FinOps Practitioner, Leadership
+datasets:
+- Cost and Usage
+description: Calculate unit-cost metrics (e.g., cost per GB of storage) to expose cost density and target optimizations that
+  lower overall spend.
+columns: Charge Period Start, Billed Cost, Consumed Quantity, Charge Description, Consumed Unit
+keywords:
+- cost per gb
+- unit cost
+- data transfer
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/calculate-unit-economics/
+published_sql: |-
+  SELECT
+      CAST(ChargePeriodStart AS DATE) AS ChargePeriodDate,
+      SUM(BilledCost) / NULLIF(SUM(CAST(ConsumedQuantity AS DECIMAL(10, 2))), 0) AS CostPerGB
+  FROM focus_data_table
+  WHERE
+      ChargeDescription LIKE '%transfer%'
+      AND ConsumedUnit = 'GB'
+  GROUP BY
+      CAST(ChargePeriodStart AS DATE)
+  ORDER BY
+      ChargePeriodDate ASC;
+adaptation: Placeholders named
+sql: |-
+  SELECT
+      CAST(ChargePeriodStart AS DATE) AS ChargePeriodDate,
+      SUM(BilledCost) / NULLIF(SUM(CAST(ConsumedQuantity AS DECIMAL(10, 2))), 0) AS CostPerGB
+  FROM focus_data_table
+  WHERE
+      ChargeDescription LIKE '%transfer%'
+      AND ConsumedUnit = 'GB'
+  GROUP BY
+      CAST(ChargePeriodStart AS DATE)
+  ORDER BY
+      ChargePeriodDate ASC
+params: []
+notes: ''

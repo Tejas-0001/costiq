@@ -1,0 +1,44 @@
+id: IC-02
+source: MM CostIQ AI extension
+title: Validate tax on AI invoices
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: Is tax on AI invoices billed at the expected rate?
+personas:
+- finance_controller
+- fpa_analyst
+catalog_persona: Finance, Tax
+datasets:
+- Cost and Usage
+- Invoice Detail
+description: Compares the effective tax rate on each invoice with the rate implied by the charge-level tax rows, and flags
+  invoices where they differ.
+columns: 'FOCUS columns: InvoiceId, ChargeCategory, BilledCost, InvoiceIssuerName, BillingPeriodStart'
+keywords: []
+products: Claude, GitHub Copilot (any taxed SaaS/API vendor)
+sql: |-
+  WITH inv AS (
+    SELECT InvoiceIssuerName, InvoiceId, BillingPeriodStart,
+           SUM(BilledCost) FILTER (WHERE ChargeCategory <> 'Tax') AS InvoicedPreTax,
+           SUM(BilledCost) FILTER (WHERE ChargeCategory = 'Tax')  AS InvoicedTax
+    FROM InvoiceDetail GROUP BY ALL
+  ),
+  detail AS (
+    SELECT InvoiceId,
+           SUM(BilledCost) FILTER (WHERE ChargeCategory <> 'Tax') AS DetailPreTax,
+           SUM(BilledCost) FILTER (WHERE ChargeCategory = 'Tax')  AS DetailTax
+    FROM CostAndUsage GROUP BY ALL
+  )
+  SELECT
+    i.InvoiceIssuerName, i.InvoiceId, strftime(i.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    ROUND(i.InvoicedTax, 2) AS InvoicedTax,
+    ROUND(d.DetailTax, 2)   AS ExpectedTax,
+    ROUND(100 * i.InvoicedTax / NULLIF(i.InvoicedPreTax, 0), 2) AS InvoiceTaxRatePct,
+    ROUND(100 * d.DetailTax   / NULLIF(d.DetailPreTax, 0), 2)   AS ExpectedTaxRatePct,
+    ROUND(i.InvoicedTax - d.DetailTax, 2) AS TaxVariance
+  FROM inv i
+  JOIN detail d USING (InvoiceId)
+  WHERE i.InvoicedTax IS NOT NULL AND ABS(i.InvoicedTax - d.DetailTax) > 0.5
+  ORDER BY ABS(TaxVariance) DESC
+params: []
+notes: ''

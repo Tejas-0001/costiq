@@ -1,0 +1,41 @@
+id: RA-01
+source: MM CostIQ AI extension
+title: AI spend by product and provider, month over month
+category: Reporting & Analytics
+module: explorer
+business_question: How is AI spend trending by product and provider month over month?
+personas:
+- cfo
+- tech_exec
+- finops_analyst
+catalog_persona: Leadership, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: An executive trend of AI spend for each product (M365 Copilot, Copilot Studio, GitHub Copilot, Azure OpenAI,
+  and Claude on each channel), with the percentage change from the previous month.
+columns: 'FOCUS columns: BillingPeriodStart, ServiceProviderName, EffectiveCost · AI extension: x_AIProduct'
+keywords:
+- ai spend
+- ai trend
+- ai cost trend
+- copilot and claude spend
+products: All
+sql: |-
+  WITH monthly AS (
+    SELECT BillingPeriodStart, x_AIProduct, ServiceProviderName, SUM(EffectiveCost) AS EffectiveCost
+    FROM CostAndUsage
+    WHERE x_AIProduct IS NOT NULL
+    GROUP BY ALL
+  )
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    x_AIProduct,
+    ServiceProviderName,
+    ROUND(EffectiveCost, 2) AS EffectiveCost,
+    ROUND(LAG(EffectiveCost) OVER w, 2) AS PriorMonthCost,
+    ROUND(100 * (EffectiveCost - LAG(EffectiveCost) OVER w) / NULLIF(LAG(EffectiveCost) OVER w, 0), 1) AS PctChange
+  FROM monthly
+  WINDOW w AS (PARTITION BY x_AIProduct, ServiceProviderName ORDER BY BillingPeriodStart)
+  ORDER BY x_AIProduct, BillingMonth
+params: []
+notes: The latest month in the sample is partial (through October 22). Compare like-for-like with RA-01 run-rate or BF-02.

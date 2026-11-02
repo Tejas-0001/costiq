@@ -1,0 +1,50 @@
+id: BF-01
+source: MM CostIQ AI extension
+title: AI budget vs. actual by cost center
+category: Budgeting & Forecasting
+module: budgets
+business_question: Which cost centers are on track to overspend their AI budget this month?
+personas:
+- finance_controller
+- fpa_analyst
+- pl_exec
+catalog_persona: Finance, Department Heads
+datasets:
+- Cost and Usage
+- ai_budget
+description: Compares each cost center's AI spend so far this month with its monthly budget. It projects month-end spend from
+  the daily run rate and flags cost centers that are on track to overspend.
+columns: 'FOCUS columns: BillingPeriodStart, ChargePeriodStart, Tags, EffectiveCost · Supporting: ai_budget'
+keywords:
+- over budget
+- ai budget
+- budget at risk
+- overspend
+products: All
+sql: |-
+  WITH params AS (SELECT MAX(ChargePeriodStart) AS d FROM CostAndUsage),
+  mtd AS (
+    SELECT json_extract_string(Tags, '$.cost_center') AS CostCenter, BillingPeriodStart,
+           SUM(EffectiveCost) AS MTDCost
+    FROM CostAndUsage, params
+    WHERE x_AIProduct IS NOT NULL AND BillingPeriodStart = date_trunc('month', params.d)
+    GROUP BY ALL
+  )
+  SELECT
+    b.CostCenter,
+    b.BudgetAmount,
+    ROUND(m.MTDCost, 2) AS MonthToDateCost,
+    ROUND(m.MTDCost / day(params.d) * day(last_day(params.d)), 2) AS ProjectedMonthEnd,
+    ROUND(100 * m.MTDCost / day(params.d) * day(last_day(params.d)) / b.BudgetAmount, 1) AS ProjectedPctOfBudget,
+    CASE WHEN m.MTDCost / day(params.d) * day(last_day(params.d)) > b.BudgetAmount THEN 'Over budget'
+         WHEN m.MTDCost / day(params.d) * day(last_day(params.d)) > 0.9 * b.BudgetAmount THEN 'At risk'
+         ELSE 'On track' END AS Status
+  FROM ai_budget b
+  CROSS JOIN params
+  LEFT JOIN mtd m ON m.CostCenter = b.CostCenter AND m.BillingPeriodStart = b.BudgetPeriodStart
+  WHERE b.BudgetPeriodStart = date_trunc('month', params.d)
+  ORDER BY ProjectedPctOfBudget DESC NULLS LAST
+params: []
+notes: Seat purchases are booked on the first day of the month, which inflates a straight-line projection for cost centers
+  that hold seats. For a stricter projection, exclude rows with `ChargeCategory = 'Purchase'` from the run rate and add them
+  back as a fixed amount.

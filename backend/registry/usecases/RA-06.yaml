@@ -1,0 +1,47 @@
+id: RA-06
+source: MM CostIQ AI extension
+title: Top 10 AI users in the last 30 days
+category: Reporting & Analytics
+module: explorer
+business_question: Who are the top 10 AI users by cost?
+personas:
+- pl_exec
+- finops_analyst
+catalog_persona: Department Heads, FinOps Practitioner
+datasets:
+- Cost and Usage
+- ai_user_activity
+- ai_user_directory
+description: Ranks the heaviest individual users of usage-billed AI. This is useful for spotting power users to learn from,
+  and runaway usage to investigate.
+columns: 'FOCUS columns: ChargePeriodStart, EffectiveCost · AI extension: x_UserPrincipal, x_AIProduct'
+keywords:
+- top users
+- heaviest users
+- power users
+products: GitHub Copilot, Claude Enterprise (usage credits), Claude Code
+sql: |-
+  WITH params AS (SELECT MAX(ChargePeriodStart) AS d FROM CostAndUsage),
+  per_user AS (
+    SELECT x_UserPrincipal AS UserPrincipal, x_AIProduct, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage, params
+    WHERE x_UserPrincipal IS NOT NULL AND ChargePeriodStart > params.d - INTERVAL 30 DAY
+    GROUP BY ALL
+    UNION ALL
+    SELECT UserPrincipal, x_AIProduct, SUM(EstimatedCost) * 0.9 AS Cost  -- Claude Code at contracted rate (10% commit discount)
+    FROM ai_user_activity, params
+    WHERE x_AIProduct = 'claude_code' AND ActivityDate > CAST(params.d AS DATE) - 30
+    GROUP BY ALL
+  )
+  SELECT
+    p.UserPrincipal,
+    d.Department,
+    ROUND(SUM(p.Cost), 2) AS Last30DayCost,
+    string_agg(p.x_AIProduct || ': $' || CAST(ROUND(p.Cost, 0) AS VARCHAR), ', ' ORDER BY p.Cost DESC) AS Breakdown
+  FROM per_user p
+  LEFT JOIN ai_user_directory d USING (UserPrincipal)
+  GROUP BY ALL
+  ORDER BY Last30DayCost DESC
+  LIMIT 10
+params: []
+notes: Replace the 0.9 factor with your own invoiced-to-list ratio, or use the allocation in AL-03.

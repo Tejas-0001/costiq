@@ -1,0 +1,78 @@
+id: F-48
+source: FinOps Foundation FOCUS 1.4
+title: Report commitment discount purchases
+category: Rate Optimization
+module: rates
+business_question: What commitment discounts did we buy, and from whom?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: Tracking and reconciling commitment-based discount purchases across service providers is a key to success for
+  FinOps.
+columns: Service Provider Name, Billing Account ID, Commitment Discount ID, Commitment Discount Type, Commitment Discount
+  Unit, Commitment Discount Quantity, Charge Frequency, Billed Cost, Charge Period Start, Charge Period End, Charge Category
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/report-commitment-discount-purchases/
+published_sql: |-
+  SELECT
+    MIN(ChargePeriodStart) AS ChargePeriodStart,
+    MAX(ChargePeriodEnd) AS ChargePeriodEnd,
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountUnit,
+    CommitmentDiscountQuantity,
+    ChargeFrequency,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+    AND ChargeCategory = 'Purchase'
+    AND CommitmentDiscountId IS NOT NULL
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountUnit,
+    CommitmentDiscountQuantity,
+    ChargeFrequency
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    MIN(ChargePeriodStart) AS ChargePeriodStart,
+    MAX(ChargePeriodEnd) AS ChargePeriodEnd,
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountUnit,
+    CommitmentDiscountQuantity,
+    ChargeFrequency,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+    AND ChargeCategory = 'Purchase'
+    AND CommitmentDiscountId IS NOT NULL
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountUnit,
+    CommitmentDiscountQuantity,
+    ChargeFrequency
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

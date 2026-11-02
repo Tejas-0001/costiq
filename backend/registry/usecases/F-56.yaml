@@ -1,0 +1,72 @@
+id: F-56
+source: FinOps Foundation FOCUS 1.4
+title: Cash vs. Accrual Comparison by Billing Period
+category: Reporting & Analytics
+module: explorer
+business_question: Where do cash (billed) and accrual (effective) views of cost diverge, and why?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+catalog_persona: FinOps Practitioner, Finance
+datasets:
+- Cost and Usage
+- Invoice Detail
+- Contract Commitment
+- Billing Period
+description: Highlights billing periods where the cash-based view (BilledCost) and the accrual-based view (EffectiveCost)
+  diverge – typical of commitment discounts or prepaid purchases where billing timing differs from consumption.
+columns: Billed Cost, Contracted Cost, Effective Cost, List Cost, Billing Account ID, Billing Account Name, Billing Currency,
+  Billing Period End, Billing Period Start, Charge Category, Charge Period End, Charge Period Start, Commitment Discount ID,
+  Invoice Issuer Name, Service Name, Service Provider Name
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/cash-vs-accrual-comparison-by-billing-period/
+published_sql: |-
+  SELECT
+    ServiceProviderName,
+    InvoiceIssuerName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    SUM(BilledCost) AS TotalBilledCost,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    SUM(EffectiveCost) - SUM(BilledCost) AS CostBasisDifference
+  FROM focus_data_table
+  WHERE
+    BillingPeriodStart >= ? AND BillingPeriodEnd < ?
+  GROUP BY
+    ServiceProviderName,
+    InvoiceIssuerName,
+    BillingPeriodStart,
+    BillingPeriodEnd
+  HAVING
+    ABS(SUM(EffectiveCost) - SUM(BilledCost)) > 0.01
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ServiceProviderName,
+    InvoiceIssuerName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    SUM(BilledCost) AS TotalBilledCost,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    SUM(EffectiveCost) - SUM(BilledCost) AS CostBasisDifference
+  FROM focus_data_table
+  WHERE
+    BillingPeriodStart >= :period_start AND BillingPeriodEnd < :period_end
+  GROUP BY
+    ServiceProviderName,
+    InvoiceIssuerName,
+    BillingPeriodStart,
+    BillingPeriodEnd
+  HAVING
+    ABS(SUM(EffectiveCost) - SUM(BilledCost)) > 0.01
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

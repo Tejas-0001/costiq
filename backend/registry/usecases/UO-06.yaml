@@ -1,0 +1,49 @@
+id: UO-06
+source: MM CostIQ AI extension
+title: Seat utilization summary and reclaim value
+category: Usage Optimization
+module: anomalies
+business_question: How well are AI seats used, and what is idle capacity worth?
+personas:
+- cfo
+- tech_exec
+- ai_program_owner
+catalog_persona: Leadership, IT Asset Management
+datasets:
+- ai_seat_assignment
+- ai_user_activity
+description: Sorts each product's seats into active (6 or more days in the last 28), light (1 to 5 days) and unused (0 days).
+  It reports utilization and the monthly cost of unused and light seats that could be reclaimed or downgraded.
+columns: ''
+keywords:
+- seat utilization
+- license utilization
+- reclaim seats
+products: M365 Copilot, GitHub Copilot, Claude Enterprise
+sql: |-
+  WITH params AS (SELECT MAX(ActivityDate) AS d FROM ai_user_activity),
+  days AS (
+    SELECT x_AIProduct, UserPrincipal, COUNT(DISTINCT ActivityDate) AS ActiveDays28
+    FROM ai_user_activity, params
+    WHERE ActivityDate > params.d - 28
+    GROUP BY ALL
+  ),
+  seat AS (
+    SELECT s.x_AIProduct, s.MonthlySeatCost, COALESCE(d.ActiveDays28, 0) AS ActiveDays28
+    FROM ai_seat_assignment s
+    LEFT JOIN days d ON d.x_AIProduct = s.x_AIProduct AND d.UserPrincipal = s.UserPrincipal
+  )
+  SELECT
+    x_AIProduct,
+    COUNT(*)                                                   AS AssignedSeats,
+    COUNT(*) FILTER (WHERE ActiveDays28 >= 6)                  AS ActiveSeats,
+    COUNT(*) FILTER (WHERE ActiveDays28 BETWEEN 1 AND 5)       AS LightSeats,
+    COUNT(*) FILTER (WHERE ActiveDays28 = 0)                   AS UnusedSeats,
+    ROUND(100.0 * COUNT(*) FILTER (WHERE ActiveDays28 >= 6) / COUNT(*), 1) AS UtilizationPct,
+    ROUND(SUM(MonthlySeatCost) FILTER (WHERE ActiveDays28 = 0), 2)         AS UnusedMonthlyCost,
+    ROUND(SUM(MonthlySeatCost) FILTER (WHERE ActiveDays28 BETWEEN 1 AND 5), 2) AS LightMonthlyCost
+  FROM seat
+  GROUP BY ALL
+  ORDER BY UnusedMonthlyCost DESC
+params: []
+notes: ''

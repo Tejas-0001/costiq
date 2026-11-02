@@ -1,0 +1,77 @@
+id: F-31
+source: FinOps Foundation FOCUS 1.4
+title: Get historical usage and rates to enable cost forecasting
+category: Budgeting & Forecasting
+module: budgets
+business_question: What usage and rate history do we need to forecast cost accurately?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Billing Period
+- Invoice Detail
+description: While Finance will look at higher-level forecasting data such as amortized costs and total cashflow, a FinOps
+  Practitioner needs to forecast from quantities of
+columns: Service Provider Name, Billing Period Start, Billing Period End, Service Category, Service Name, Region ID, Region
+  Name, Pricing Unit, Effective Cost, Pricing Quantity
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/get-historical-usage-and-rates-to-enable-cost-forecasting/
+published_sql: |-
+  SELECT
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    SUM(PricingQuantity) AS TotalPricingQuantity
+  FROM focus_data_table
+  WHERE BillingPeriodStart >= ? AND BillingPeriodEnd <= ?
+  GROUP BY
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    SUM(PricingQuantity) AS TotalPricingQuantity
+  FROM focus_data_table
+  WHERE BillingPeriodStart >= :period_start AND BillingPeriodEnd <= :period_end
+  GROUP BY
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

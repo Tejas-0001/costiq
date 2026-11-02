@@ -1,0 +1,56 @@
+id: F-60
+source: FinOps Foundation FOCUS 1.4
+title: Report application cost month over month
+category: Reporting & Analytics
+module: explorer
+business_question: How is my application’s cost changing month over month?
+personas:
+- cloud_ops
+- pl_exec
+catalog_persona: Engineering, Product
+datasets:
+- Billing Period
+- Cost and Usage
+- Invoice Detail
+description: As an application owner or engineering team I want to track the month over month costs of my application.
+columns: Billing Period Start
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/application-cost/
+published_sql: |-
+  SELECT
+    MONTH(BillingPeriodStart),
+    ServiceName,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE Tags["Application"] = ?
+    AND ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+  GROUP BY
+    MONTH(BillingPeriodStart),
+    ServiceName
+adaptation: Placeholders named; Tags access made portable
+sql: |-
+  SELECT
+    MONTH(BillingPeriodStart),
+    ServiceName,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE json_extract_string(Tags, '$.Application') = :application
+    AND ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+  GROUP BY
+    MONTH(BillingPeriodStart),
+    ServiceName
+params:
+- name: application
+  type: string
+  default: web-store
+  label: Application tag value
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The page lists only Billing Period Start, but the query also uses Service Name, Effective Cost, Tags (an "Application"
+  tag key), Charge Period Start and Charge Period End.'

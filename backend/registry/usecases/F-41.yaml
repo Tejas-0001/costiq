@@ -1,0 +1,93 @@
+id: F-41
+source: FinOps Foundation FOCUS 1.4
+title: Calculate Commitment Discount Coverage Rate with Eligibility-Adjusted Denominator
+category: Rate Optimization
+module: rates
+business_question: What share of eligible spend is covered by commitment discounts?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+catalog_persona: FinOps Practitioner, Finance
+datasets:
+- Cost and Usage
+- Invoice Detail
+- Contract Commitment
+description: Computes a commitment discount coverage rate using only eligible charges as the denominator.
+columns: Commitment Program Eligibility Details, Billed Cost, Capacity Reservation ID, Capacity Reservation Status, Charge
+  Category, Charge Period End, Charge Period Start, Commitment Discount ID, Commitment Discount Status, Commitment Discount
+  Type, Effective Cost, Service Name, Service Provider Name
+keywords:
+- coverage
+- savings plan coverage
+- ri coverage
+- commitment coverage
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/calculate-commitment-discount-coverage-rate-with-eligibility-adjusted-denominator/
+published_sql: |-
+  WITH CommitmentDiscountEligible AS (
+    SELECT
+      CU.ServiceProviderName,
+      CU.EffectiveCost,
+      CU.CommitmentDiscountId
+    FROM focus_data_table CU
+    WHERE CU.ChargePeriodStart >= ? AND CU.ChargePeriodEnd < ?
+      AND CU.ChargeCategory = 'Usage'
+      AND (
+        -- Include covered rows in the denominator
+        CU.CommitmentDiscountId IS NOT NULL
+        -- If uncovered, check if the JSON array contains an eligible program type
+        OR EXISTS (
+          SELECT 1
+          FROM UNNEST(JSON_EXTRACT_ARRAY(CU.CommitmentProgramEligibilityDetails, '$.CommitmentPrograms')) AS CP
+          WHERE JSON_VALUE(CP, '$.ProgramType') IN ('FlexibleSpendPlan', 'ResourceReservation')
+        )
+      )
+  )
+  SELECT
+    ServiceProviderName,
+    SUM(CASE WHEN CommitmentDiscountId IS NOT NULL THEN EffectiveCost ELSE 0 END) AS CoveredCost,
+    SUM(EffectiveCost) AS EligibleCost,
+    SUM(CASE WHEN CommitmentDiscountId IS NOT NULL THEN EffectiveCost ELSE 0 END)
+      / NULLIF(SUM(EffectiveCost), 0) AS CommitmentCoverageRate
+  FROM CommitmentDiscountEligible
+  GROUP BY ServiceProviderName
+adaptation: Rewritten for portability (see notes)
+sql: |-
+  WITH CommitmentDiscountEligible AS (
+    SELECT
+      CU.ServiceProviderName,
+      CU.EffectiveCost,
+      CU.CommitmentDiscountId
+    FROM focus_data_table CU
+    WHERE CU.ChargePeriodStart >= :period_start AND CU.ChargePeriodEnd < :period_end
+      AND CU.ChargeCategory = 'Usage'
+      AND (
+        -- Include covered rows in the denominator
+        CU.CommitmentDiscountId IS NOT NULL
+        -- If uncovered, check if the JSON array contains an eligible program type
+        OR EXISTS (
+          SELECT 1
+          FROM json_each(CU.CommitmentProgramEligibilityDetails -> 'CommitmentPrograms') AS CP
+          WHERE json_extract_string(CP.value, '$.ProgramType') IN ('FlexibleSpendPlan', 'ResourceReservation')
+        )
+      )
+  )
+  SELECT
+    ServiceProviderName,
+    SUM(CASE WHEN CommitmentDiscountId IS NOT NULL THEN EffectiveCost ELSE 0 END) AS CoveredCost,
+    SUM(EffectiveCost) AS EligibleCost,
+    SUM(CASE WHEN CommitmentDiscountId IS NOT NULL THEN EffectiveCost ELSE 0 END)
+      / NULLIF(SUM(EffectiveCost), 0) AS CommitmentCoverageRate
+  FROM CommitmentDiscountEligible
+  GROUP BY ServiceProviderName
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- (Paraphrased) Unused commitment rows (CommitmentDiscountStatus = "Unused") still carry a CommitmentDiscountId, so
+  they inflate both the numerator and the denominator; filter them out to obtain a utilization-adjusted coverage rate.'

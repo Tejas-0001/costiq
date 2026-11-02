@@ -1,0 +1,56 @@
+id: CO-05
+source: MM CostIQ Utilities extension
+title: 'Storage growth and tiering opportunities'
+category: 'Optimization · Cloud'
+module: optimization
+business_question: 'Which storage is growing fastest, and where would tiering or lifecycle rules save money?'
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: 'Cloud Operations'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Storage resources over $500 a month with their growth since the first month, joined to storage-tiering recommendations.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'storage'
+- 'tiering'
+- 'lifecycle'
+- 's3'
+- 'intelligent tiering'
+- 'archive'
+- 'snapshots'
+products: Any provider
+sql: |-
+  WITH s AS (
+    SELECT ResourceName, MAX(ServiceName) AS ServiceName, MAX(json_extract_string(Tags, '$.cost_center')) AS CostCenter,
+           SUM(CASE WHEN BillingPeriodStart = :first_month THEN EffectiveCost ELSE 0 END) AS FirstMonthCost,
+           SUM(CASE WHEN BillingPeriodStart = :last_month THEN EffectiveCost ELSE 0 END) AS LastMonthCost
+    FROM CostAndUsage
+    WHERE ServiceCategory = 'Storage' AND ChargeCategory = 'Usage' AND ResourceName IS NOT NULL
+    GROUP BY ResourceName
+  )
+  SELECT
+    s.ResourceName, s.ServiceName, s.CostCenter,
+    ROUND(s.FirstMonthCost, 2) AS FirstMonthCost, ROUND(s.LastMonthCost, 2) AS LastMonthCost,
+    ROUND(100 * (s.LastMonthCost - s.FirstMonthCost) / NULLIF(s.FirstMonthCost, 0), 1) AS GrowthPct,
+    r.RecommendedResourceSummary,
+    ROUND(COALESCE(r.EstimatedMonthlySavings, 0), 2) AS EstimatedMonthlySavings,
+    CASE WHEN r.RecommendationId IS NOT NULL THEN 'Tiering recommended'
+         WHEN s.LastMonthCost > 1.2 * s.FirstMonthCost THEN 'Growing: review lifecycle rules'
+         ELSE 'Review retention' END AS Finding
+  FROM s
+  LEFT JOIN optimization_recommendation r ON r.ResourceName = s.ResourceName AND r.ActionType = 'storage_tier'
+  WHERE s.LastMonthCost > 500
+  ORDER BY EstimatedMonthlySavings DESC, LastMonthCost DESC
+params:
+- name: first_month
+  type: date
+  default: '2026-07-01'
+  label: 'First month'
+- name: last_month
+  type: date
+  default: '2026-09-01'
+  label: 'Last full month'
+notes: 'Grid data (SCADA, AMI) often has retention rules from regulators; check them before moving tiers.'

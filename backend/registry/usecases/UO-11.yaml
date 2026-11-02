@@ -1,0 +1,59 @@
+id: UO-11
+source: MM CostIQ Utilities extension
+title: 'Failed and retried LLM requests (tokens paid for nothing)'
+category: 'Optimization · AI'
+module: optimization
+business_question: 'How much LLM spend goes on requests that failed or were retried?'
+personas:
+- ai_program_owner
+- finops_analyst
+catalog_persona: 'AI Program Owner, Engineering'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Joins gateway telemetry (failed and retried requests) to each application''s AI cost. Retry storms usually come from timeouts set below the model''s p95 latency or from missing backoff.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'retry'
+- 'retries'
+- 'failed requests'
+- 'errors'
+- 'timeout'
+- 'waste'
+- 'gateway'
+products: Any provider
+sql: |-
+  WITH t AS (
+    SELECT Application, MAX(ModelName) AS ModelName, SUM(Requests) AS Requests, SUM(FailedRequests) AS Failed,
+           SUM(RetriedRequests) AS Retried
+    FROM ai_app_telemetry_daily
+    WHERE UsageDate >= :period_start AND UsageDate < :period_end
+    GROUP BY Application
+  ),
+  c AS (
+    SELECT json_extract_string(Tags, '$.application') AS Application, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage
+    WHERE (x_AIProduct IS NOT NULL OR json_extract_string(Tags, '$.ai_component') IS NOT NULL)
+      AND ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+    GROUP BY json_extract_string(Tags, '$.application')
+  )
+  SELECT
+    t.Application, t.ModelName, t.Requests,
+    ROUND(100.0 * t.Failed / NULLIF(t.Requests, 0), 1) AS FailedPct,
+    ROUND(100.0 * t.Retried / NULLIF(t.Requests, 0), 1) AS RetriedPct,
+    ROUND(c.Cost, 2) AS AppCost,
+    ROUND(c.Cost * (t.Failed + t.Retried) / NULLIF(t.Requests, 0), 2) AS WastedCost
+  FROM t
+  JOIN c ON c.Application = t.Application
+  WHERE t.Failed + t.Retried > 0
+  ORDER BY WastedCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-23'
+  label: 'End of the period (exclusive)'
+notes: 'Waste is pro rata by request count; long failed requests may cost more.'

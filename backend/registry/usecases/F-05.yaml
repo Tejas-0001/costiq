@@ -1,0 +1,59 @@
+id: F-05
+source: FinOps Foundation FOCUS 1.4
+title: Analyze tag coverage
+category: Allocation
+module: allocation
+business_question: What share of each provider’s spend carries the tags we allocate by?
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: FinOps Practitioner, Engineering
+datasets:
+- Cost and Usage
+- Contract Commitment
+description: Analyze the share of a provider's costs that are tagged with a specific tag, so a practitioner can check how
+  much spend is allocated through tags.
+columns: Charge Period Start, Charge Period End, Tags, Effective Cost, Service Provider Name (Provider Name in earlier versions)
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/analyze-tag-coverage/
+published_sql: |-
+  SELECT
+      SUM(CASE
+          WHEN JSON_CONTAINS_PATH(tags, 'one', '$.?')
+          THEN EffectiveCost
+          ELSE 0
+      END) / SUM(EffectiveCost) * 100 AS TaggedPercentage
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+       AND EffectiveCost > 0
+       AND ServiceProviderName = ?
+adaptation: Rewritten for portability (see notes)
+sql: |-
+  SELECT
+      SUM(CASE
+          WHEN Tags ->> :tag_key IS NOT NULL
+          THEN EffectiveCost
+          ELSE 0
+      END) / NULLIF(SUM(EffectiveCost), 0) * 100 AS TaggedPercentage
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+       AND EffectiveCost > 0
+       AND ServiceProviderName = :provider
+params:
+- name: tag_key
+  type: string
+  default: cost_center
+  label: Tag key to measure coverage for
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+- name: provider
+  type: string
+  default: AWS
+  label: Service provider name
+notes: '- The tag key is passed as a parameter through the JSON path `''$.?''`.'

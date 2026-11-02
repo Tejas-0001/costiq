@@ -1,0 +1,66 @@
+id: F-01
+source: FinOps Foundation FOCUS 1.4
+title: Allocate multi-currency charges per application
+category: Allocation
+module: allocation
+business_question: How do we allocate and charge back application costs billed in different currencies?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+- Billing Period
+description: Finance needs to allocate costs and run chargeback for application charges that come from different geographic
+  locations and are billed in different currencies.
+columns: Service Provider Name, Billing Account ID, Billing Account Name, Billing Currency, Billed Cost, Tags, Billing Period
+  Start, Billing Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/allocate-multi-currency-charges-per-application-2/
+published_sql: |-
+  SELECT
+    Tags["ApplicationId"],
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE
+    BillingPeriodStart >= ? AND BillingPeriodEnd < ?
+  GROUP BY
+    Tags["ApplicationId"],
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency
+adaptation: Placeholders named; Tags access made portable
+sql: |-
+  SELECT
+    json_extract_string(Tags, '$.ApplicationId'),
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE
+    BillingPeriodStart >= :period_start AND BillingPeriodEnd < :period_end
+  GROUP BY
+    json_extract_string(Tags, '$.ApplicationId'),
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- Totals stay separate per billing currency (the query does no currency conversion). - Next use case on the site:
+  "Analyze cost by participating entities".'

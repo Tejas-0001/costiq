@@ -1,0 +1,4 @@
+vendor,invoice_id,invoice_line_id,billing_period,product,category,charge_type,amount,currency,cost_center,application,invoice_date
+ServiceNow,SN-INV-2026-11,SN-INV-2026-11-01,2026-11,ServiceNow ITSM and ITOM,Business Applications,subscription,70000.00,USD,Corporate IT,itsm,2026-11-01
+Salesforce,SF-INV-88213,SF-INV-88213-01,2026-11,Salesforce Service Cloud,Business Applications,subscription,95000.00,USD,Customer Operations,crm-service,2026-11-01
+SAP,SAP-RISE-2611,SAP-RISE-2611-02,2026-11,SAP S/4HANA implementation services,Business Applications,implementation,120000.00,USD,Corporate IT,erp-s4hana,2026-11-03

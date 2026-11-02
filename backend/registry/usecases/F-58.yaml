@@ -1,0 +1,48 @@
+id: F-58
+source: FinOps Foundation FOCUS 1.4
+title: Determine Effective Savings Rate by Service
+category: Reporting & Analytics
+module: explorer
+business_question: What is the Effective Savings Rate for each service?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: This use cases focuses on Effective Savings Rate (ESR) per Service. The Effective Savings Rate is a KPI to track
+  the efficiency of using commitment-based discounts.
+columns: Service Provider Name, Service Name, Contracted Cost, Effective Cost, Charge Period Start, Charge Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/determine-effective-savings-rate-by-service/
+published_sql: |-
+  SELECT
+    ServiceProviderName,
+    ServiceName,
+    SUM(ContractedCost) AS ContractedCost,
+    SUM(EffectiveCost)  AS EffectiveCost,
+    (SUM(ContractedCost) - SUM(EffectiveCost)) / NULLIF(SUM(ContractedCost), 0) AS EffectiveSavingsRate
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+  GROUP BY ServiceProviderName, ServiceName
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ServiceProviderName,
+    ServiceName,
+    SUM(ContractedCost) AS ContractedCost,
+    SUM(EffectiveCost)  AS EffectiveCost,
+    (SUM(ContractedCost) - SUM(EffectiveCost)) / NULLIF(SUM(ContractedCost), 0) AS EffectiveSavingsRate
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+  GROUP BY ServiceProviderName, ServiceName
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

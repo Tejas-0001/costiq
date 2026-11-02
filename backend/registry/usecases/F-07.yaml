@@ -1,0 +1,68 @@
+id: F-07
+source: FinOps Foundation FOCUS 1.4
+title: Determine target of virtual currency usage
+category: Allocation
+module: allocation
+business_question: Which charge categories burn the most virtual currency?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: Identify and rank the top charge categories driving virtual-currency consumption to target optimization efforts.
+columns: Service Provider Name, Host Provider Name, Service Name, Charge Description, Pricing Currency Effective Cost, Charge
+  Period Start, Charge Period End, Pricing Currency
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/determine-target-of-virtual-currency-usage-2/
+published_sql: |-
+  SELECT
+      ServiceProviderName,
+      HostProviderName,
+      ServiceName,
+      ChargeDescription,
+      SUM(PricingCurrencyEffectiveCost) AS TotalPricingCurrencyEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  AND PricingCurrency = ?
+  GROUP BY
+      ServiceProviderName,
+      HostProviderName,
+      ServiceName,
+      ChargeDescription
+  ORDER BY TotalPricingCurrencyEffectiveCost DESC
+  LIMIT 10
+adaptation: Placeholders named
+sql: |-
+  SELECT
+      ServiceProviderName,
+      HostProviderName,
+      ServiceName,
+      ChargeDescription,
+      SUM(PricingCurrencyEffectiveCost) AS TotalPricingCurrencyEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+  AND PricingCurrency = :pricing_currency
+  GROUP BY
+      ServiceProviderName,
+      HostProviderName,
+      ServiceName,
+      ChargeDescription
+  ORDER BY TotalPricingCurrencyEffectiveCost DESC
+  LIMIT 10
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+- name: pricing_currency
+  type: string
+  default: Snowflake Credits
+  label: Pricing currency (virtual currency name)
+notes: '- The context says "charge categories", but the query groups by Charge Description, not Charge Category. - Related
+  use cases: Analyze purchase of virtual currency; Calculate consumption of virtual currency within a billing period; Determine
+  contracted savings by virtual currency.'

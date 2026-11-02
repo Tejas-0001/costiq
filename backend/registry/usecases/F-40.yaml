@@ -1,0 +1,68 @@
+id: F-40
+source: FinOps Foundation FOCUS 1.4
+title: Report effective cost of compute
+category: Planning & Estimating
+module: rates
+business_question: What does our compute cost, and where can engineering reduce it?
+personas:
+- cloud_ops
+catalog_persona: Engineering
+datasets:
+- Cost and Usage
+- Contract Commitment
+- Billing Period
+- Invoice Detail
+description: Engineers and engineering managers want to reduce billed compute costs from a specific service provider.
+columns: Commitment Discount Type, Service Name, Service Provider Name, Sub Account ID, Billing Period Start, Billing Period
+  End, Effective Cost, Service Category
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/report-effective-cost-of-compute/
+published_sql: |-
+  SELECT
+    CommitmentDiscountType,
+    ServiceProviderName,
+    ServiceName,
+    SubAccountId,
+    SubAccountName,
+    BillingPeriodStart,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE BillingPeriodStart  >= ? AND BillingPeriodEnd <= ?
+    AND ServiceCategory = 'Compute'
+  GROUP BY
+    CommitmentDiscountType,
+    ServiceName,
+    ServiceProviderName,
+    SubAccountId,
+    SubAccountName,
+    BillingPeriodStart
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    CommitmentDiscountType,
+    ServiceProviderName,
+    ServiceName,
+    SubAccountId,
+    SubAccountName,
+    BillingPeriodStart,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE BillingPeriodStart  >= :period_start AND BillingPeriodEnd <= :period_end
+    AND ServiceCategory = 'Compute'
+  GROUP BY
+    CommitmentDiscountType,
+    ServiceName,
+    ServiceProviderName,
+    SubAccountId,
+    SubAccountName,
+    BillingPeriodStart
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

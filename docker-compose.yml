@@ -1,0 +1,35 @@
+# MM CostIQ Utilities MVP: FastAPI backend + Next.js web app on synthetic Meridian Energy data.
+#   docker compose up -d --build     build and start, then open http://localhost:3000
+#   docker compose down              stop (demo changes are kept in the costiq-data volume)
+#   docker compose down -v           stop and reset the demo to the built-in sample
+# Ports bind to localhost because sign-in is demo personas only. Set COSTIQ_BIND=0.0.0.0 to show it on your network.
+name: costiq
+
+services:
+  backend:
+    build: ./backend
+    image: mm-costiq-backend:mvp
+    environment:
+      COSTIQ_AUTH_MODE: demo
+      COSTIQ_PSEUDONYM_KEY: ${COSTIQ_PSEUDONYM_KEY:-dev-only-change-me}
+      COSTIQ_ALERT_WEBHOOK_URL: ${COSTIQ_ALERT_WEBHOOK_URL:-}
+    volumes:
+      - costiq-data:/data
+    ports:
+      - "${COSTIQ_BIND:-127.0.0.1}:${COSTIQ_API_PORT:-8080}:8080"
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    image: mm-costiq-frontend:mvp
+    environment:
+      COSTIQ_API_URL: http://backend:8080
+    ports:
+      - "${COSTIQ_BIND:-127.0.0.1}:${COSTIQ_WEB_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  costiq-data:

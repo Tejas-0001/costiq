@@ -1,0 +1,57 @@
+id: F-20
+source: FinOps Foundation FOCUS 1.4
+title: Calculate consumption of virtual currency within a billing period
+category: Budgeting & Forecasting
+module: budgets
+business_question: How fast are we consuming virtual currency this billing period, and when will it run out?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: Track virtual-currency burn throughout the billing period to forecast exhaustion dates and stay within budget.
+columns: Service Provider Name, Pricing Currency Effective Cost, Charge Period Start, Charge Period End, Pricing Currency,
+  Charge Category
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/calculate-consumption-of-virtual-currency-within-a-billing-period-2/
+published_sql: |-
+  SELECT
+      ServiceProviderName,
+      SUM(PricingCurrencyEffectiveCost) AS TotalPricingCurrencyEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  AND PricingCurrency = ?
+  AND ChargeCategory = 'Usage'
+  GROUP BY
+      ServiceProviderName
+  ORDER BY TotalPricingCurrencyEffectiveCost DESC
+  LIMIT 10
+adaptation: Placeholders named
+sql: |-
+  SELECT
+      ServiceProviderName,
+      SUM(PricingCurrencyEffectiveCost) AS TotalPricingCurrencyEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+  AND PricingCurrency = :pricing_currency
+  AND ChargeCategory = 'Usage'
+  GROUP BY
+      ServiceProviderName
+  ORDER BY TotalPricingCurrencyEffectiveCost DESC
+  LIMIT 10
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+- name: pricing_currency
+  type: string
+  default: Snowflake Credits
+  label: Pricing currency (virtual currency name)
+notes: '- Previous use case: "Identify unused capacity reservations". Next: "Compare billed cost per subaccount to budget".'

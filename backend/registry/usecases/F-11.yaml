@@ -1,0 +1,75 @@
+id: F-11
+source: FinOps Foundation FOCUS 1.4
+title: Track marketplace purchases across providers
+category: Allocation
+module: allocation
+business_question: How much are we spending on marketplace purchases, and with which vendors?
+personas:
+- finance_controller
+- fpa_analyst
+- finops_analyst
+- cfo
+- tech_exec
+catalog_persona: Finance, FinOps Practitioner, Procurement, Leadership
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Billing Period
+- Invoice Detail
+description: Identify marketplace purchases where the service provider differs from the host provider, to track third-party
+  software spend and optimize vendor relationships.
+columns: Service Provider Name, Host Provider Name, Invoice Issuer Name, Service Name, Charge Category, Billed Cost, Charge
+  Period Start, Charge Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/track-marketplace-purchases-across-providers/
+published_sql: |-
+  SELECT
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName,
+    ServiceName,
+    ChargeCategory,
+    SUM(BilledCost) AS TotalBilledCost,
+    COUNT(DISTINCT ResourceId) AS ResourceCount
+   FROM focus_data_table
+   WHERE ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+    AND ServiceProviderName != HostProviderName
+    AND ChargeCategory IN ('Purchase', 'Usage')
+   GROUP BY
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName,
+    ServiceName,
+    ChargeCategory
+   ORDER BY TotalBilledCost DESC
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName,
+    ServiceName,
+    ChargeCategory,
+    SUM(BilledCost) AS TotalBilledCost,
+    COUNT(DISTINCT ResourceId) AS ResourceCount
+   FROM focus_data_table
+   WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+    AND ServiceProviderName != HostProviderName
+    AND ChargeCategory IN ('Purchase', 'Usage')
+   GROUP BY
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName,
+    ServiceName,
+    ChargeCategory
+   ORDER BY TotalBilledCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The query uses ResourceId, which is not in the page''s column list.'

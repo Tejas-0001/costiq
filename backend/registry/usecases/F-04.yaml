@@ -1,0 +1,71 @@
+id: F-04
+source: FinOps Foundation FOCUS 1.4
+title: Analyze purchase of virtual currency
+category: Allocation
+module: allocation
+business_question: How are we buying virtual currency (credits, tokens), and are we on track to avoid overage?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: Analyze virtual-currency purchase patterns (e.g., upfront) and actively monitor burn down to prevent overage
+  charges.
+columns: Service Provider Name, Host Provider Name, Charge Description, Pricing Unit, Billing Currency, Pricing Quantity,
+  Billed Cost, Charge Period Start, Charge Period End, Charge Category
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/analyze-purchase-of-virtual-currency-2/
+published_sql: |-
+  SELECT
+      ServiceProviderName,
+      ChargeDescription,
+      PricingUnit,
+      BillingCurrency,
+      SUM(PricingQuantity) AS TotalPricingQuantity,
+      SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+      AND ChargeCategory = 'Purchase'
+       AND PricingUnit = ?
+  GROUP BY
+      ServiceProviderName,
+      ChargeDescription,
+      PricingUnit,
+      BillingCurrency
+adaptation: Placeholders named
+sql: |-
+  SELECT
+      ServiceProviderName,
+      ChargeDescription,
+      PricingUnit,
+      BillingCurrency,
+      SUM(PricingQuantity) AS TotalPricingQuantity,
+      SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+      AND ChargeCategory = 'Purchase'
+       AND PricingUnit = :pricing_unit
+  GROUP BY
+      ServiceProviderName,
+      ChargeDescription,
+      PricingUnit,
+      BillingCurrency
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+- name: pricing_unit
+  type: string
+  default: Credits
+  label: Pricing unit of the virtual currency purchase
+notes: '- The v1.3 tab has the same query, but it also selects and groups by `PublisherName`. The v1.3 text was not captured
+  verbatim. - Host Provider Name is in the column list but not in the query. - Related use cases: Determine target of virtual
+  currency usage (Allocation); Calculate consumption of virtual currency within a billing period (Budgeting); Determine contracted
+  savings by virtual currency (Planning & Estimating).'

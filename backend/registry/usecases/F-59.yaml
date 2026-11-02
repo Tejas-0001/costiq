@@ -1,0 +1,84 @@
+id: F-59
+source: FinOps Foundation FOCUS 1.4
+title: Effective Cost by Service and Region
+category: Reporting & Analytics
+module: explorer
+business_question: What is effective cost by service and region in each billing period?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+- cloud_ops
+catalog_persona: FinOps Practitioner, Finance, Engineering
+datasets:
+- Cost and Usage
+- Billing Period
+- Invoice Detail
+- Contract Commitment
+description: Aggregates EffectiveCost by billing period to align accrual-based cost reporting with invoice cycles.
+columns: Effective Cost, Billing Period End, Billing Period Start, Charge Category, Charge Period End, Charge Period Start,
+  Commitment Discount ID, Commitment Discount Status, Consumed Quantity, Consumed Unit, Pricing Quantity, Region Name, Service
+  Name, Service Provider Name
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/effective-cost-by-service-and-region/
+published_sql: |-
+  SELECT
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    SUM(PricingQuantity) AS TotalPricingQuantity
+  FROM focus_data_table
+  WHERE
+    BillingPeriodStart >= ? AND BillingPeriodEnd < ?
+  GROUP BY
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    SUM(PricingQuantity) AS TotalPricingQuantity
+  FROM focus_data_table
+  WHERE
+    BillingPeriodStart >= :period_start AND BillingPeriodEnd < :period_end
+  GROUP BY
+    ServiceProviderName,
+    BillingPeriodStart,
+    BillingPeriodEnd,
+    ServiceCategory,
+    ServiceName,
+    RegionId,
+    RegionName,
+    PricingUnit
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The query also uses Service Category, Region ID and Pricing Unit, which the page does not list under FOCUS columns.
+  Several listed columns (Charge Category, Commitment Discount ID/Status, Consumed Quantity/Unit, Charge Period Start/End)
+  are not used in the query.'

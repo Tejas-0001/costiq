@@ -1,0 +1,67 @@
+id: F-49
+source: FinOps Foundation FOCUS 1.4
+title: Analyze capacity reservations on compute costs
+category: Reporting & Analytics
+module: explorer
+business_question: How much do capacity reservations affect compute cost?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Cost and Usage
+- Contract Commitment
+- Invoice Detail
+description: Compute is often the largest spend area in a cloud bill.
+columns: Capacity Reservation ID, Capacity Reservation Status, Service Provider Name, Billing Account ID, Billed Cost, Effective
+  Cost, Charge Period Start, Charge Period End, Service Category
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/analyze-capacity-reservations-on-compute-costs-2/
+published_sql: |-
+  SELECT
+    CASE
+          WHEN CapacityReservationId IS NOT NULL AND  CapacityReservationStatus  = 'Unused' THEN 'Unused Capacity Reservation'
+          WHEN CapacityReservationId IS NOT NULL AND  CapacityReservationStatus  = 'Used' THEN 'Compute using Capacity Reservation'
+          ELSE 'Compute without Capacity Reservation'
+    END AS Status,
+    ServiceProviderName,
+    BillingAccountId,
+    SUM(BilledCost) AS TotalBilledCost,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+    AND ServiceCategory = 'Compute'
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    CapacityReservationId,
+    CapacityReservationStatus
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    CASE
+          WHEN CapacityReservationId IS NOT NULL AND  CapacityReservationStatus  = 'Unused' THEN 'Unused Capacity Reservation'
+          WHEN CapacityReservationId IS NOT NULL AND  CapacityReservationStatus  = 'Used' THEN 'Compute using Capacity Reservation'
+          ELSE 'Compute without Capacity Reservation'
+    END AS Status,
+    ServiceProviderName,
+    BillingAccountId,
+    SUM(BilledCost) AS TotalBilledCost,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+    AND ServiceCategory = 'Compute'
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    CapacityReservationId,
+    CapacityReservationStatus
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

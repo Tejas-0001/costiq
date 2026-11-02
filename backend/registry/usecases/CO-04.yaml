@@ -1,0 +1,47 @@
+id: CO-04
+source: MM CostIQ Utilities extension
+title: 'Previous-generation and ARM migration candidates'
+category: 'Optimization · Cloud'
+module: optimization
+business_question: 'Which resources run on older or x86 instance families where a current or ARM (Graviton) family is cheaper?'
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: 'Cloud Operations'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Provider upgrade-generation recommendations with the resource''s cost center and recent spend.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'graviton'
+- 'arm'
+- 'previous generation'
+- 'instance family'
+- 'modernize'
+products: Any provider
+sql: |-
+  WITH spend AS (
+    SELECT ResourceName, MAX(json_extract_string(Tags, '$.cost_center')) AS CostCenter, MAX(ServiceName) AS ServiceName,
+           SUM(EffectiveCost) AS Last30DaysCost
+    FROM CostAndUsage
+    WHERE ChargePeriodStart > CAST(:as_of AS TIMESTAMP) - INTERVAL '30' DAY
+      AND ChargePeriodStart <= CAST(:as_of AS TIMESTAMP)
+    GROUP BY ResourceName
+  )
+  SELECT
+    r.RecommendationId, r.ResourceName, s.CostCenter, s.ServiceName, r.CurrentResourceSummary, r.RecommendedResourceSummary,
+    ROUND(COALESCE(s.Last30DaysCost, r.CurrentMonthlyCost), 2) AS Last30DaysCost,
+    ROUND(r.EstimatedMonthlySavings, 2) AS EstimatedMonthlySavings, r.Effort, r.RestartNeeded,
+    COALESCE(a.Status, 'not tracked') AS TrackerStatus
+  FROM optimization_recommendation r
+  LEFT JOIN spend s ON s.ResourceName = r.ResourceName
+  LEFT JOIN optimization_action a ON a.Origin = r.RecommendationId
+  WHERE r.ActionType = 'upgrade_generation'
+  ORDER BY EstimatedMonthlySavings DESC
+params:
+- name: as_of
+  type: date
+  default: '2026-10-22'
+  label: 'Evaluate as of'
+notes: 'Database engines need a compatibility test before moving to ARM.'

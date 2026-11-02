@@ -1,0 +1,15 @@
+# Copied from CostIQ/CostIQ/backend/requirements.txt (validated with DuckDB + PostgreSQL 16), plus MVP additions.
+fastapi==0.162.0
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+duckdb==2.0.0
+sqlglot==30.26.0
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
+PyJWT[crypto]==2.15.0
+PyYAML==6.0.3
+httpx==0.28.1
+python-multipart
+pyarrow
+pandas
+pytest

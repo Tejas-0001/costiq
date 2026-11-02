@@ -1,0 +1,46 @@
+id: UO-05
+source: MM CostIQ AI extension
+title: Unused AI seats (no activity in 28 days)
+category: Usage Optimization
+module: anomalies
+business_question: Which AI seats have been idle for 28 days?
+personas:
+- ai_program_owner
+- finops_analyst
+catalog_persona: IT Asset Management, FinOps Practitioner
+datasets:
+- ai_seat_assignment
+- ai_user_activity (cost from Cost and Usage purchase rows)
+description: Lists every assigned seat whose holder had no activity in the last 28 days, the same window as the Microsoft
+  365 admin center. Each row shows the monthly cost and the last date the person was active.
+columns: 'Supporting: ai_seat_assignment, ai_user_activity'
+keywords:
+- idle seats
+- unused licenses
+- inactive copilot users
+- unused copilot
+products: M365 Copilot, GitHub Copilot, Claude Enterprise
+sql: |-
+  WITH params AS (SELECT MAX(ActivityDate) AS d FROM ai_user_activity),
+  activity AS (
+    SELECT x_AIProduct, UserPrincipal,
+           COUNT(DISTINCT CASE WHEN ActivityDate > params.d - 28 THEN ActivityDate END) AS ActiveDays28,
+           MAX(ActivityDate) AS LastActivityDate
+    FROM ai_user_activity, params
+    GROUP BY ALL
+  )
+  SELECT
+    s.x_AIProduct,
+    s.UserPrincipal,
+    s.Department,
+    s.LicenseSku,
+    s.MonthlySeatCost,
+    COALESCE(a.ActiveDays28, 0) AS ActiveDays28,
+    a.LastActivityDate
+  FROM ai_seat_assignment s
+  LEFT JOIN activity a ON a.x_AIProduct = s.x_AIProduct AND a.UserPrincipal = s.UserPrincipal
+  WHERE COALESCE(a.ActiveDays28, 0) = 0
+  ORDER BY s.x_AIProduct, s.Department, s.UserPrincipal
+params: []
+notes: M365 Copilot activity comes from Graph `getMicrosoft365CopilotUsageUserDetail`. If the tenant hides user names in reports,
+  you need to turn that off for the join to work.

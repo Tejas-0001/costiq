@@ -1,0 +1,32 @@
+id: RA-07
+source: MM CostIQ AI extension
+title: Spend by service tier and speed
+category: Reporting & Analytics
+module: explorer
+business_question: How much spend runs on standard, batch, priority and fast tiers?
+personas:
+- cloud_ops
+- finops_analyst
+catalog_persona: Engineering, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: Splits token spend across the standard, batch (50% off) and priority tiers, and fast mode, by product. Batch
+  share is a lever to increase. Fast mode and priority spend should be deliberate choices.
+columns: 'FOCUS columns: BillingPeriodStart, EffectiveCost · AI extension: x_ServiceTier, x_Speed, x_*Tokens'
+keywords: []
+products: Claude API
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    x_AIProduct,
+    x_ServiceTier,
+    COALESCE(x_Speed, 'standard') AS Speed,
+    SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens + x_OutputTokens) AS Tokens,
+    ROUND(SUM(EffectiveCost), 2) AS EffectiveCost,
+    ROUND(100 * SUM(EffectiveCost) / SUM(SUM(EffectiveCost)) OVER (PARTITION BY BillingPeriodStart, x_AIProduct), 1) AS PctOfProductSpend
+  FROM CostAndUsage
+  WHERE x_ServiceTier IS NOT NULL AND ChargeCategory = 'Usage'
+  GROUP BY BillingPeriodStart, x_AIProduct, x_ServiceTier, COALESCE(x_Speed, 'standard')
+  ORDER BY BillingMonth, x_AIProduct, EffectiveCost DESC
+params: []
+notes: ''

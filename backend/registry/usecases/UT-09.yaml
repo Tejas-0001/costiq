@@ -1,0 +1,57 @@
+id: UT-09
+source: MM CostIQ Utilities extension
+title: 'Incremental technology cost by storm event'
+category: 'Utilities · Operations & AI'
+module: utilities
+business_question: 'What extra cloud cost did each major storm cause, ready for a storm-cost recovery filing?'
+personas:
+- regulatory_analyst
+- finops_analyst
+- cfo
+catalog_persona: 'Regulatory Accounting, Storm Recovery'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Storm-tagged charges (storm_event tag) compared with the same application''s average daily cost in the 14 days before the event. The incremental amount is what a storm-recovery filing can claim; capturing it by event ID avoids rebuilding it from invoices months later.'
+columns: 'FOCUS columns plus ut_* reference tables and ut_allocated_cost'
+keywords:
+- 'storm'
+- 'storm cost recovery'
+- 'hurricane'
+- 'outage'
+- 'incremental cost'
+- 'securitization'
+products: Any provider
+sql: |-
+  WITH ev AS (SELECT * FROM ut_storm_event),
+  storm AS (
+    SELECT json_extract_string(Tags, '$.storm_event') AS StormEventId, json_extract_string(Tags, '$.application') AS Application,
+           COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) AS Days, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage
+    WHERE json_extract_string(Tags, '$.storm_event') IS NOT NULL
+    GROUP BY json_extract_string(Tags, '$.storm_event'), json_extract_string(Tags, '$.application')
+  ),
+  pre AS (
+    SELECT ev.StormEventId, json_extract_string(c.Tags, '$.application') AS Application, SUM(c.EffectiveCost) / 14 AS DailyBaseline
+    FROM CostAndUsage c CROSS JOIN ev
+    WHERE c.ChargePeriodStart >= CAST(ev.StartDate AS TIMESTAMP) - INTERVAL '14' DAY
+      AND c.ChargePeriodStart < CAST(ev.StartDate AS TIMESTAMP)
+    GROUP BY ev.StormEventId, json_extract_string(c.Tags, '$.application')
+  )
+  SELECT
+    s.StormEventId, ev.Name, ev.Jurisdictions, s.Application, s.Days,
+    ROUND(s.Cost, 2) AS StormPeriodCost,
+    ROUND(COALESCE(p.DailyBaseline, 0) * s.Days, 2) AS BaselineCost,
+    ROUND(s.Cost - COALESCE(p.DailyBaseline, 0) * s.Days, 2) AS IncrementalCost
+  FROM storm s
+  JOIN ev ON ev.StormEventId = s.StormEventId
+  LEFT JOIN pre p ON p.StormEventId = s.StormEventId AND p.Application = s.Application
+  ORDER BY IncrementalCost DESC
+params: []
+notes: 'Flagged rows are recoverable costs to include in the event''s filing, not errors.'
+compliance:
+  area: 'Operations & AI'
+  reference: 'State storm-cost recovery dockets'
+  unit: 'applications'
+  flag: 'IncrementalCost > 0'
+  amount: IncrementalCost

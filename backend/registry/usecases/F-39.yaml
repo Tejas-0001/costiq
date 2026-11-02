@@ -1,0 +1,64 @@
+id: F-39
+source: FinOps Foundation FOCUS 1.4
+title: Quantify usage of a component resource
+category: Planning & Estimating
+module: rates
+business_question: How much of each component resource (cores, GB) are we consuming each day?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: Captures daily aggregate usage of component resources, such as core hours or gigabytes, when service providers
+  bill by virtual machine or provisioned quantity.
+columns: Service Provider Name, Service Name, Pricing Unit, Region Name, SKU Price Details, Charge Period Start, Charge Period
+  End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/quantify-usage-of-a-component-resource-2/
+published_sql: |-
+  SELECT
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      JSON_UNQUOTE(JSON_EXTRACT(SkuPriceDetails, '$.InstanceSeries')) AS InstanceSeries,
+      SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(SkuPriceDetails, '$.CoreCount')) AS UNSIGNED)) AS TotalCoreCount
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  AND JSON_CONTAINS_PATH(SkuPriceDetails, 'all', '$.CoreCount', '$.InstanceSeries')
+  GROUP BY
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      InstanceSeries
+adaptation: Rewritten for portability (see notes)
+sql: |-
+  SELECT
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      json_extract_string(SkuPriceDetails, '$.InstanceSeries') AS InstanceSeries,
+      SUM(CAST(json_extract_string(SkuPriceDetails, '$.CoreCount') AS INTEGER)) AS TotalCoreCount
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+    AND json_extract_string(SkuPriceDetails, '$.CoreCount') IS NOT NULL
+    AND json_extract_string(SkuPriceDetails, '$.InstanceSeries') IS NOT NULL
+  GROUP BY
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      json_extract_string(SkuPriceDetails, '$.InstanceSeries')
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The SQL is MySQL-style (JSON_UNQUOTE, JSON_EXTRACT, JSON_CONTAINS_PATH, CAST AS UNSIGNED).'

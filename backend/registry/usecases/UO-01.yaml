@@ -1,0 +1,42 @@
+id: UO-01
+source: MM CostIQ AI extension
+title: Prompt cache hit rate and savings
+category: Usage Optimization
+module: anomalies
+business_question: How much input is served from prompt cache, and what did it save?
+personas:
+- cloud_ops
+- finops_analyst
+catalog_persona: Engineering, FinOps Practitioner
+datasets:
+- Cost and Usage
+- ai_model_catalog
+description: Measures how much of each application's input is served from cache, and what that saved compared with paying
+  the full input price. A low hit rate on a high-volume application is a strong optimization candidate.
+columns: 'FOCUS columns: Tags · AI extension: x_ModelName, x_InputTokens, x_CacheReadTokens, x_CacheWriteTokens · Supporting:
+  ai_model_catalog'
+keywords:
+- prompt caching
+- cache hit
+- cache savings
+products: Claude (all channels), Azure OpenAI, GitHub Copilot
+sql: |-
+  SELECT
+    COALESCE(json_extract_string(c.Tags, '$.application'), c.x_WorkspaceName, '(unknown)') AS Application,
+    c.x_AIProduct,
+    c.x_ModelName,
+    SUM(c.x_InputTokens)      AS UncachedInputTokens,
+    SUM(c.x_CacheReadTokens)  AS CacheReadTokens,
+    SUM(c.x_CacheWriteTokens) AS CacheWriteTokens,
+    ROUND(100.0 * SUM(c.x_CacheReadTokens)
+          / NULLIF(SUM(c.x_InputTokens + c.x_CacheReadTokens + c.x_CacheWriteTokens), 0), 1) AS CacheHitRatePct,
+    ROUND(SUM(c.x_CacheReadTokens) / 1e6 * (MAX(m.InputPricePerM) - MAX(m.CacheReadPricePerM)), 2) AS ListSavingsFromCache
+  FROM CostAndUsage c
+  JOIN ai_model_catalog m ON m.ModelName = c.x_ModelName
+  WHERE c.x_ModelName IS NOT NULL AND c.ChargeCategory = 'Usage'
+  GROUP BY ALL
+  HAVING SUM(c.x_InputTokens + c.x_CacheReadTokens + c.x_CacheWriteTokens) > 0
+  ORDER BY UncachedInputTokens DESC
+params: []
+notes: Savings are estimated at list price from ai_model_catalog. For GitHub Copilot, the AI usage report shows cache read
+  and write tokens, but the price is set in AI credits, so read savings as indicative.

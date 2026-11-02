@@ -1,0 +1,45 @@
+id: CO-06
+source: MM CostIQ Utilities extension
+title: 'Data transfer and egress hotspots'
+category: 'Optimization · Cloud'
+module: optimization
+business_question: 'Where is data-transfer and egress cost concentrated, by account, region and cost center?'
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: 'Cloud Operations'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Networking charges for data transfer and content delivery, by account, region and cost center. Egress is often fixed by architecture (caching, compression, keeping traffic in region) rather than by rate.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'egress'
+- 'data transfer'
+- 'bandwidth'
+- 'networking'
+- 'cdn'
+- 'nat gateway'
+products: Any provider
+sql: |-
+  SELECT
+    ServiceProviderName, SubAccountId, RegionId, ServiceName, ChargeDescription,
+    json_extract_string(Tags, '$.cost_center') AS CostCenter,
+    ROUND(SUM(ConsumedQuantity), 0) AS Quantity, MAX(ConsumedUnit) AS Unit,
+    ROUND(SUM(EffectiveCost), 2) AS EgressCost
+  FROM CostAndUsage
+  WHERE ServiceCategory = 'Networking'
+    AND (LOWER(ChargeDescription) LIKE '%transfer%' OR ServiceSubcategory IN ('Network Connectivity', 'Content Delivery'))
+    AND ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+  GROUP BY ServiceProviderName, SubAccountId, RegionId, ServiceName, ChargeDescription, json_extract_string(Tags, '$.cost_center')
+  ORDER BY EgressCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-23'
+  label: 'End of the period (exclusive)'
+notes: ''

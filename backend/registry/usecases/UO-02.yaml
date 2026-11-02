@@ -1,0 +1,41 @@
+id: UO-02
+source: MM CostIQ AI extension
+title: Identify cache writes that never pay back
+category: Usage Optimization
+module: anomalies
+business_question: Where do cache writes cost more than the reads save?
+personas:
+- cloud_ops
+catalog_persona: Engineering
+datasets:
+- Cost and Usage
+- ai_model_catalog
+description: A cache write costs more than a normal input token, and a cache read costs much less. Caching only pays off when
+  the prompts it stores are read back often enough. This use case calculates the net benefit of caching for each workspace
+  and model, then flags where cache writes cost more than the reads save.
+columns: 'FOCUS columns: EffectiveCost · AI extension: x_WorkspaceName, x_ModelName, x_InputTokens, x_CacheReadTokens, x_CacheWriteTokens
+  · Supporting: ai_model_catalog'
+keywords: []
+products: Claude (all channels)
+sql: |-
+  SELECT
+    COALESCE(c.x_WorkspaceName, c.SubAccountName, 'Default Workspace') AS Workspace,
+    c.x_AIProduct,
+    c.x_ModelName,
+    SUM(c.x_CacheWriteTokens) AS CacheWriteTokens,
+    SUM(c.x_CacheReadTokens)  AS CacheReadTokens,
+    ROUND(SUM(c.x_CacheReadTokens) / NULLIF(SUM(c.x_CacheWriteTokens), 0), 2) AS ReadsPerWrite,
+    ROUND(SUM(c.x_CacheReadTokens)  / 1e6 * (MAX(m.InputPricePerM) - MAX(m.CacheReadPricePerM))
+        - SUM(c.x_CacheWriteTokens) / 1e6 * (MAX(m.CacheWritePricePerM) - MAX(m.InputPricePerM)), 2) AS NetCacheBenefitAtList,
+    CASE WHEN SUM(c.x_CacheReadTokens)  / 1e6 * (MAX(m.InputPricePerM) - MAX(m.CacheReadPricePerM))
+            < SUM(c.x_CacheWriteTokens) / 1e6 * (MAX(m.CacheWritePricePerM) - MAX(m.InputPricePerM))
+         THEN 'Caching costs more than it saves' ELSE 'OK' END AS Finding
+  FROM CostAndUsage c
+  JOIN ai_model_catalog m ON m.ModelName = c.x_ModelName
+  WHERE c.x_ModelVendor = 'Anthropic' AND c.ChargeCategory = 'Usage'
+  GROUP BY ALL
+  HAVING SUM(c.x_CacheWriteTokens) > 0
+  ORDER BY NetCacheBenefitAtList
+params: []
+notes: Typical fixes are to move volatile content after the cache breakpoint, use the 1-hour cache TTL for prompts that are
+  reused less often, or stop caching one-off prompts.

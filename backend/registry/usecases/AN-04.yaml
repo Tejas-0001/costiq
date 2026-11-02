@@ -1,0 +1,34 @@
+id: AN-04
+source: MM CostIQ AI extension
+title: New models appearing in spend
+category: Anomaly Management
+module: anomalies
+business_question: Which new models have started appearing in spend?
+personas:
+- finops_analyst
+- auditor
+catalog_persona: FinOps Practitioner, Governance
+datasets:
+- Cost and Usage
+description: Lists each product and model pair with the date it first appeared, its spend since then, and how many users or
+  keys are using it. A new model can be a planned upgrade or an unplanned cost and governance change.
+columns: 'FOCUS columns: ChargePeriodStart, EffectiveCost · AI extension: x_AIProduct, x_ModelName, x_UserPrincipal, x_ApiKeyId'
+keywords: []
+products: All token-billed products
+sql: |-
+  WITH first_seen AS (
+    SELECT x_AIProduct, x_ModelName, MIN(CAST(ChargePeriodStart AS DATE)) AS FirstSeen
+    FROM CostAndUsage WHERE x_ModelName IS NOT NULL GROUP BY ALL
+  ),
+  data_start AS (SELECT MIN(CAST(ChargePeriodStart AS DATE)) AS d FROM CostAndUsage)
+  SELECT f.x_AIProduct, f.x_ModelName, f.FirstSeen,
+         ROUND(SUM(c.EffectiveCost), 2) AS SpendSinceFirstSeen,
+         COUNT(DISTINCT COALESCE(c.x_UserPrincipal, c.x_ApiKeyId)) AS DistinctUsersOrKeys
+  FROM first_seen f
+  CROSS JOIN data_start
+  JOIN CostAndUsage c ON c.x_AIProduct = f.x_AIProduct AND c.x_ModelName = f.x_ModelName
+  WHERE f.FirstSeen > data_start.d + 7
+  GROUP BY ALL
+  ORDER BY f.FirstSeen DESC
+params: []
+notes: ''

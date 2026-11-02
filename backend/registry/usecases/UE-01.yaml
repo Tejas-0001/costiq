@@ -1,0 +1,44 @@
+id: UE-01
+source: MM CostIQ AI extension
+title: Cost per active user, by product
+category: Unit Economics
+module: ai
+business_question: What does each AI product cost per active user?
+personas:
+- cfo
+- tech_exec
+- finance_controller
+- fpa_analyst
+catalog_persona: Leadership, Finance
+datasets:
+- Cost and Usage
+- ai_user_activity
+description: Total monthly cost of each product, seats plus usage, divided by the number of people who actually used it that
+  month. This is the honest per-user price of AI, which you can compare with the list seat price.
+columns: 'FOCUS columns: BillingPeriodStart, EffectiveCost · AI extension: x_AIProduct · Supporting: ai_user_activity'
+keywords:
+- cost per user
+- per seat cost
+- cost per active user
+products: M365 Copilot, GitHub Copilot, Claude Enterprise, Claude Code
+sql: |-
+  WITH cost AS (
+    SELECT BillingPeriodStart, x_AIProduct, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage WHERE x_AIProduct IS NOT NULL GROUP BY ALL
+  ),
+  users AS (
+    SELECT date_trunc('month', ActivityDate)::TIMESTAMP AS BillingPeriodStart, x_AIProduct,
+           COUNT(DISTINCT UserPrincipal) AS ActiveUsers
+    FROM ai_user_activity GROUP BY ALL
+  )
+  SELECT
+    strftime(c.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    c.x_AIProduct,
+    ROUND(c.Cost, 2) AS TotalCost,
+    u.ActiveUsers,
+    ROUND(c.Cost / u.ActiveUsers, 2) AS CostPerActiveUser
+  FROM cost c
+  JOIN users u USING (BillingPeriodStart, x_AIProduct)
+  ORDER BY BillingMonth, CostPerActiveUser DESC
+params: []
+notes: ''

@@ -1,0 +1,54 @@
+id: RO-05
+source: MM CostIQ AI extension
+title: Seat commitment utilization
+category: Rate Optimization
+module: rates
+business_question: How many committed seats are actually assigned and active?
+personas:
+- finops_analyst
+- cfo
+- ai_program_owner
+catalog_persona: Procurement, IT Asset Management
+datasets:
+- Contract Commitment
+- Cost and Usage
+- ai_seat_assignment
+- ai_user_activity
+description: For each seat-based commitment, compares seats committed, seats assigned to people, and seats actually active
+  in the last 28 days. Use it to plan true-downs at renewal and to reassign idle seats before buying more.
+columns: 'FOCUS columns: ContractCommitmentId, ContractCommitmentQuantity, ContractCommitmentUnit, ContractCommitmentPeriodEnd,
+  ContractApplied · AI extension: x_AIProduct'
+keywords:
+- true down
+- true-up
+- seat commitment
+products: M365 Copilot, GitHub Copilot, Claude Enterprise
+sql: |-
+  WITH map AS (
+    SELECT DISTINCT json_extract_string(ContractApplied, '$.Elements[0].ContractCommitmentID') AS ContractCommitmentId, x_AIProduct
+    FROM CostAndUsage WHERE ChargeCategory = 'Purchase' AND ConsumedUnit = 'Seats'
+  ),
+  params AS (SELECT MAX(ActivityDate) AS d FROM ai_user_activity),
+  active AS (
+    SELECT x_AIProduct, COUNT(DISTINCT UserPrincipal) AS ActiveUsers28
+    FROM ai_user_activity, params WHERE ActivityDate > params.d - 28 GROUP BY 1
+  ),
+  assigned AS (SELECT x_AIProduct, COUNT(*) AS AssignedSeats FROM ai_seat_assignment GROUP BY 1)
+  SELECT
+    c.ContractCommitmentId,
+    m.x_AIProduct,
+    c.ContractCommitmentQuantity       AS CommittedSeats,
+    a.AssignedSeats,
+    ac.ActiveUsers28,
+    ROUND(100.0 * ac.ActiveUsers28 / c.ContractCommitmentQuantity, 1) AS ActiveVsCommittedPct,
+    CAST(c.ContractCommitmentPeriodEnd AS DATE) AS RenewalDate,
+    c.ContractCommitmentQuantity - ac.ActiveUsers28 AS TrueDownCandidateSeats
+  FROM ContractCommitment c
+  JOIN map m USING (ContractCommitmentId)
+  LEFT JOIN assigned a USING (x_AIProduct)
+  LEFT JOIN active ac USING (x_AIProduct)
+  WHERE c.ContractCommitmentUnit = 'Seats'
+  ORDER BY ActiveVsCommittedPct
+params: []
+adaptation: ContractApplied path uses the FOCUS 1.4 Elements structure
+notes: ''

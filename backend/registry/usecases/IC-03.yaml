@@ -1,0 +1,41 @@
+id: IC-03
+source: MM CostIQ AI extension
+title: Estimated vs. invoiced cost for Claude Code
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: How does Claude Code’s estimated cost compare with what was invoiced?
+personas:
+- finance_controller
+- fpa_analyst
+- finops_analyst
+catalog_persona: Finance, FinOps Practitioner
+datasets:
+- Cost and Usage
+- ai_user_activity
+description: The Claude Code Analytics API reports estimated cost at list price, while the invoice reflects the negotiated
+  rate. This use case compares the two by month, so finance knows which number dashboards show and which one ties to accounts
+  payable.
+columns: ''
+keywords: []
+products: Claude Code
+sql: |-
+  WITH est AS (
+    SELECT date_trunc('month', ActivityDate)::TIMESTAMP AS BillingPeriodStart, SUM(EstimatedCost) AS EstimatedCost
+    FROM ai_user_activity WHERE x_AIProduct = 'claude_code' GROUP BY 1
+  ),
+  inv AS (
+    SELECT BillingPeriodStart, SUM(ListCost) AS ListCost, SUM(EffectiveCost) AS EffectiveCost, SUM(BilledCost) AS BilledCost
+    FROM CostAndUsage WHERE x_AIProduct = 'claude_code' GROUP BY 1
+  )
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    ROUND(e.EstimatedCost, 2) AS AnalyticsEstimatedCost,
+    ROUND(i.ListCost, 2)      AS InvoicedAtList,
+    ROUND(i.BilledCost, 2)    AS InvoicedBilledCost,
+    ROUND(100 * (e.EstimatedCost / NULLIF(i.ListCost, 0) - 1), 2)   AS EstimateVsListPct,
+    ROUND(100 * (1 - i.BilledCost / NULLIF(e.EstimatedCost, 0)), 2) AS DiscountVsEstimatePct
+  FROM est e
+  JOIN inv i USING (BillingPeriodStart)
+  ORDER BY BillingMonth
+params: []
+notes: ''

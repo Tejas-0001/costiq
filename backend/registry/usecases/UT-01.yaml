@@ -1,0 +1,55 @@
+id: UT-01
+source: MM CostIQ Utilities extension
+title: 'Technology spend by FERC account and cost class'
+category: 'Utilities · Regulatory accounting'
+module: utilities
+business_question: 'Does every allocated technology dollar land in a FERC account, and how much is capital, O&M or deferral?'
+personas:
+- regulatory_analyst
+- finance_controller
+- auditor
+- cfo
+catalog_persona: 'Regulatory Accounting, Controller'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Summarizes the allocation chain''s output by legal entity, FERC Uniform System of Accounts account and cost class. Order No. 898 added computer hardware and software accounts inside each plant function; O&M is mapped through ut_ferc_account_map. Dollars with no account are flagged, because they cannot be presented in a rate case or a FERC Form 1 without a manual entry.'
+columns: 'FOCUS columns plus ut_* reference tables and ut_allocated_cost'
+keywords:
+- 'ferc account'
+- 'uniform system of accounts'
+- 'usoa'
+- 'order 898'
+- 'capital'
+- 'o&m'
+- 'unmapped'
+products: Any provider
+sql: |-
+  SELECT
+    LegalEntity,
+    COALESCE(FercAccount, '(unmapped)') AS FercAccount,
+    COALESCE(MAX(FercTitle), 'No FERC account mapped') AS FercTitle,
+    CostClass,
+    COUNT(DISTINCT ChargeKey) AS ChargeLines,
+    ROUND(SUM(AllocatedCost), 2) AS AllocatedCost,
+    CASE WHEN FercAccount IS NULL THEN 'Unmapped' ELSE 'Mapped' END AS Status
+  FROM ut_allocated_cost
+  WHERE PeriodStart >= :period_start AND PeriodStart < :period_end
+  GROUP BY LegalEntity, FercAccount, CostClass
+  ORDER BY CASE WHEN FercAccount IS NULL THEN 0 ELSE 1 END, AllocatedCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'The FERC map is illustrative and owned by the client''s regulatory accounting team. Capital (implementation services) books to 397.2 and deferred subscriptions to 182.3 by rule, before the map is consulted.'
+compliance:
+  area: 'Regulatory accounting'
+  reference: '18 CFR Part 101 (USoA) · FERC Order No. 898'
+  unit: 'account lines'
+  flag: 'Status = ''Unmapped'''
+  amount: AllocatedCost

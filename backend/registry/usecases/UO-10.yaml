@@ -1,0 +1,62 @@
+id: UO-10
+source: MM CostIQ Utilities extension
+title: 'Provisioned throughput utilization and pay-as-you-go break-even'
+category: 'Optimization · AI'
+module: optimization
+business_question: 'Is provisioned AI capacity (PTU, provisioned throughput) used enough to beat pay-as-you-go?'
+personas:
+- ai_program_owner
+- finops_analyst
+- cfo
+catalog_persona: 'AI Program Owner, FinOps Practitioner'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Compares each provisioned deployment''s fixed cost with what its actual tokens would cost at pay-as-you-go list prices (ai_model_catalog), with average utilization.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'ptu'
+- 'provisioned throughput'
+- 'reserved capacity'
+- 'utilization'
+- 'azure openai'
+- 'break even'
+products: Any provider
+sql: |-
+  WITH c AS (
+    SELECT Deployment, Application, ModelName, MAX(Units) AS Units, COUNT(*) AS Days,
+           SUM(DailyCost) AS ProvisionedCost, AVG(UtilizationPct) AS AvgUtilizationPct
+    FROM ai_provisioned_capacity
+    WHERE UsageDate >= :period_start AND UsageDate < :period_end
+    GROUP BY Deployment, Application, ModelName
+  ),
+  t AS (
+    SELECT Application, SUM(Requests * AvgInputTokens) AS InTok, SUM(Requests * AvgOutputTokens) AS OutTok
+    FROM ai_app_telemetry_daily
+    WHERE UsageDate >= :period_start AND UsageDate < :period_end
+    GROUP BY Application
+  ),
+  x AS (
+    SELECT c.*, (t.InTok * m.InputPricePerM + t.OutTok * m.OutputPricePerM) / 1000000 AS Payg
+    FROM c LEFT JOIN t ON t.Application = c.Application LEFT JOIN ai_model_catalog m ON m.ModelName = c.ModelName
+  )
+  SELECT
+    Deployment, Application, ModelName, Units, Days,
+    ROUND(AvgUtilizationPct, 1) AS AvgUtilizationPct,
+    ROUND(ProvisionedCost, 2) AS ProvisionedCost,
+    ROUND(Payg, 2) AS PayAsYouGoEquivalent,
+    ROUND((ProvisionedCost - Payg) / Days * 30, 2) AS MonthlySavingsIfPayg,
+    CASE WHEN AvgUtilizationPct < 50 AND ProvisionedCost > Payg THEN 'Under-utilized: move to pay-as-you-go or fewer units'
+         ELSE 'Provisioning justified' END AS Finding
+  FROM x
+  ORDER BY MonthlySavingsIfPayg DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-23'
+  label: 'End of the period (exclusive)'
+notes: 'Pay-as-you-go equivalents use list prices; negotiated rates move the break-even.'

@@ -1,0 +1,33 @@
+id: UE-05
+source: MM CostIQ AI extension
+title: Copilot Studio cost per answer and action
+category: Unit Economics
+module: ai
+business_question: What does each Copilot Studio agent cost per answer or action?
+personas:
+- ai_program_owner
+catalog_persona: Business Application Owner
+datasets:
+- Cost and Usage
+description: Breaks each agent's consumption down by billable action type (classic answer, generative answer, agent action,
+  Graph grounding), with credits and cost per interaction. Moving an agent toward cheaper action types, for example classic
+  topics for frequent questions, lowers its cost per resolution.
+columns: 'FOCUS columns: EffectiveCost · AI extension: x_AgentName, x_ActionType, x_CreditQuantity, x_RequestCount'
+keywords: []
+products: Copilot Studio
+sql: |-
+  SELECT
+    x_AgentName,
+    x_ActionType,
+    SUM(x_RequestCount)   AS Interactions,
+    SUM(x_CreditQuantity) AS Credits,
+    ROUND(SUM(x_CreditQuantity) / NULLIF(SUM(x_RequestCount), 0), 2) AS CreditsPerInteraction,
+    ROUND(SUM(EffectiveCost) / NULLIF(SUM(x_RequestCount), 0), 4)    AS EffectiveCostPerInteraction,
+    ROUND(100.0 * SUM(x_CreditQuantity) / SUM(SUM(x_CreditQuantity)) OVER (PARTITION BY x_AgentName), 1) AS PctOfAgentCredits
+  FROM CostAndUsage
+  WHERE x_AIProduct = 'copilot_studio' AND ChargeCategory = 'Usage'
+  GROUP BY x_AgentName, x_ActionType
+  ORDER BY x_AgentName, Credits DESC
+params: []
+notes: Credit rates per action in the sample are illustrative. Load the current rates from Microsoft's Copilot Credits licensing
+  guidance.

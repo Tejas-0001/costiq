@@ -1,0 +1,62 @@
+id: F-06
+source: FinOps Foundation FOCUS 1.4
+title: Analyze total cost by allocated resource
+category: Allocation
+module: allocation
+business_question: What does each workload or namespace consume inside shared infrastructure?
+personas:
+- cloud_ops
+- finops_analyst
+catalog_persona: Engineering, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: Aggregate effective cost by allocated resource ID to see what individual workloads or namespaces actually consume
+  within shared infrastructure.
+columns: Allocated Resource ID, Allocated Resource Name, Resource ID, Effective Cost, Charge Period Start, Charge Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/analyze-total-cost-by-allocated-resource/
+published_sql: |-
+  SELECT
+    AllocatedResourceId,
+    AllocatedResourceName,
+    ResourceId AS OriginResourceId,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    COUNT(*) AS ChargeCount
+   FROM focus_data_table
+   WHERE ChargeCategory='Usage'
+    AND ChargePeriodStart >= ? AND ChargePeriodEnd <= ?
+    AND AllocatedMethodId IS NOT NULL
+    AND AllocatedResourceId IS NOT NULL
+   GROUP BY
+    AllocatedResourceId,
+    AllocatedResourceName,
+    ResourceId
+   ORDER BY TotalEffectiveCost DESC
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    AllocatedResourceId,
+    AllocatedResourceName,
+    ResourceId AS OriginResourceId,
+    SUM(EffectiveCost) AS TotalEffectiveCost,
+    COUNT(*) AS ChargeCount
+   FROM focus_data_table
+   WHERE ChargeCategory='Usage'
+    AND ChargePeriodStart >= :period_start AND ChargePeriodEnd <= :period_end
+    AND AllocatedMethodId IS NOT NULL
+    AND AllocatedResourceId IS NOT NULL
+   GROUP BY
+    AllocatedResourceId,
+    AllocatedResourceName,
+    ResourceId
+   ORDER BY TotalEffectiveCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

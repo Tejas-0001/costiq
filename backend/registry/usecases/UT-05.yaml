@@ -1,0 +1,89 @@
+id: UT-05
+source: MM CostIQ Utilities extension
+title: 'Rate-case test-year bridge for cloud, SaaS and AI O&M by vendor'
+category: 'Utilities · Regulatory accounting'
+module: regulatory
+business_question: 'How does each vendor''s cloud, SaaS and AI O&M move from the base period to the test year, and does it tie to invoices?'
+personas:
+- regulatory_analyst
+- cfo
+- finance_controller
+- opco_finance
+catalog_persona: 'Regulatory Accounting & Rates'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'The exhibit a rates team files: base-period actuals for the docket''s operating company and jurisdiction, annualized, then carried to the forecast test year with known-and-measurable renewal escalators. Each vendor''s base period is tied to its invoices; an invoice exception is flagged because it weakens the prudence case.'
+columns: 'FOCUS columns plus ut_* reference tables and ut_allocated_cost'
+keywords:
+- 'rate case'
+- 'test year'
+- 'base period'
+- 'exhibit'
+- 'bridge'
+- 'known and measurable'
+- 'o&m'
+products: Any provider
+sql: |-
+  WITH rc AS (SELECT * FROM ut_rate_case WHERE Docket = :docket),
+  base AS (
+    SELECT a.ServiceProviderName AS Vendor, SUM(a.AllocatedCost) AS BaseActual
+    FROM ut_allocated_cost a JOIN rc ON a.LegalEntity = rc.LegalEntity AND a.Jurisdiction = rc.Jurisdiction
+    WHERE a.CostClass IN ('om', 'deferral') AND a.PeriodStart >= rc.BasePeriodStart AND a.PeriodStart < rc.BasePeriodEnd
+    GROUP BY a.ServiceProviderName
+  ),
+  mo AS (
+    SELECT COUNT(DISTINCT a.PeriodStart) AS n FROM ut_allocated_cost a JOIN rc
+      ON a.PeriodStart >= rc.BasePeriodStart AND a.PeriodStart < rc.BasePeriodEnd
+  ),
+  inv AS (
+    SELECT i.InvoiceIssuerName AS Vendor, SUM(i.BilledCost) AS Invoiced
+    FROM InvoiceDetail i JOIN rc ON i.BillingPeriodStart >= rc.BasePeriodStart AND i.BillingPeriodStart < rc.BasePeriodEnd
+    GROUP BY i.InvoiceIssuerName
+  ),
+  chg AS (
+    SELECT c.InvoiceIssuerName AS Vendor, SUM(c.BilledCost) AS Charged
+    FROM CostAndUsage c JOIN rc ON c.BillingPeriodStart >= rc.BasePeriodStart AND c.BillingPeriodStart < rc.BasePeriodEnd
+    GROUP BY c.InvoiceIssuerName
+  ),
+  fx AS (
+    SELECT b.Vendor, b.BaseActual, b.BaseActual * 12 / mo.n AS Annualized, COALESCE(v.EscalatorPct, 0) AS EscalatorPct,
+           v.RenewalDate,
+           CASE WHEN v.RenewalDate >= rc.TestYearStart AND v.RenewalDate < rc.TestYearEnd
+                THEN (12 - ((EXTRACT(YEAR FROM v.RenewalDate) - EXTRACT(YEAR FROM rc.TestYearStart)) * 12
+                            + EXTRACT(MONTH FROM v.RenewalDate) - EXTRACT(MONTH FROM rc.TestYearStart))) / 12.0
+                WHEN v.RenewalDate < rc.TestYearStart THEN 1.0 ELSE 0.0 END AS EscalatedShare,
+           i.Invoiced, c.Charged
+    FROM base b CROSS JOIN mo CROSS JOIN rc
+    LEFT JOIN ut_vendor v ON v.Vendor = b.Vendor
+    LEFT JOIN inv i ON i.Vendor = b.Vendor
+    LEFT JOIN chg c ON c.Vendor = b.Vendor
+  )
+  SELECT
+    Vendor,
+    ROUND(BaseActual, 2) AS BasePeriodActual,
+    ROUND(Annualized, 2) AS BaseAnnualized,
+    EscalatorPct,
+    CAST(RenewalDate AS DATE) AS RenewalDate,
+    ROUND(Annualized * (1 + EscalatorPct / 100 * EscalatedShare), 2) AS TestYearForecast,
+    ROUND(Annualized * EscalatorPct / 100 * EscalatedShare, 2) AS KnownAndMeasurable,
+    CASE WHEN EscalatedShare > 0 AND EscalatorPct > 0 THEN 'Contract escalator at renewal'
+         ELSE 'Base period annualized' END AS Reason,
+    CASE WHEN Invoiced IS NULL THEN 'Billed via another issuer'
+         WHEN ABS(Invoiced - COALESCE(Charged, 0)) <= 1 THEN 'Tied to invoices'
+         ELSE 'Invoice exception' END AS InvoiceTieOut,
+    ROUND(COALESCE(Invoiced, 0) - COALESCE(Charged, 0), 2) AS InvoiceDifference
+  FROM fx
+  ORDER BY BaseAnnualized DESC
+params:
+- name: docket
+  type: string
+  default: 'OH-26-1105-EL-AIR'
+  label: 'Rate case docket'
+notes: 'Invoice tie-out compares the vendor''s invoices with all of its charges in the base period (every entity), so one exception can affect several dockets.'
+compliance:
+  area: 'Regulatory accounting'
+  reference: 'Rate-case base period and known-and-measurable adjustments'
+  unit: 'vendors'
+  flag: 'InvoiceTieOut = ''Invoice exception'''
+  amount: BasePeriodActual

@@ -1,0 +1,348 @@
+"""Add Meridian Energy's monitoring and optimization data to a CostIQ sample DuckDB file.
+
+  python data/optimization.py sample/costiq_sample.duckdb
+
+Run after data/utility.py. Idempotent. Everything is synthetic and illustrative.
+
+Adds
+  * FOCUS charges (with matching invoice lines) for AI applications the telemetry describes:
+      - interconnection-study-agent on an Azure OpenAI PTU deployment that runs at ~25-40% utilization
+      - doc-search-rag: Bedrock inference + embeddings + an OpenSearch Serverless vector store
+      - outage-summary-bot on a frontier model for short summaries (a model-routing candidate)
+    plus shared-EKS idle capacity and three unattached EBS volumes.
+  * resource_utilization_daily, ai_app_telemetry_daily, ai_provisioned_capacity, optimization_recommendation
+    (AWS Cost Optimization Hub, Azure Advisor), optimization_action (a backlog at every lifecycle stage) and
+    cost_alert_rule.
+"""
+from __future__ import annotations
+import datetime as dt, hashlib, json, os, re, sys
+import duckdb
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+START, AS_OF = dt.date(2026, 7, 1), dt.date(2026, 10, 22)
+AI_ACCOUNT = ("aws-ai-8009", "Meridian AI Platform AWS")
+AI_SUB = ("888800008009", "meridian-ai-platform")
+GRID_ACCOUNT, GRID_SUB = ("aws-grid-8008", "Meridian Grid AWS"), ("888800008008", "meridian-grid-platform")
+MS_ACCOUNT = ("ms-mca-1001", "Meridian MCA")
+SOURCE_AI, SOURCE_PTU = "aws_ai_focus_export", "azure_ptu_focus_export"
+PRICES = {"claude-opus-5-5": (5.0, 25.0), "claude-sonnet-5-5": (3.0, 15.0), "claude-haiku-5-5": (1.0, 5.0),
+          "gpt-5.4": (2.5, 15.0)}  # illustrative list $ per 1M input / output tokens
+PTU = {"deployment": "aoai-ptu-gridplan", "app": "interconnection-study-agent", "model": "gpt-5.4", "units": 50, "daily": 1200.0}
+
+
+def ts(d):
+    return dt.datetime(d.year, d.month, d.day)
+
+
+def next_month(d):
+    return dt.date(d.year + (d.month == 12), d.month % 12 + 1, 1)
+
+
+def h(day, key, spread=0.15):
+    x = int(hashlib.md5(f"{day}{key}".encode()).hexdigest()[:6], 16) / 0xFFFFFF
+    return 1 + spread * (2 * x - 1)
+
+
+def days():
+    d = START
+    while d <= AS_OF:
+        yield d
+        d += dt.timedelta(days=1)
+
+
+# ------------------------------------------------------------------------------------------- LLM app telemetry
+# app, model, cost center, requests/day (weekday), avg input, avg output, max_tokens, failed %, retried %, accepted %,
+# input growth over the window (context bloat), truncation %
+APPS = [
+    ("customer-outage-assistant", "claude-sonnet-5-5", "Customer Operations", 2000, 9000, 400, 1024, 0.03, 0.14, 0.70, 0.0, 0.01),
+    ("grid-model-assistant", "claude-sonnet-5-5", "Transmission Planning", 300, 25000, 900, 2048, 0.01, 0.02, 0.60, 0.0, 0.02),
+    (PTU["app"], PTU["model"], "Transmission Planning", 420, 40000, 2500, 4096, 0.02, 0.04, 0.35, 3.0, 0.12),
+    ("doc-search-rag", "claude-sonnet-5-5", "Corporate IT", 3000, 12000, 600, 1024, 0.01, 0.02, 0.80, 0.0, 0.01),
+    ("outage-summary-bot", "claude-opus-5-5", "Grid Operations", 2400, 6000, 350, 1024, 0.005, 0.01, 0.95, 0.0, 0.0),
+]
+
+
+def telemetry():
+    out = []
+    span = (AS_OF - START).days
+    for d in days():
+        wk = 0.35 if d.weekday() >= 5 else 1.0
+        for app, model, cc, req, ain, aout, mx, fail, retry, acc, growth, trunc in APPS:
+            n = int(req * wk * h(d, app))
+            ain_d = ain * (1 + growth * (d - START).days / span) * h(d, app + "in", 0.08)
+            out.append({"UsageDate": d, "Application": app, "ModelName": model, "Requests": n,
+                        "FailedRequests": int(n * fail), "RetriedRequests": int(n * retry), "AvgInputTokens": round(ain_d, 1),
+                        "AvgOutputTokens": round(aout * h(d, app + "out", 0.1), 1), "MaxTokensSetting": mx,
+                        "TruncatedResponses": int(n * trunc), "AcceptedOutcomes": int(n * acc * h(d, app + "acc", 0.05)),
+                        "LatencyP95Ms": int((2200 if "opus" in model else 1400) * h(d, app + "lat"))})
+    return out
+
+
+def charge(day, cost, account, sub, provider, source, detail, **kw):
+    r = {"BillingAccountId": account[0], "BillingAccountName": account[1], "BillingAccountType": "Billing Account",
+         "BillingCurrency": "USD", "BillingPeriodStart": ts(dt.date(day.year, day.month, 1)), "BillingPeriodEnd": ts(next_month(day)),
+         "ChargeCategory": "Usage", "ChargeFrequency": "Usage-Based", "ChargePeriodStart": ts(day),
+         "ChargePeriodEnd": ts(day + dt.timedelta(days=1)), "BilledCost": round(cost, 4), "EffectiveCost": round(cost, 4),
+         "ListCost": round(cost, 4), "ContractedCost": round(cost, 4), "PricingCategory": "Standard", "PricingCurrency": "USD",
+         "PricingCurrencyEffectiveCost": round(cost, 4), "HostProviderName": provider, "ServiceProviderName": provider,
+         "InvoiceIssuerName": provider, "SubAccountId": sub[0], "SubAccountName": sub[1], "SubAccountType": "Account",
+         "x_CostSource": "invoiced", "x_SourceSystem": source,
+         "InvoiceId": f"INV-{account[0]}-{day:%Y%m}" + ("-AI" if account == MS_ACCOUNT else ""),
+         "InvoiceDetailId": f"IND-{account[0]}-{day:%Y%m}-{detail}"}
+    r.update(kw)
+    return r
+
+
+def ai_charges(tel):
+    out = []
+    by = {(t["UsageDate"], t["Application"]): t for t in tel}
+    for d in days():
+        # Azure OpenAI PTU: a fixed daily cost whatever the traffic
+        t = by[(d, PTU["app"])]
+        tok_in, tok_out = int(t["Requests"] * t["AvgInputTokens"]), int(t["Requests"] * t["AvgOutputTokens"])
+        out.append(charge(d, PTU["daily"], MS_ACCOUNT, ("sub-ms-ai-ptu", "meridian-ai-ptu"), "Microsoft", SOURCE_PTU, "PTU",
+                          ServiceName="Azure OpenAI", ServiceCategory="AI and Machine Learning", ServiceSubcategory="Generative AI",
+                          ChargeDescription=f"Azure OpenAI provisioned throughput {PTU['units']} PTU ({PTU['model']})",
+                          RegionId="eastus2", RegionName="eastus2", ResourceId=f"/subscriptions/ai/{PTU['deployment']}",
+                          ResourceName=PTU["deployment"], ResourceType="Provisioned deployment", SkuId="aoai-ptu",
+                          SkuMeter="PTU-hours", ConsumedQuantity=PTU["units"] * 24, ConsumedUnit="PTU-hours",
+                          PricingQuantity=PTU["units"] * 24, PricingUnit="PTU-hours", x_AIProduct="azure_openai",
+                          x_ModelName=PTU["model"], x_ModelVendor="OpenAI", x_ServiceTier="provisioned", x_TokenType="mixed",
+                          x_InputTokens=tok_in, x_OutputTokens=tok_out, x_CacheReadTokens=0, x_CacheWriteTokens=0,
+                          x_RequestCount=t["Requests"], x_InferenceGeo="us",
+                          Tags=json.dumps({"cost_center": "Transmission Planning", "application": PTU["app"],
+                                           "environment": "prod", "ai_component": "inference"})))
+        # Bedrock token workloads priced from telemetry
+        for app, cc in (("doc-search-rag", "Corporate IT"), ("outage-summary-bot", "Grid Operations")):
+            t = by[(d, app)]
+            pin, pout = PRICES[t["ModelName"]]
+            tin, tout = t["Requests"] * t["AvgInputTokens"], t["Requests"] * t["AvgOutputTokens"]
+            cost = (tin * pin + tout * pout) / 1e6
+            out.append(charge(d, cost, AI_ACCOUNT, AI_SUB, "AWS", SOURCE_AI, "Usage",
+                              ServiceName="Amazon Bedrock", ServiceCategory="AI and Machine Learning", ServiceSubcategory="Generative AI",
+                              ChargeDescription=f"Amazon Bedrock {t['ModelName']} tokens", RegionId="us-east-2", RegionName="us-east-2",
+                              ResourceId=f"arn:aws:bedrock:us-east-2:{AI_SUB[0]}:{app}", ResourceName=app, ResourceType="Model invocation",
+                              SkuId=f"bedrock-{t['ModelName']}", SkuMeter="Tokens", ConsumedQuantity=int(tin + tout), ConsumedUnit="Tokens",
+                              PricingQuantity=(tin + tout) / 1e6, PricingUnit="1M Tokens", x_AIProduct="claude_bedrock",
+                              x_ModelName=t["ModelName"], x_ModelVendor="Anthropic", x_ServiceTier="standard", x_TokenType="mixed",
+                              x_InputTokens=int(tin), x_OutputTokens=int(tout), x_CacheReadTokens=0, x_CacheWriteTokens=0,
+                              x_RequestCount=t["Requests"], x_InferenceGeo="us",
+                              Tags=json.dumps({"cost_center": cc, "application": app, "environment": "prod", "ai_component": "inference"})))
+        # RAG supporting components: embeddings and the vector store
+        for svc, cat, comp, daily, res in (("Amazon Bedrock", "AI and Machine Learning", "embedding", 35, "rag-embeddings"),
+                                           ("Amazon OpenSearch Service", "Databases", "vector_db", 260, "rag-vector-store")):
+            out.append(charge(d, daily * h(d, res), AI_ACCOUNT, AI_SUB, "AWS", SOURCE_AI, "Usage",
+                              ServiceName=svc, ServiceCategory=cat, ServiceSubcategory="Generative AI" if comp == "embedding" else "Search",
+                              ChargeDescription=f"{svc} {res}", RegionId="us-east-2", RegionName="us-east-2",
+                              ResourceId=f"arn:aws:{comp}:us-east-2:{AI_SUB[0]}:{res}", ResourceName=res, ResourceType=svc,
+                              SkuId=f"{res}-sku", SkuMeter="Units", ConsumedQuantity=24, ConsumedUnit="Hours", PricingQuantity=24,
+                              PricingUnit="Hours", x_AIProduct="claude_bedrock" if comp == "embedding" else None,
+                              Tags=json.dumps({"cost_center": "Corporate IT", "application": "doc-search-rag",
+                                               "environment": "prod", "ai_component": comp})))
+        # Unattached EBS volumes left behind by the OMS test rebuild (grid account)
+        for i, daily in enumerate((14, 11, 9), 1):
+            res = f"vol-oms-test-orphan-0{i}"
+            out.append(charge(d, daily, GRID_ACCOUNT, GRID_SUB, "AWS", "aws_grid_focus_export", "Orphans",
+                              ServiceName="Amazon EBS", ServiceCategory="Storage", ServiceSubcategory="Block Storage",
+                              ChargeDescription=f"Amazon EBS gp3 volume {res} (unattached)", RegionId="us-east-2", RegionName="us-east-2",
+                              ResourceId=f"arn:aws:ec2:us-east-2:{GRID_SUB[0]}:volume/{res}", ResourceName=res, ResourceType="Amazon EBS",
+                              SkuId="EBS-gp3", SkuMeter="GB-Month", ConsumedQuantity=500, ConsumedUnit="GB-Month", PricingQuantity=500,
+                              PricingUnit="GB-Month",
+                              Tags=json.dumps({"cost_center": "Grid Operations", "application": "oms-test", "environment": "nonprod"})))
+    return out
+
+
+def eks_idle(con, cols):
+    """Shared-EKS idle capacity: the part of the cluster no workload requested (FOCUS split-cost allocation)."""
+    tmpl = con.execute("""SELECT * FROM CostAndUsage WHERE ResourceName = 'shared-eks' AND AllocatedMethodId IS NOT NULL
+                          ORDER BY ChargePeriodStart LIMIT 1""").fetchone()
+    if not tmpl:
+        return []
+    base = dict(zip(cols, tmpl))
+    out = []
+    for d in days():
+        cost = round(31 * h(d, "eks-idle"), 4)
+        r = dict(base)
+        r.update(ChargePeriodStart=ts(d), ChargePeriodEnd=ts(d + dt.timedelta(days=1)),
+                 BillingPeriodStart=ts(dt.date(d.year, d.month, 1)), BillingPeriodEnd=ts(next_month(d)),
+                 BilledCost=cost, EffectiveCost=cost, ListCost=cost, ContractedCost=cost, PricingCurrencyEffectiveCost=cost,
+                 AllocatedResourceId="idle", AllocatedResourceName="(idle capacity)",
+                 AllocatedTags=json.dumps({"cost_center": "Corporate IT"}),
+                 AllocatedMethodDetails=json.dumps({"Elements": [{"AllocatedRatio": 0.18, "UsageUnit": "vCPU-Hours", "Basis": "unrequested"}]}),
+                 ChargeDescription="Amazon EKS shared-eks idle capacity (unrequested vCPU and memory)",
+                 InvoiceDetailId=f"IND-{base['BillingAccountId']}-{d:%Y%m}-EKSIdle", InvoiceId=f"INV-{base['BillingAccountId']}-{d:%Y%m}-EKS",
+                 x_SourceSystem="aws_focus_export")
+        out.append(r)
+    return out
+
+
+# ------------------------------------------------------------------------------------------- utilization
+# resource name, id prefix, profile (busy | idle | nonprod | rightsize | gpu)
+UTIL = [("adms-dev-ec2", "nonprod"), ("oms-test-ec2", "idle"), ("siting-gis-ec2", "rightsize"),
+        ("gridplan-gpu-endpoint", "gpu"), ("adms-analytics-emr", "busy"), ("mdm-aurora", "busy"), ("oms-app-asg", "busy"),
+        ("portal-eks", "busy"), ("vol-oms-test-orphan-01", "detached"), ("vol-oms-test-orphan-02", "detached"),
+        ("vol-oms-test-orphan-03", "detached")]
+GPU_IDLE_FROM = dt.date(2026, 9, 20)
+
+
+def utilization():
+    out = []
+    for d in days():
+        wkend = d.weekday() >= 5
+        for res, prof in UTIL:
+            cpu, mem, gpu, req, hrs = 0.0, 0.0, None, 0, 24.0
+            if prof == "busy":
+                cpu, mem, req = 62 * h(d, res), 71 * h(d, res + "m"), int(90000 * h(d, res + "r"))
+            elif prof == "nonprod":  # busy in business hours on weekdays, near idle otherwise, but running 24x7
+                cpu = 4 + (0 if wkend else 14 * h(d, res))
+                mem, req = 22 * h(d, res + "m"), 0 if wkend else int(1500 * h(d, res + "r"))
+            elif prof == "idle":
+                cpu, mem, req = 2.1 * h(d, res), 9 * h(d, res + "m"), 0
+            elif prof == "rightsize":
+                rs = d >= dt.date(2026, 9, 1)
+                cpu, mem, req = (58 if rs else 21) * h(d, res), (61 if rs else 24) * h(d, res + "m"), int(4000 * h(d, res + "r"))
+            elif prof == "gpu":
+                busy = d < GPU_IDLE_FROM and not wkend
+                cpu, mem, gpu = (35 if busy else 1.5) * h(d, res), 40 * h(d, res + "m"), (72 * h(d, res + "g") if busy else 0.0)
+                req = int(2400 * h(d, "rq")) if busy else 0
+            elif prof == "detached":
+                cpu, mem, req, hrs = 0.0, 0.0, 0, 24.0
+            out.append({"UsageDate": d, "ResourceId": res, "ResourceName": res, "CpuP95": round(cpu, 2), "MemP95": round(mem, 2),
+                        "GpuUtilAvg": None if gpu is None else round(gpu, 2), "Requests": req, "RunningHours": hrs})
+    return out
+
+
+def ptu_capacity(tel):
+    out = []
+    for t in (t for t in tel if t["Application"] == PTU["app"]):
+        # utilization grows with context size; still far below what 50 PTU can serve
+        util = min(95.0, 100 * t["Requests"] * t["AvgInputTokens"] / 150_000_000)
+        out.append({"UsageDate": t["UsageDate"], "Deployment": PTU["deployment"], "Application": PTU["app"],
+                    "ModelName": PTU["model"], "Units": PTU["units"], "DailyCost": PTU["daily"], "UtilizationPct": round(util, 2)})
+    return out
+
+
+T = dt.datetime
+RECS = [  # id, source, provider, sub, resource, action, current, recommended, monthly cost, savings, effort, restart
+    ("coh-0001", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "oms-test-ec2", "stop_idle", "m6i.4xlarge, CPU p95 2%",
+     "Stop or terminate", 4800, 4800, "low", True),
+    ("coh-0002", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "adms-dev-ec2", "schedule_offhours", "m6i.8xlarge running 24x7",
+     "Run 07:00-19:00 weekdays", 9300, 5980, "low", True),
+    ("coh-0003", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "adms-analytics-emr", "rightsize", "r6g.8xlarge x 6 core nodes",
+     "r6g.4xlarge x 6 core nodes", 24600, 4900, "medium", True),
+    ("coh-0004", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "mdm-aurora", "upgrade_generation", "db.r6i.8xlarge",
+     "db.r7g.8xlarge (Graviton)", 28800, 3460, "medium", True),
+    ("coh-0005", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "adms-lake", "storage_tier", "S3 Standard, 62% objects not read in 90 days",
+     "S3 Intelligent-Tiering", 7200, 2160, "low", False),
+    ("coh-0006", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "vol-oms-test-orphan-01", "delete_unattached",
+     "gp3 500 GiB, unattached 110 days", "Snapshot and delete", 420, 420, "low", False),
+    ("coh-0007", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "vol-oms-test-orphan-02", "delete_unattached",
+     "gp3 500 GiB, unattached 110 days", "Snapshot and delete", 330, 330, "low", False),
+    ("coh-0008", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "vol-oms-test-orphan-03", "delete_unattached",
+     "gp3 500 GiB, unattached 110 days", "Snapshot and delete", 270, 270, "low", False),
+    ("coh-0009", "aws_cost_optimization_hub", "AWS", GRID_SUB[0], "account:888800008008", "purchase_commitment",
+     "On-demand compute $64K/month", "1-year Compute Savings Plan, $28/hour", 64000, 11800, "low", False),
+    ("adv-0001", "azure_advisor", "Microsoft", "sub-ms-ai-ptu", PTU["deployment"], "rightsize", "50 PTU, average utilization 31%",
+     "Pay-as-you-go or 15 PTU", 36000, 29500, "medium", False),
+]
+ACTIONS = [  # id, origin, lever, domain, title, scope type, scope key, cost center, owner, confidence, status, est, dates
+    ("OPT-001", "coh-0001", "idle", "cloud", "Stop idle OMS test instance", "resource", "oms-test-ec2", "Grid Operations",
+     "Grid Operations IT", "provider_recommended", "identified", 4800, (T(2026, 7, 28), None, None, None)),
+    ("OPT-002", "coh-0002", "scheduling", "cloud", "Schedule ADMS dev to business hours", "resource", "adms-dev-ec2", "Grid Operations",
+     "Grid Operations IT", "provider_recommended", "approved", 5980, (T(2026, 8, 20), T(2026, 9, 2), None, None)),
+    ("OPT-003", "manual", "rightsizing", "cloud", "Rightsize renewables siting GIS server", "resource", "siting-gis-ec2",
+     "Renewables Development", "Renewables IT", "costiq_estimated", "verified", 7300, (T(2026, 8, 10), T(2026, 8, 20), T(2026, 9, 1), None)),
+    ("OPT-004", "manual", "rightsizing", "cloud", "Reduce AMI ingest Kinesis shards", "resource", "ami-ingest-kinesis",
+     "Customer Operations", "Customer Operations IT", "costiq_estimated", "implemented", 3700, (T(2026, 8, 25), T(2026, 9, 5), T(2026, 9, 15), None)),
+    ("OPT-005", "UO-09", "gpu_idle", "ai", "Scale grid-planning GPU endpoint to zero when idle", "resource", "gridplan-gpu-endpoint",
+     "Transmission Planning", "Transmission Planning", "costiq_estimated", "identified", 49000, (T(2026, 9, 24), None, None, None)),
+    ("OPT-006", "adv-0001", "ptu", "ai", "Move interconnection agent off 50 PTU", "resource", PTU["deployment"], "Transmission Planning",
+     "AI Program Office", "provider_recommended", "identified", 29500, (T(2026, 8, 1), None, None, None)),
+    ("OPT-007", "UO-05", "seats", "ai", "Reclaim unused Copilot and Claude seats", "seat_pool", "unused_seats", "Corporate IT",
+     "Corporate IT", "costiq_estimated", "approved", 1190, (T(2026, 10, 1), T(2026, 10, 6), None, None)),
+]
+RULES = [
+    ("AR-01", "Cost center forecast over budget", "budget_threshold", "*", 100, "in_app"),
+    ("AR-02", "AI budget will run out before month end", "token_budget", "*", 50, "in_app"),
+    ("AR-03", "Daily spend anomaly", "anomaly", "*", 300, "in_app"),
+    ("AR-04", "Commitment expiring within 90 days", "commitment_expiry", "*", 90, "in_app"),
+    ("AR-05", "Provisioned AI capacity under 50% utilized", "forecast_overrun", "azure_openai", 50, "in_app"),
+]
+
+
+def insert_dicts(con, table, dicts):
+    cols = [r[0] for r in con.execute(f"DESCRIBE {table}").fetchall()]
+    if dicts:
+        con.executemany(f"INSERT INTO {table} VALUES ({', '.join('?' * len(cols))})", [[d.get(c) for c in cols] for d in dicts])
+
+
+def apply(path):
+    con = duckdb.connect(path)
+    text = re.sub(r"--[^\n]*", "", open(os.path.join(ROOT, "schema", "costiq_optimization_schema.sql")).read())
+    for stmt in [s.strip() for s in text.split(";") if s.strip()]:
+        con.execute(stmt)
+    cols = [r[0] for r in con.execute("DESCRIBE CostAndUsage").fetchall()]
+
+    # remove what a previous run added
+    con.execute(f"DELETE FROM CostAndUsage WHERE x_SourceSystem IN ('{SOURCE_AI}', '{SOURCE_PTU}')")
+    con.execute("DELETE FROM CostAndUsage WHERE ResourceName LIKE 'vol-oms-test-orphan-%'")
+    con.execute("DELETE FROM CostAndUsage WHERE ResourceName = 'shared-eks' AND AllocatedResourceId = 'idle'")
+    con.execute("DELETE FROM InvoiceDetail WHERE InvoiceDetailId LIKE '%-PTU' OR InvoiceDetailId LIKE '%-Orphans' "
+                "OR InvoiceDetailId LIKE '%-EKSIdle' OR BillingAccountId = ?", [AI_ACCOUNT[0]])
+
+    tel = telemetry()
+    new = ai_charges(tel) + eks_idle(con, cols)
+    insert_dicts(con, "CostAndUsage", new)
+
+    icol = [r[0] for r in con.execute("DESCRIBE InvoiceDetail").fetchall()]
+    det_ids = sorted({r["InvoiceDetailId"] for r in new})
+    for inv, det, ps, pe, cat, issuer, acct, amt in con.execute(f"""
+            SELECT InvoiceId, InvoiceDetailId, BillingPeriodStart, BillingPeriodEnd, ChargeCategory, InvoiceIssuerName,
+                   BillingAccountId, SUM(BilledCost)
+            FROM CostAndUsage WHERE InvoiceDetailId IN ({', '.join('?' * len(det_ids))}) GROUP BY ALL""", det_ids).fetchall():
+        issued = pe.date() <= AS_OF
+        rec = {"BilledCost": amt, "BillingAccountId": acct, "BillingCurrency": "USD", "BillingPeriodEnd": pe,
+               "BillingPeriodStart": ps, "ChargeCategory": cat, "InvoiceDetailCreated": pe,
+               "InvoiceDetailDescription": f"{issuer} {cat} charges", "InvoiceDetailGrain": json.dumps({"ChargeCategory": cat}),
+               "InvoiceDetailId": det, "InvoiceDetailLastUpdated": pe + dt.timedelta(days=3), "InvoiceId": inv,
+               "InvoiceIssueDate": pe + dt.timedelta(days=2) if issued else None, "InvoiceIssueStatus": "Issued" if issued else "Open",
+               "InvoiceIssuerName": issuer, "PaymentCurrency": "USD", "PaymentCurrencyBilledCost": amt,
+               "PaymentCurrencyInvoiceDetailId": "PAY-" + det, "PaymentDueDate": pe + dt.timedelta(days=32) if issued else None,
+               "PaymentTerms": "Net 30", "PurchaseOrderNumber": "PO-IT-2026-AI", "ReferenceInvoiceId": None}
+        con.execute(f"INSERT INTO InvoiceDetail VALUES ({', '.join('?' * len(icol))})", [rec[c] for c in icol])
+
+    for t in ("resource_utilization_daily", "ai_app_telemetry_daily", "ai_provisioned_capacity", "optimization_recommendation",
+              "optimization_action", "cost_alert_rule", "cost_alert_event"):
+        con.execute(f"DELETE FROM {t}")
+    insert_dicts(con, "ai_app_telemetry_daily", tel)
+    insert_dicts(con, "resource_utilization_daily", utilization())
+    insert_dicts(con, "ai_provisioned_capacity", ptu_capacity(tel))
+    insert_dicts(con, "optimization_recommendation", [
+        {"RecommendationId": i, "Source": s, "ServiceProviderName": p, "SubAccountId": sub, "ResourceId": res, "ResourceName": res,
+         "ActionType": a, "CurrentResourceSummary": cur, "RecommendedResourceSummary": rec, "CurrentMonthlyCost": c,
+         "EstimatedMonthlySavings": sv, "Effort": e, "RestartNeeded": rs, "RefreshedAt": T(2026, 10, 21, 4, 0)}
+        for i, s, p, sub, res, a, cur, rec, c, sv, e, rs in RECS])
+    insert_dicts(con, "optimization_action", [
+        {"OptimizationId": i, "Origin": o, "Lever": lv, "Domain": dm, "Title": tt, "ScopeType": st, "ScopeKey": sk,
+         "CostCenter": cc, "Owner": ow, "Confidence": cf, "Status": status, "EstimatedMonthlySavings": est,
+         "IdentifiedOn": dates[0], "ApprovedOn": dates[1], "ImplementedOn": dates[2], "VerifiedOn": dates[3],
+         "ImplementedBy": "demo.cloud_ops@meridian.example" if dates[2] else None}
+        for i, o, lv, dm, tt, st, sk, cc, ow, cf, status, est, dates in ACTIONS])
+    # AI budgets sized for the utility's AI stack (the base sample's budgets predate it)
+    for cc, amt in (("Transmission Planning", 95000), ("Corporate IT", 16000), ("Grid Operations", 16000),
+                    ("Customer Operations", 9000)):
+        con.execute("UPDATE ai_budget SET BudgetAmount = ? WHERE CostCenter = ?", [amt, cc])
+    insert_dicts(con, "cost_alert_rule", [
+        {"RuleId": r, "Name": n, "Kind": k, "Target": t, "ThresholdPct": th, "Channel": ch, "Enabled": True}
+        for r, n, k, t, th, ch in RULES])
+    from utility import refresh_budgets  # data/ is on sys.path when run as a script
+    refresh_budgets(con)
+    con.execute("CHECKPOINT")
+    con.close()
+    print(f"{path}: {len(new)} optimization charge rows, {len(tel)} telemetry rows, {len(RECS)} recommendations, "
+          f"{len(ACTIONS)} optimization actions")
+
+
+if __name__ == "__main__":
+    for p in sys.argv[1:] or [os.path.join(ROOT, "sample", "costiq_sample.duckdb")]:
+        apply(p)

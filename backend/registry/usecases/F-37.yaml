@@ -1,0 +1,69 @@
+id: F-37
+source: FinOps Foundation FOCUS 1.4
+title: Determine contracted savings by virtual currency
+category: Planning & Estimating
+module: rates
+business_question: How much are our contracts saving us on virtual-currency pricing?
+personas:
+- finance_controller
+- fpa_analyst
+- finops_analyst
+catalog_persona: Finance, FinOps Practitioner
+datasets:
+- Cost and Usage
+- Contract Commitment
+- Invoice Detail
+description: Compares the contracted rate in virtual currency with the list price to measure the difference, showing the savings
+  from contract terms that reduce the virtual-currency price of certain operations.
+columns: Service Name, Service Subcategory, Charge Description, Billing Currency, Pricing Currency, Pricing Currency List
+  Unit Price, Pricing Currency Contracted Unit Price, List Unit Price, Contracted Unit Price, Charge Period End, Charge Period
+  Start
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/determine-contracted-savings-by-virtual-currency/
+published_sql: |-
+  SELECT
+          ServiceName,
+          ServiceSubcategory,
+          ChargeDescription,
+          BillingCurrency,
+          PricingCurrency,
+          SUM(PricingCurrencyListUnitPrice-PricingCurrencyContractedUnitPrice) AS ContractedSavingsInPricingCurrency,
+          SUM(ListUnitPrice - ContractedUnitPrice) AS ContractedSavingsInBillingCurrency
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  AND PricingCurrencyListUnitPrice > PricingCurrencyContractedUnitPrice
+  GROUP BY
+          ServiceName,
+          ServiceSubcategory,
+          ChargeDescription,
+          BillingCurrency,
+          PricingCurrency
+adaptation: Placeholders named
+sql: |-
+  SELECT
+          ServiceName,
+          ServiceSubcategory,
+          ChargeDescription,
+          BillingCurrency,
+          PricingCurrency,
+          SUM(PricingCurrencyListUnitPrice-PricingCurrencyContractedUnitPrice) AS ContractedSavingsInPricingCurrency,
+          SUM(ListUnitPrice - ContractedUnitPrice) AS ContractedSavingsInBillingCurrency
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+  AND PricingCurrencyListUnitPrice > PricingCurrencyContractedUnitPrice
+  GROUP BY
+          ServiceName,
+          ServiceSubcategory,
+          ChargeDescription,
+          BillingCurrency,
+          PricingCurrency
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

@@ -1,0 +1,46 @@
+id: F-35
+source: FinOps Foundation FOCUS 1.4
+title: Understand the billing account or sub account entity
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: Which billing accounts and subaccounts had charges, and what type is each?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: List all billing and sub-accounts with charges in the period, showing service provider, account ID, name, and
+  type.
+columns: Service Provider Name, Billing Account ID, Billing Account Name, Billing Account Type, Charge Period Start, Charge
+  Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/understand-the-billing-account-or-sub-account-entity-2/
+published_sql: |-
+  SELECT DISTINCT
+      ServiceProviderName,
+      BillingAccountID,
+      BillingAccountName,
+      BillingAccountType
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+adaptation: Placeholders named
+sql: |-
+  SELECT DISTINCT
+      ServiceProviderName,
+      BillingAccountID,
+      BillingAccountName,
+      BillingAccountType
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

@@ -1,0 +1,75 @@
+id: F-28
+source: FinOps Foundation FOCUS 1.4
+title: Calculate average rate of a component resource
+category: Budgeting & Forecasting
+module: budgets
+business_question: What is our average rate per core (or other component) across SKUs and regions?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: Aggregate usage and pricing across multiple SKUs to compute the average cost per core for each virtual machine
+  series by region. This common denominator supports benchmarking when billed and consumed units differ.
+columns: Service Provider Name, Service Name, Pricing Unit, Region Name, SKU Price Details, Charge Period Start, Charge Period
+  End, Effective Cost
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/calculate-average-rate-of-a-component-resource-2/
+published_sql: |-
+  SELECT
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      JSON_UNQUOTE(JSON_EXTRACT(SkuPriceDetails, '$.InstanceSeries')) AS InstanceSeries,
+      SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(SkuPriceDetails, '$.CoreCount')) AS UNSIGNED)) AS TotalCoreCount,
+      CASE
+          WHEN SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(SkuPriceDetails, '$.CoreCount')) AS UNSIGNED)) > 0
+          THEN SUM(EffectiveCost) / SUM(CAST(JSON_UNQUOTE(JSON_EXTRACT(SkuPriceDetails, '$.CoreCount')) AS UNSIGNED))
+          ELSE NULL
+      END AS AverageEffectiveCoreCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  AND JSON_CONTAINS_PATH(SkuPriceDetails, 'all', '$.CoreCount', '$.InstanceSeries')
+  GROUP BY
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      InstanceSeries
+adaptation: Rewritten for portability (see notes)
+sql: |-
+  SELECT
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      json_extract_string(SkuPriceDetails, '$.InstanceSeries') AS InstanceSeries,
+      SUM(CAST(json_extract_string(SkuPriceDetails, '$.CoreCount') AS INTEGER)) AS TotalCoreCount,
+      CASE
+          WHEN SUM(CAST(json_extract_string(SkuPriceDetails, '$.CoreCount') AS INTEGER)) > 0
+          THEN SUM(EffectiveCost) / SUM(CAST(json_extract_string(SkuPriceDetails, '$.CoreCount') AS INTEGER))
+          ELSE NULL
+      END AS AverageEffectiveCoreCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+    AND json_extract_string(SkuPriceDetails, '$.CoreCount') IS NOT NULL
+    AND json_extract_string(SkuPriceDetails, '$.InstanceSeries') IS NOT NULL
+  GROUP BY
+      ServiceProviderName,
+      ServiceName,
+      PricingUnit,
+      RegionName,
+      json_extract_string(SkuPriceDetails, '$.InstanceSeries')
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The query uses MySQL-style JSON functions (`JSON_EXTRACT`, `JSON_UNQUOTE`, `JSON_CONTAINS_PATH`, `CAST ... AS UNSIGNED`)
+  on SkuPriceDetails.'

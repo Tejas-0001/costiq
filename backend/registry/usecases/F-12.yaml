@@ -1,0 +1,54 @@
+id: F-12
+source: FinOps Foundation FOCUS 1.4
+title: Verify accuracy of provider invoices aka invoice reconciliation
+category: Allocation
+module: allocation
+business_question: Do our provider invoices match the billing data line for line?
+personas:
+- finance_controller
+- fpa_analyst
+- finops_analyst
+- cfo
+- tech_exec
+catalog_persona: Finance, FinOps Practitioner, Leadership
+datasets:
+- Billing Period
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: Aggregate provider billing data per period and reconcile it against provider invoices to check charge accuracy,
+  flag discrepancies and support financial accountability.
+columns: Invoice Issuer Name, Invoice ID, Billed Cost, Charge Period Start, Charge Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/verify-accuracy-of-provider-invoices-aka-invoice-reconciliation/
+published_sql: |-
+  SELECT
+      InvoiceIssuerName,
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  GROUP BY
+      InvoiceIssuerName,
+      InvoiceId
+adaptation: Placeholders named
+sql: |-
+  SELECT
+      InvoiceIssuerName,
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+  GROUP BY
+      InvoiceIssuerName,
+      InvoiceId
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

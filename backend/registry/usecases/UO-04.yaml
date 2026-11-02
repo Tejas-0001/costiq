@@ -1,0 +1,48 @@
+id: UO-04
+source: MM CostIQ AI extension
+title: 'Model right-sizing: frontier models on simple tasks'
+category: Usage Optimization
+module: anomalies
+business_question: Where are frontier models doing work a cheaper model could do?
+personas:
+- cloud_ops
+catalog_persona: Engineering, Architecture
+datasets:
+- Cost and Usage
+- ai_model_catalog
+description: Finds applications running frontier-tier models with short outputs, which usually means extraction, classification
+  or routing work that a cheaper model could handle. It then estimates the cost at the vendor's balanced-tier list prices.
+columns: 'FOCUS columns: Tags, ListCost · AI extension: x_ModelName, x_ModelVendor, x_*Tokens · Supporting: ai_model_catalog'
+keywords:
+- model right sizing
+- cheaper model
+- frontier model
+products: Claude (all channels), Azure OpenAI
+sql: |-
+  WITH frontier AS (
+    SELECT
+      COALESCE(json_extract_string(c.Tags, '$.application'), c.x_WorkspaceName) AS Application,
+      c.x_AIProduct, c.x_ModelName, c.x_ModelVendor,
+      SUM(c.x_InputTokens) AS inp, SUM(c.x_CacheReadTokens) AS cr, SUM(c.x_CacheWriteTokens) AS cw, SUM(c.x_OutputTokens) AS outp,
+      SUM(c.ListCost) AS ListCost
+    FROM CostAndUsage c
+    JOIN ai_model_catalog m ON m.ModelName = c.x_ModelName AND m.ModelTier = 'frontier'
+    WHERE c.ChargeCategory = 'Usage'
+    GROUP BY ALL
+  ),
+  alt AS (
+    SELECT ModelVendor, ModelName AS AltModel, InputPricePerM, OutputPricePerM, CacheReadPricePerM, CacheWritePricePerM
+    FROM ai_model_catalog WHERE ModelTier = 'balanced' AND Approved
+  )
+  SELECT
+    f.Application, f.x_AIProduct, f.x_ModelName, a.AltModel,
+    ROUND(f.outp / NULLIF(f.inp + f.cr + f.cw, 0), 3) AS OutputToInputRatio,
+    ROUND(f.ListCost, 2) AS CurrentListCost,
+    ROUND((f.inp * a.InputPricePerM + f.cr * a.CacheReadPricePerM + f.cw * a.CacheWritePricePerM + f.outp * a.OutputPricePerM) / 1e6, 2) AS AltModelListCost,
+    ROUND(f.ListCost - (f.inp * a.InputPricePerM + f.cr * a.CacheReadPricePerM + f.cw * a.CacheWritePricePerM + f.outp * a.OutputPricePerM) / 1e6, 2) AS EstimatedListSavings
+  FROM frontier f
+  JOIN alt a ON a.ModelVendor = f.x_ModelVendor
+  ORDER BY EstimatedListSavings DESC
+params: []
+notes: These are candidates, not decisions. Before switching models, validate quality with an evaluation set. Applications
+  with an output-to-input ratio under 0.05 are the usual first targets.

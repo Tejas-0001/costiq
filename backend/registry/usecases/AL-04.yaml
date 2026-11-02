@@ -1,0 +1,36 @@
+id: AL-04
+source: MM CostIQ AI extension
+title: Allocate Copilot Studio credits and cost by agent
+category: Allocation
+module: allocation
+business_question: Which Copilot Studio agents consume credits, and how much comes from packs vs. pay-as-you-go?
+personas:
+- finops_analyst
+- ai_program_owner
+catalog_persona: FinOps Practitioner, Business Application Owner
+datasets:
+- Cost and Usage
+description: Copilot Studio meters in Copilot Credits, and each billable action consumes a different number of credits. Credits
+  are drawn from a prepaid capacity pack first; anything beyond the pack goes to pay-as-you-go. This use case shows how many
+  credits each agent consumed, how much came from the pack and how much from PAYG, and what each portion cost.
+columns: 'FOCUS columns: BillingPeriodStart, PricingCategory, EffectiveCost, BilledCost, Tags · AI extension: x_AgentName,
+  x_CreditQuantity'
+keywords: []
+products: Copilot Studio
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m')                                         AS BillingMonth,
+    x_AgentName,
+    json_extract_string(Tags, '$.cost_center')                                    AS CostCenter,
+    SUM(x_CreditQuantity)                                                         AS CreditsConsumed,
+    SUM(CASE WHEN PricingCategory = 'Committed' THEN x_CreditQuantity ELSE 0 END) AS CreditsFromPack,
+    SUM(CASE WHEN PricingCategory = 'Standard'  THEN x_CreditQuantity ELSE 0 END) AS CreditsPayAsYouGo,
+    ROUND(SUM(EffectiveCost), 2)                                                  AS EffectiveCost,
+    ROUND(SUM(BilledCost), 2)                                                     AS BilledCostPayg
+  FROM CostAndUsage
+  WHERE x_AIProduct = 'copilot_studio' AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  ORDER BY BillingMonth, CreditsConsumed DESC
+params: []
+notes: Pack usage rows have BilledCost = 0, because the pack was billed when it was purchased. Their EffectiveCost carries
+  the amortized pack rate, so EffectiveCost is the right measure for allocation.

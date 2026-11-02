@@ -1,0 +1,51 @@
+id: UT-06
+source: MM CostIQ Utilities extension
+title: 'Renewals and price escalators landing in a rate-case test year'
+category: 'Utilities · Regulatory accounting'
+module: utilities
+business_question: 'Which contract renewals and escalators fall inside the test year and should be filed as known-and-measurable changes?'
+personas:
+- regulatory_analyst
+- finops_analyst
+- cfo
+catalog_persona: 'Regulatory Accounting, Vendor Management'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Lists vendors whose renewal date falls inside the docket''s forecast test year, with the escalator and its annual dollar effect. Missing these understates the test year; renegotiating them before filing is a prudence point.'
+columns: 'FOCUS columns plus ut_* reference tables and ut_allocated_cost'
+keywords:
+- 'renewal'
+- 'escalator'
+- 'price increase'
+- 'known and measurable'
+- 'test year'
+- 'contract'
+products: Any provider
+sql: |-
+  SELECT
+    rc.Docket,
+    v.Vendor,
+    CAST(v.RenewalDate AS DATE) AS RenewalDate,
+    v.EscalatorPct,
+    ROUND(v.AnnualContractValue, 2) AS AnnualContractValue,
+    ROUND(v.AnnualContractValue * v.EscalatorPct / 100, 2) AS AnnualEscalation,
+    CASE WHEN v.RenewalDate >= rc.TestYearStart AND v.RenewalDate < rc.TestYearEnd THEN 'In test year'
+         WHEN v.RenewalDate < rc.TestYearStart THEN 'Before test year'
+         ELSE 'After test year' END AS Timing
+  FROM ut_vendor v
+  CROSS JOIN ut_rate_case rc
+  WHERE rc.Docket = :docket AND v.EscalatorPct > 0
+  ORDER BY v.RenewalDate
+params:
+- name: docket
+  type: string
+  default: 'OH-26-1105-EL-AIR'
+  label: 'Rate case docket'
+notes: 'Annual contract values come from ut_vendor (vendor management); escalators apply from the renewal date.'
+compliance:
+  area: 'Regulatory accounting'
+  reference: 'Known-and-measurable test-year adjustments'
+  unit: 'contracts'
+  flag: 'Timing = ''In test year'''
+  amount: AnnualEscalation

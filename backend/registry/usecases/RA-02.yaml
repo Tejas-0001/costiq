@@ -1,0 +1,39 @@
+id: RA-02
+source: MM CostIQ AI extension
+title: Token consumption by model and token type
+category: Reporting & Analytics
+module: explorer
+business_question: How many tokens of each type does each model consume, and at what cost?
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: FinOps Practitioner, Engineering
+datasets:
+- Cost and Usage
+description: Shows how many uncached input, cache read, cache write and output tokens each model consumed, and what they cost.
+  This is the core token-utilization view.
+columns: 'FOCUS columns: BillingPeriodStart, EffectiveCost · AI extension: x_ModelVendor, x_ModelName, x_InputTokens, x_CacheReadTokens,
+  x_CacheWriteTokens, x_OutputTokens'
+keywords:
+- tokens
+- token usage
+- token consumption
+- how many tokens
+products: Claude (all channels), Azure OpenAI, GitHub Copilot
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    x_ModelVendor,
+    x_ModelName,
+    SUM(x_InputTokens)      AS UncachedInputTokens,
+    SUM(x_CacheReadTokens)  AS CacheReadTokens,
+    SUM(x_CacheWriteTokens) AS CacheWriteTokens,
+    SUM(x_OutputTokens)     AS OutputTokens,
+    SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens + x_OutputTokens) AS TotalTokens,
+    ROUND(SUM(EffectiveCost), 2) AS EffectiveCost
+  FROM CostAndUsage
+  WHERE x_ModelName IS NOT NULL
+  GROUP BY ALL
+  ORDER BY BillingMonth, EffectiveCost DESC
+params: []
+notes: ''

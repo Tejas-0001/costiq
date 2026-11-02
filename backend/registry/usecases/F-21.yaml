@@ -1,0 +1,46 @@
+id: F-21
+source: FinOps Foundation FOCUS 1.4
+title: Compare billed cost per subaccount to budget
+category: Budgeting & Forecasting
+module: budgets
+business_question: Is each subaccount’s billed cost within its budget?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: Product wants to confirm charges are in line with expectations (budgets), for a business whose costs all sit
+  within one subaccount.
+columns: Service Provider Name, Sub Account ID, Sub Account Name, Charge Category, Charge Period Start, Charge Period End
+keywords:
+- budget
+- over budget
+- subaccount budget
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/compare-billed-cost-per-subaccount-to-budget-2/
+published_sql: "SELECT\n  ServiceProviderName,\n  SubAccountId,\n  SubAccountName,\n  SUM(BilledCost) AS TotalBilledCost\n\
+  FROM focus_data_table\nWHERE ChargeCategory = 'Usage'\n  AND ChargePeriodStart >= ? and ChargePeriodEnd <= ?\n  AND ServiceProviderName\
+  \ = ?  \n  AND SubAccountId = ?  \nGROUP BY\n  ServiceProviderName,\n  SubAccountId,\n  SubAccountName"
+adaptation: Placeholders named
+sql: "SELECT\n  ServiceProviderName,\n  SubAccountId,\n  SubAccountName,\n  SUM(BilledCost) AS TotalBilledCost\nFROM focus_data_table\n\
+  WHERE ChargeCategory = 'Usage'\n  AND ChargePeriodStart >= :period_start and ChargePeriodEnd <= :period_end\n  AND ServiceProviderName\
+  \ = :provider  \n  AND SubAccountId = :sub_account_id  \nGROUP BY\n  ServiceProviderName,\n  SubAccountId,\n  SubAccountName"
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+- name: provider
+  type: string
+  default: AWS
+  label: Service provider name
+- name: sub_account_id
+  type: string
+  default: '333333333333'
+  label: Sub account (AWS account, subscription, project)
+notes: '- The query uses Billed Cost, which the page''s column list does not include.'

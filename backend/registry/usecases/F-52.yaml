@@ -1,0 +1,65 @@
+id: F-52
+source: FinOps Foundation FOCUS 1.4
+title: Analyze service costs by subaccount
+category: Reporting & Analytics
+module: explorer
+business_question: Which services cost the most in each subaccount?
+personas:
+- cloud_ops
+catalog_persona: Engineering
+datasets:
+- Cost and Usage
+description: By understanding the services incurring the highest cost in a subaccount for a period of time, Engineers can
+  get a high-level picture of where to prioritize their efforts when it comes to optimizing usage.
+columns: Sub Account ID, Sub Account Name, Service Name, Charge Period Start, Charge Period End, Effective Cost
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/service-costs-subaccount/
+published_sql: |-
+  SELECT
+    ChargePeriodStart,
+    SubAccountId,
+    SubAccountName,
+    ServiceName,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE SubAccountID = ?
+    AND ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+  GROUP BY
+    ChargePeriodStart,
+    SubAccountId,
+    SubAccountName,
+    ServiceName
+  ORDER BY SUM(EffectiveCost) DESC
+  LIMIT 10
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ChargePeriodStart,
+    SubAccountId,
+    SubAccountName,
+    ServiceName,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE SubAccountID = :sub_account_id
+    AND ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+  GROUP BY
+    ChargePeriodStart,
+    SubAccountId,
+    SubAccountName,
+    ServiceName
+  ORDER BY SUM(EffectiveCost) DESC
+  LIMIT 10
+params:
+- name: sub_account_id
+  type: string
+  default: '222222222222'
+  label: Sub account (AWS account, subscription, project)
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

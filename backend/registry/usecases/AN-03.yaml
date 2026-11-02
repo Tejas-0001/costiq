@@ -1,0 +1,38 @@
+id: AN-03
+source: MM CostIQ AI extension
+title: Per-developer daily usage outliers
+category: Anomaly Management
+module: anomalies
+business_question: Has any developer’s daily AI cost spiked far above normal?
+personas:
+- tech_exec
+catalog_persona: Engineering Leadership
+datasets:
+- ai_user_activity
+description: Flags developers whose daily coding-assistant cost was at least four times their own trailing 14-day average
+  and over $20. Typical causes are long autonomous agent sessions, very large repositories pulled into context, and stuck
+  loops.
+columns: 'Supporting: ai_user_activity.EstimatedCost, ai_user_directory'
+keywords: []
+products: Claude Code, GitHub Copilot
+sql: |-
+  WITH daily AS (
+    SELECT ActivityDate, x_AIProduct, UserPrincipal, SUM(EstimatedCost) AS Cost
+    FROM ai_user_activity
+    WHERE x_AIProduct IN ('claude_code', 'github_copilot')
+    GROUP BY ALL
+  ),
+  scored AS (
+    SELECT *, AVG(Cost) OVER (PARTITION BY x_AIProduct, UserPrincipal ORDER BY ActivityDate
+                              ROWS BETWEEN 14 PRECEDING AND 1 PRECEDING) AS Baseline
+    FROM daily
+  )
+  SELECT s.ActivityDate, s.x_AIProduct, s.UserPrincipal, d.Department,
+         ROUND(s.Cost, 2) AS EstimatedCost, ROUND(s.Baseline, 2) AS Trailing14DayAvg,
+         ROUND(s.Cost / NULLIF(s.Baseline, 0), 1) AS Multiple
+  FROM scored s
+  LEFT JOIN ai_user_directory d USING (UserPrincipal)
+  WHERE s.Cost > 20 AND s.Cost >= 4 * s.Baseline
+  ORDER BY s.ActivityDate DESC
+params: []
+notes: ''

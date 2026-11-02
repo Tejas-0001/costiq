@@ -1,0 +1,40 @@
+id: RA-04
+source: MM CostIQ AI extension
+title: 'Blended cost per 1M tokens: same model, different channel'
+category: Reporting & Analytics
+module: explorer
+business_question: What is the blended cost per 1M tokens for each model and channel?
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: FinOps Practitioner, Architecture
+datasets:
+- Cost and Usage
+description: Unit prices alone don't show what an application actually pays. The token mix matters, especially how many input
+  tokens are served from cache. This use case calculates blended cost per million tokens and cache share for each model and
+  channel, so a workload can be placed on the cheapest channel for its pattern.
+columns: 'FOCUS columns: EffectiveCost · AI extension: x_ModelName, x_AIProduct, x_*Tokens'
+keywords:
+- cost per million tokens
+- per 1m tokens
+- cheapest channel
+products: Claude (API, Bedrock, Vertex, Foundry, Claude Code, Claude Enterprise), GitHub Copilot, Azure OpenAI
+sql: |-
+  SELECT
+    x_ModelName,
+    x_AIProduct AS Channel,
+    SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens + x_OutputTokens) AS TotalTokens,
+    ROUND(100.0 * SUM(x_CacheReadTokens)
+          / NULLIF(SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens), 0), 1) AS PctInputFromCache,
+    ROUND(100.0 * SUM(x_OutputTokens)
+          / NULLIF(SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens + x_OutputTokens), 0), 1) AS PctOutput,
+    ROUND(SUM(EffectiveCost), 2) AS EffectiveCost,
+    ROUND(SUM(EffectiveCost)
+          / NULLIF(SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens + x_OutputTokens), 0) * 1e6, 4) AS BlendedCostPer1M
+  FROM CostAndUsage
+  WHERE x_ModelName IS NOT NULL AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  ORDER BY x_ModelName, BlendedCostPer1M
+params: []
+notes: GitHub Copilot's EffectiveCost is net of included AI credits, so its blended rate looks artificially low. Use ListCost
+  instead of EffectiveCost for a gross comparison.

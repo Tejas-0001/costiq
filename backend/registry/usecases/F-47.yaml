@@ -1,0 +1,74 @@
+id: F-47
+source: FinOps Foundation FOCUS 1.4
+title: Identify unused commitments
+category: Rate Optimization
+module: rates
+business_question: Which commitments are unused, so we can reassign, resell or resize them?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: Identify all data in a time period where CommitmentDiscountStatus is unused, thus identifying commitments that
+  aren't used and enabling the Practitioner to take action on either selling the commitment (if able), working with other
+  personas
+columns: Service Provider Name, Billing Account ID, Commitment Discount ID, Commitment Discount Type, Billed Cost, Charge
+  Period Start, Charge Period End, Effective Cost, Commitment Discount Status
+keywords:
+- unused savings plan
+- wasted commitment
+- unused commitment
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/identify-unused-commitments-2/
+published_sql: |-
+  SELECT
+    MIN(ChargePeriodStart) AS ChargePeriodStart,
+    MAX(ChargePeriodEnd) AS ChargePeriodEnd,
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountStatus,
+    SUM(BilledCost) AS TotalBilledCost,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+    AND CommitmentDiscountStatus = 'Unused'
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountStatus
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    MIN(ChargePeriodStart) AS ChargePeriodStart,
+    MAX(ChargePeriodEnd) AS ChargePeriodEnd,
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountStatus,
+    SUM(BilledCost) AS TotalBilledCost,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+    AND CommitmentDiscountStatus = 'Unused'
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    CommitmentDiscountId,
+    CommitmentDiscountType,
+    CommitmentDiscountStatus
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

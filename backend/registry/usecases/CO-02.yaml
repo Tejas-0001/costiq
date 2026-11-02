@@ -1,0 +1,57 @@
+id: CO-02
+source: MM CostIQ Utilities extension
+title: 'Idle and unattached resources'
+category: 'Optimization · Cloud'
+module: optimization
+business_question: 'Which resources are running and billing but doing no work?'
+personas:
+- finops_analyst
+- cloud_ops
+- tech_exec
+catalog_persona: 'Cloud Operations'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Resources whose CPU p95 stayed under 5% with no requests for 14 days (utilization exports), and unattached volumes. Under ratemaking, spend on assets that are not used and useful is exposed to disallowance, so idle resources are both waste and prudence risk.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'idle'
+- 'unused'
+- 'unattached'
+- 'orphaned volume'
+- 'zombie'
+- 'not used and useful'
+- 'stop instance'
+products: Any provider
+sql: |-
+  WITH u AS (
+    SELECT ResourceName, MAX(CpuP95) AS MaxCpuP95, SUM(Requests) AS Requests
+    FROM resource_utilization_daily
+    WHERE UsageDate > CAST(:as_of AS DATE) - INTERVAL '14' DAY AND UsageDate <= CAST(:as_of AS DATE)
+    GROUP BY ResourceName
+  ),
+  spend AS (
+    SELECT ResourceName, MAX(json_extract_string(Tags, '$.cost_center')) AS CostCenter, MAX(ServiceName) AS ServiceName,
+           SUM(EffectiveCost) AS Last30DaysCost
+    FROM CostAndUsage
+    WHERE ChargePeriodStart > CAST(:as_of AS TIMESTAMP) - INTERVAL '30' DAY
+      AND ChargePeriodStart <= CAST(:as_of AS TIMESTAMP)
+    GROUP BY ResourceName
+  )
+  SELECT
+    u.ResourceName, s.CostCenter, s.ServiceName,
+    ROUND(u.MaxCpuP95, 1) AS MaxCpuP95Last14Days,
+    u.Requests AS RequestsLast14Days,
+    CASE WHEN s.ServiceName = 'Amazon EBS' THEN 'Unattached volume' ELSE 'Idle: no requests, CPU p95 under 5%' END AS Finding,
+    ROUND(s.Last30DaysCost, 2) AS Last30DaysCost,
+    ROUND(s.Last30DaysCost, 2) AS EstimatedMonthlySavings
+  FROM u
+  JOIN spend s ON s.ResourceName = u.ResourceName
+  WHERE u.MaxCpuP95 < 5 AND u.Requests = 0
+  ORDER BY EstimatedMonthlySavings DESC
+params:
+- name: as_of
+  type: date
+  default: '2026-10-22'
+  label: 'Evaluate as of'
+notes: 'Snapshot before deleting volumes; stopping is reversible.'

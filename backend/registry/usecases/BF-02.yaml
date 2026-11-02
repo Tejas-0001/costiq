@@ -1,0 +1,53 @@
+id: BF-02
+source: MM CostIQ AI extension
+title: Forecast month-end AI spend by product
+category: Budgeting & Forecasting
+module: budgets
+business_question: Where will AI spend land at month end, by product?
+personas:
+- finance_controller
+- fpa_analyst
+- finops_analyst
+catalog_persona: Finance, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: Projects this month's spend for each product. Recurring seat purchases are counted as fixed; usage is projected
+  from the last 7 days' average. The projection is compared with last month's actual.
+columns: 'FOCUS columns: BillingPeriodStart, ChargePeriodStart, ChargeCategory, EffectiveCost · AI extension: x_AIProduct'
+keywords:
+- forecast
+- month end
+- projection
+- where will we land
+products: All
+sql: |-
+  WITH params AS (SELECT MAX(ChargePeriodStart) AS d FROM CostAndUsage),
+  cur AS (
+    SELECT x_AIProduct,
+           SUM(EffectiveCost) FILTER (WHERE ChargeCategory <> 'Usage') AS FixedCost,
+           SUM(EffectiveCost) FILTER (WHERE ChargeCategory = 'Usage')  AS UsageMTD,
+           SUM(EffectiveCost) FILTER (WHERE ChargeCategory = 'Usage' AND ChargePeriodStart > params.d - INTERVAL 7 DAY) / 7 AS DailyRunRate
+    FROM CostAndUsage, params
+    WHERE x_AIProduct IS NOT NULL AND BillingPeriodStart = date_trunc('month', params.d)
+    GROUP BY ALL
+  ),
+  prev AS (
+    SELECT x_AIProduct, SUM(EffectiveCost) AS PriorMonthCost
+    FROM CostAndUsage, params
+    WHERE x_AIProduct IS NOT NULL AND BillingPeriodStart = date_trunc('month', params.d) - INTERVAL 1 MONTH
+    GROUP BY ALL
+  )
+  SELECT
+    c.x_AIProduct,
+    ROUND(COALESCE(c.FixedCost, 0) + COALESCE(c.UsageMTD, 0), 2) AS MonthToDate,
+    ROUND(COALESCE(c.FixedCost, 0) + COALESCE(c.UsageMTD, 0)
+          + COALESCE(c.DailyRunRate, 0) * date_diff('day', CAST(params.d AS DATE), last_day(params.d)), 2) AS ForecastMonthEnd,
+    ROUND(p.PriorMonthCost, 2) AS PriorMonthActual,
+    ROUND(100 * ((COALESCE(c.FixedCost, 0) + COALESCE(c.UsageMTD, 0)
+          + COALESCE(c.DailyRunRate, 0) * date_diff('day', CAST(params.d AS DATE), last_day(params.d))) / NULLIF(p.PriorMonthCost, 0) - 1), 1) AS PctVsPriorMonth
+  FROM cur c
+  CROSS JOIN params
+  LEFT JOIN prev p USING (x_AIProduct)
+  ORDER BY ForecastMonthEnd DESC
+params: []
+notes: ''

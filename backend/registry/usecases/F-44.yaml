@@ -1,0 +1,127 @@
+id: F-44
+source: FinOps Foundation FOCUS 1.4
+title: Discount Effectiveness by Service
+category: Rate Optimization
+module: rates
+business_question: How effective are our discounts, service by service?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+- cfo
+catalog_persona: FinOps Practitioner, Finance, Procurement
+datasets:
+- Cost and Usage
+- Invoice Detail
+- Contract Commitment
+- Billing Period
+description: Compares ListCost, ContractedCost, EffectiveCost, and BilledCost per service to quantify negotiated and effective
+  discounts.
+columns: Billed Cost, Contracted Cost, Effective Cost, List Cost, Billing Account ID, Billing Account Name, Billing Currency,
+  Billing Period End, Billing Period Start, Charge Category, Charge Period End, Charge Period Start, Commitment Discount ID,
+  Invoice Issuer Name, Service Name, Service Provider Name
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/discount-effectiveness-by-service/
+published_sql: |-
+  WITH AggregatedData AS (
+    SELECT
+      ServiceProviderName,
+      BillingAccountId,
+      BillingAccountName,
+      BillingCurrency,
+      ServiceName,
+      SUM(EffectiveCost) AS TotalEffectiveCost,
+      SUM(BilledCost) AS TotalBilledCost,
+      SUM(
+        CASE
+          WHEN ChargeCategory = 'Usage' AND BilledCost = 0 AND EffectiveCost <> 0
+          THEN 0
+          ELSE ContractedCost
+        END
+      ) AS TotalContractedCost,
+      SUM(
+        CASE
+          WHEN ChargeCategory = 'Usage' AND BilledCost = 0 AND EffectiveCost <> 0
+          THEN 0
+          ELSE ListCost
+        END
+      ) AS TotalListCost
+    FROM focus_data_table
+    WHERE
+      BillingPeriodStart >= ? AND BillingPeriodEnd < ? AND ChargeClass IS NULL
+    GROUP BY
+      ServiceProviderName,
+      BillingAccountId,
+      BillingAccountName,
+      BillingCurrency,
+      ServiceName
+  )
+  SELECT
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency,
+    ServiceName,
+    TotalEffectiveCost,
+    TotalBilledCost,
+    TotalListCost,
+    (1 - TotalContractedCost / NULLIF(TotalListCost, 0)) * 100 AS ContractedDiscount,
+    (1 - TotalEffectiveCost / NULLIF(TotalListCost, 0)) * 100 AS EffectiveDiscount
+  FROM AggregatedData
+adaptation: Placeholders named
+sql: |-
+  WITH AggregatedData AS (
+    SELECT
+      ServiceProviderName,
+      BillingAccountId,
+      BillingAccountName,
+      BillingCurrency,
+      ServiceName,
+      SUM(EffectiveCost) AS TotalEffectiveCost,
+      SUM(BilledCost) AS TotalBilledCost,
+      SUM(
+        CASE
+          WHEN ChargeCategory = 'Usage' AND BilledCost = 0 AND EffectiveCost <> 0
+          THEN 0
+          ELSE ContractedCost
+        END
+      ) AS TotalContractedCost,
+      SUM(
+        CASE
+          WHEN ChargeCategory = 'Usage' AND BilledCost = 0 AND EffectiveCost <> 0
+          THEN 0
+          ELSE ListCost
+        END
+      ) AS TotalListCost
+    FROM focus_data_table
+    WHERE
+      BillingPeriodStart >= :period_start AND BillingPeriodEnd < :period_end AND ChargeClass IS NULL
+    GROUP BY
+      ServiceProviderName,
+      BillingAccountId,
+      BillingAccountName,
+      BillingCurrency,
+      ServiceName
+  )
+  SELECT
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency,
+    ServiceName,
+    TotalEffectiveCost,
+    TotalBilledCost,
+    TotalListCost,
+    (1 - TotalContractedCost / NULLIF(TotalListCost, 0)) * 100 AS ContractedDiscount,
+    (1 - TotalEffectiveCost / NULLIF(TotalListCost, 0)) * 100 AS EffectiveDiscount
+  FROM AggregatedData
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

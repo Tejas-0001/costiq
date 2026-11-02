@@ -1,0 +1,59 @@
+id: F-25
+source: FinOps Foundation FOCUS 1.4
+title: Verify accuracy of service provider invoices
+category: Data Ingestion
+module: reconciliation
+business_question: Do provider invoices match our usage data for the billing period?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+- Billing Period
+description: The goal is to verify that the charges found in the FOCUS dataset match those of the service providers' invoices.
+  A FinOps Practitioner totals service provider cost data for a billing period and compares the totals to the invoices.
+columns: Service Provider Name, Billing Account ID, Billing Account Name, Billing Currency, Billed Cost, Billing Period Start,
+  Billing Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/verify-accuracy-of-service-provider-invoices/
+published_sql: |-
+  SELECT
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE BillingPeriodStart >= ? AND BillingPeriodEnd < ?
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency,
+    SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE BillingPeriodStart >= :period_start AND BillingPeriodEnd < :period_end
+  GROUP BY
+    ServiceProviderName,
+    BillingAccountId,
+    BillingAccountName,
+    BillingCurrency
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

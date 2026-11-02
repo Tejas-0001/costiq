@@ -1,0 +1,60 @@
+id: UO-13
+source: MM CostIQ Utilities extension
+title: 'Cost per accepted outcome by LLM application'
+category: 'Optimization · AI'
+module: optimization
+business_question: 'What does each LLM application cost per request and per outcome a user actually accepted?'
+personas:
+- ai_program_owner
+- finops_analyst
+- cfo
+- tech_exec
+catalog_persona: 'AI Program Owner, CFO'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'All AI cost of an application (inference, embeddings, vector store) divided by its requests and by the outcomes users or workflows accepted. Cost per accepted outcome is the unit to manage and to defend in a rate case; cost per prompt rewards answers nobody uses.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'unit cost'
+- 'cost per answer'
+- 'cost per outcome'
+- 'accepted'
+- 'value'
+- 'roi'
+- 'rag'
+products: Any provider
+sql: |-
+  WITH t AS (
+    SELECT Application, MAX(ModelName) AS ModelName, SUM(Requests) AS Requests, SUM(AcceptedOutcomes) AS Accepted
+    FROM ai_app_telemetry_daily
+    WHERE UsageDate >= :period_start AND UsageDate < :period_end
+    GROUP BY Application
+  ),
+  c AS (
+    SELECT json_extract_string(Tags, '$.application') AS Application, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage
+    WHERE (x_AIProduct IS NOT NULL OR json_extract_string(Tags, '$.ai_component') IS NOT NULL)
+      AND ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+    GROUP BY json_extract_string(Tags, '$.application')
+  )
+  SELECT
+    t.Application, t.ModelName, t.Requests,
+    t.Accepted AS AcceptedOutcomes,
+    ROUND(100.0 * t.Accepted / NULLIF(t.Requests, 0), 1) AS AcceptancePct,
+    ROUND(c.Cost, 2) AS Cost,
+    ROUND(c.Cost / NULLIF(t.Requests, 0), 4) AS CostPerRequest,
+    ROUND(c.Cost / NULLIF(t.Accepted, 0), 4) AS CostPerAcceptedOutcome
+  FROM t
+  JOIN c ON c.Application = t.Application
+  ORDER BY CostPerAcceptedOutcome DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-23'
+  label: 'End of the period (exclusive)'
+notes: 'Accepted outcomes come from application telemetry (thumbs-up, task completed, ticket closed).'

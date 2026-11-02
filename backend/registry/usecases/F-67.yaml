@@ -1,0 +1,53 @@
+id: F-67
+source: FinOps Foundation FOCUS 1.4
+title: Analyze credit memos
+category: Unit Economics
+module: reconciliation
+business_question: Which credit memos did providers issue, and how much did they reduce net spend?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+description: Locate Service Provider-issued credit memos in billing data and analyze how each one reduces net spend.
+columns: Service Provider Name, Invoice ID, Billed Cost, Charge Period Start, Charge Period End, Charge Category
+keywords:
+- credit memo
+- credits
+- refund
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/analyze-credit-memos-2/
+published_sql: |-
+  SELECT
+      ServiceProviderName,
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  AND ChargeCategory = 'Credit'
+  GROUP BY
+      ServiceProviderName,
+      InvoiceId
+adaptation: Placeholders named
+sql: |-
+  SELECT
+      ServiceProviderName,
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+  AND ChargeCategory = 'Credit'
+  GROUP BY
+      ServiceProviderName,
+      InvoiceId
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

@@ -1,0 +1,74 @@
+id: F-42
+source: FinOps Foundation FOCUS 1.4
+title: Commitment Discount Effective Cost Breakdown
+category: Rate Optimization
+module: rates
+business_question: How is commitment discount cost amortized across periods and workloads?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+catalog_persona: FinOps Practitioner, Finance
+datasets:
+- Cost and Usage
+- Billing Period
+- Invoice Detail
+- Contract Commitment
+description: Analyzes commitment discount amortization by charge period. Filters to Usage charges that have a Commitment Discount
+  ID and groups by Commitment Discount ID and
+columns: Effective Cost, Billing Period End, Billing Period Start, Charge Category, Charge Period End, Charge Period Start,
+  Commitment Discount ID, Commitment Discount Status, Consumed Quantity, Consumed Unit, Pricing Quantity, Region Name, Service
+  Name, Service Provider Name
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/commitment-discount-effective-cost-breakdown/
+published_sql: |-
+  SELECT
+    ServiceProviderName,
+    CommitmentDiscountId,
+    CommitmentDiscountStatus,
+    ChargePeriodStart,
+    ChargePeriodEnd,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE
+    ChargePeriodStart >= ?
+    AND ChargePeriodEnd < ?
+    AND NOT CommitmentDiscountId IS NULL
+    AND ChargeCategory = 'Usage'
+  GROUP BY
+    ServiceProviderName,
+    CommitmentDiscountId,
+    CommitmentDiscountStatus,
+    ChargePeriodStart,
+    ChargePeriodEnd
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ServiceProviderName,
+    CommitmentDiscountId,
+    CommitmentDiscountStatus,
+    ChargePeriodStart,
+    ChargePeriodEnd,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE
+    ChargePeriodStart >= :period_start
+    AND ChargePeriodEnd < :period_end
+    AND NOT CommitmentDiscountId IS NULL
+    AND ChargeCategory = 'Usage'
+  GROUP BY
+    ServiceProviderName,
+    CommitmentDiscountId,
+    CommitmentDiscountStatus,
+    ChargePeriodStart,
+    ChargePeriodEnd
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

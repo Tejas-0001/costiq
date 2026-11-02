@@ -1,0 +1,68 @@
+id: AL-05
+source: MM CostIQ AI extension
+title: 'Per-user AI showback: seats plus usage'
+category: Allocation
+module: allocation
+business_question: What is each person’s total AI cost, seats plus usage?
+personas:
+- finance_controller
+- fpa_analyst
+- pl_exec
+catalog_persona: Finance, Department Heads
+datasets:
+- Cost and Usage
+- ai_seat_assignment
+- ai_user_activity
+- ai_user_directory
+description: 'Puts each person''s monthly AI cost on one row: seat licenses they hold, usage billed to them by name (GitHub
+  AI credits, Claude Enterprise usage credits), and their share of Claude Code. Rolled up by department, it shows department
+  heads the full cost of their people''s AI use.'
+columns: 'FOCUS columns: BillingPeriodStart, EffectiveCost · AI extension: x_UserPrincipal, x_AIProduct · Supporting: ai_seat_assignment,
+  ai_user_activity, ai_user_directory'
+keywords:
+- per user ai cost
+- showback
+- per person
+products: M365 Copilot, GitHub Copilot, Claude Enterprise, Claude Code
+sql: |-
+  WITH months AS (
+    SELECT DISTINCT BillingPeriodStart FROM CostAndUsage
+  ),
+  seat AS (
+    SELECT m.BillingPeriodStart, s.UserPrincipal, s.x_AIProduct, s.MonthlySeatCost AS Cost, 'seat' AS CostType
+    FROM ai_seat_assignment s
+    JOIN months m ON s.AssignedDate <= CAST(m.BillingPeriodStart AS DATE)
+  ),
+  named_usage AS (
+    SELECT BillingPeriodStart, x_UserPrincipal AS UserPrincipal, x_AIProduct, SUM(EffectiveCost) AS Cost, 'usage' AS CostType
+    FROM CostAndUsage
+    WHERE x_UserPrincipal IS NOT NULL
+    GROUP BY ALL
+  ),
+  claude_code AS (
+    SELECT date_trunc('month', a.ActivityDate)::TIMESTAMP AS BillingPeriodStart, a.UserPrincipal, 'claude_code' AS x_AIProduct,
+           SUM(a.EstimatedCost * i.Ratio) AS Cost, 'usage' AS CostType
+    FROM ai_user_activity a
+    JOIN (SELECT CAST(ChargePeriodStart AS DATE) AS d, SUM(EffectiveCost) / NULLIF(SUM(ListCost), 0) AS Ratio
+          FROM CostAndUsage WHERE x_AIProduct = 'claude_code' GROUP BY 1) i ON i.d = a.ActivityDate
+    WHERE a.x_AIProduct = 'claude_code'
+    GROUP BY ALL
+  ),
+  all_cost AS (
+    SELECT * FROM seat UNION ALL SELECT * FROM named_usage UNION ALL SELECT * FROM claude_code
+  )
+  SELECT
+    strftime(c.BillingPeriodStart, '%Y-%m')                            AS BillingMonth,
+    c.UserPrincipal,
+    d.Department,
+    ROUND(SUM(CASE WHEN CostType = 'seat'  THEN Cost ELSE 0 END), 2)   AS SeatCost,
+    ROUND(SUM(CASE WHEN CostType = 'usage' THEN Cost ELSE 0 END), 2)   AS UsageCost,
+    ROUND(SUM(Cost), 2)                                                AS TotalAICost,
+    string_agg(DISTINCT c.x_AIProduct, ', ' ORDER BY c.x_AIProduct)    AS Products
+  FROM all_cost c
+  LEFT JOIN ai_user_directory d USING (UserPrincipal)
+  GROUP BY ALL
+  ORDER BY BillingMonth, TotalAICost DESC
+params: []
+notes: Claude Code usage is valued at the ratio of invoiced cost to list cost for that day, so the per-user totals reconcile
+  to the invoice. Seat cost uses the current roster. For history, snapshot ai_seat_assignment every month.

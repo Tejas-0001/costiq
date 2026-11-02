@@ -1,0 +1,54 @@
+id: F-36
+source: FinOps Foundation FOCUS 1.4
+title: Validate Tax Variance
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: Is the tax on each invoice what we expected?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+catalog_persona: FinOps Practitioner, Finance
+datasets:
+- Cost and Usage
+- Invoice Detail
+- Contract Commitment
+description: Identifies the tax component in the Invoice Detail dataset, which is typically excluded from Cost and Usage,
+  so that usage, tax, and the total invoice amount can be matched.
+columns: Billed Cost, Invoice ID, Invoice Detail ID, Payment Currency Billed Cost, Payment Currency Invoice Detail ID, Billing
+  Currency, Charge Category, Invoice Issue Status, Payment Currency, Service Category
+keywords:
+- tax
+- tax variance
+- vat
+- sales tax
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/validate-tax-variance/
+published_sql: |-
+  SELECT
+    InvoiceId,
+    SUM(CASE WHEN ChargeCategory = 'Tax' THEN BilledCost ELSE 0 END) AS TotalTaxAmount,
+    SUM(CASE WHEN ChargeCategory <> 'Tax' THEN BilledCost ELSE 0 END) AS TotalServiceAmount,
+    SUM(BilledCost) AS GrandTotalPayable
+  FROM InvoiceDetail
+  WHERE
+    InvoiceId = ?
+  GROUP BY
+    InvoiceId
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    InvoiceId,
+    SUM(CASE WHEN ChargeCategory = 'Tax' THEN BilledCost ELSE 0 END) AS TotalTaxAmount,
+    SUM(CASE WHEN ChargeCategory <> 'Tax' THEN BilledCost ELSE 0 END) AS TotalServiceAmount,
+    SUM(BilledCost) AS GrandTotalPayable
+  FROM InvoiceDetail
+  WHERE
+    InvoiceId = :invoice_id
+  GROUP BY
+    InvoiceId
+params:
+- name: invoice_id
+  type: string
+  default: INV-GITHUB-gh-ent-5005-202608
+  label: Invoice ID
+notes: ''

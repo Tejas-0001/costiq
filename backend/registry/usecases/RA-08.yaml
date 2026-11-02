@@ -1,0 +1,36 @@
+id: RA-08
+source: MM CostIQ AI extension
+title: Model vendor vs. billing provider matrix
+category: Reporting & Analytics
+module: explorer
+business_question: Which companies bill us for each model vendor’s models?
+personas:
+- finops_analyst
+- cfo
+- tech_exec
+catalog_persona: Procurement, Leadership
+datasets:
+- Cost and Usage
+description: 'Shows, for each model vendor, who actually bills you for it: the service provider, host provider and invoice
+  issuer. Anthropic models, for example, reach you directly and through AWS, Google Cloud, Microsoft and GitHub. Use this
+  before vendor negotiations to see your total exposure to each model vendor.'
+columns: 'FOCUS columns: ServiceProviderName, HostProviderName, InvoiceIssuerName, EffectiveCost · AI extension: x_ModelVendor,
+  x_ModelName'
+keywords: []
+products: All token-billed products
+sql: |-
+  SELECT
+    x_ModelVendor,
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName,
+    string_agg(DISTINCT x_ModelName, ', ')       AS Models,
+    ROUND(SUM(EffectiveCost), 2)                  AS EffectiveCost,
+    ROUND(100 * SUM(EffectiveCost) / SUM(SUM(EffectiveCost)) OVER (PARTITION BY x_ModelVendor), 1) AS PctOfVendorSpend
+  FROM CostAndUsage
+  WHERE x_ModelVendor IS NOT NULL
+  GROUP BY x_ModelVendor, ServiceProviderName, HostProviderName, InvoiceIssuerName
+  ORDER BY x_ModelVendor, EffectiveCost DESC
+params: []
+notes: FOCUS 1.3 deprecated PublisherName, and ServiceProviderName and HostProviderName don't name the company that built
+  the model. `x_ModelVendor` fills that gap.

@@ -1,0 +1,37 @@
+id: AL-06
+source: MM CostIQ AI extension
+title: Measure AI cost attribution coverage
+category: Allocation
+module: allocation
+business_question: How much AI spend lacks a cost center, application or owner?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Cost and Usage
+description: 'Allocation is only as good as its tags. This use case shows, per product and month, what share of spend has
+  a cost center, an application and an owning identity: a user, an API key or an agent. It also isolates Claude API spend
+  with no API key or no workspace.'
+columns: 'FOCUS columns: BillingPeriodStart, Tags, EffectiveCost · AI extension: x_AIProduct, x_UserPrincipal, x_ApiKeyId,
+  x_AgentId, x_WorkspaceId'
+keywords: []
+products: All
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    x_AIProduct,
+    ROUND(SUM(EffectiveCost), 2) AS EffectiveCost,
+    ROUND(100 * SUM(CASE WHEN json_extract_string(Tags, '$.cost_center') IS NOT NULL THEN EffectiveCost ELSE 0 END)
+          / NULLIF(SUM(EffectiveCost), 0), 1) AS PctWithCostCenter,
+    ROUND(100 * SUM(CASE WHEN json_extract_string(Tags, '$.application') IS NOT NULL THEN EffectiveCost ELSE 0 END)
+          / NULLIF(SUM(EffectiveCost), 0), 1) AS PctWithApplication,
+    ROUND(100 * SUM(CASE WHEN COALESCE(x_UserPrincipal, x_ApiKeyId, x_AgentId) IS NOT NULL THEN EffectiveCost ELSE 0 END)
+          / NULLIF(SUM(EffectiveCost), 0), 1) AS PctWithOwnerIdentity,
+    ROUND(SUM(CASE WHEN x_AIProduct = 'claude_api' AND (x_ApiKeyId IS NULL OR x_WorkspaceId IS NULL)
+                   THEN EffectiveCost ELSE 0 END), 2) AS ClaudeNoKeyOrDefaultWorkspaceCost
+  FROM CostAndUsage
+  WHERE x_AIProduct IS NOT NULL AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  ORDER BY BillingMonth, EffectiveCost DESC
+params: []
+notes: ''

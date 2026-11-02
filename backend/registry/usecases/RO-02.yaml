@@ -1,0 +1,57 @@
+id: RO-02
+source: MM CostIQ AI extension
+title: Spend commitment drawdown (Anthropic commit, Azure MACC, AWS EDP)
+category: Rate Optimization
+module: rates
+business_question: Are we on track to meet our Anthropic, Azure and AWS spend commitments?
+personas:
+- finops_analyst
+- cfo
+- finance_controller
+- fpa_analyst
+catalog_persona: Procurement, Finance
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: 'Tracks AI spend against each spend-based commitment: consumed to date, the straight-line target for this point
+  in the term, and a projection to term end at the last 30 days'' run rate. This gives early warning of a shortfall, where
+  you would pay for unused commitment, or of hitting the commitment early.'
+columns: 'FOCUS columns: ContractCommitmentId, ContractCommitmentCategory, ContractCommitmentQuantity, ContractCommitmentPeriodStart/End,
+  ContractApplied, EffectiveCost, ChargePeriodStart'
+keywords:
+- commitment shortfall
+- on track commit
+- anthropic commit
+- macc drawdown
+products: Claude API, Azure OpenAI, Claude in Foundry, Claude on Bedrock, Copilot Studio PAYG
+sql: |-
+  WITH params AS (SELECT MAX(ChargePeriodStart) AS d FROM CostAndUsage),
+  spend AS (
+    SELECT json_extract_string(ContractApplied, '$.Elements[0].ContractCommitmentID') AS ContractCommitmentId,
+           SUM(EffectiveCost) AS ConsumedToDate,
+           SUM(EffectiveCost) FILTER (WHERE ChargePeriodStart > params.d - INTERVAL 30 DAY) AS Last30DaySpend
+    FROM CostAndUsage, params
+    WHERE ContractApplied IS NOT NULL
+    GROUP BY ALL
+  )
+  SELECT
+    c.ContractCommitmentId,
+    c.ServiceProviderName,
+    c.ContractCommitmentQuantity AS CommitmentAmount,
+    CAST(c.ContractCommitmentPeriodStart AS DATE) AS TermStart,
+    CAST(c.ContractCommitmentPeriodEnd AS DATE)   AS TermEnd,
+    ROUND(s.ConsumedToDate, 2) AS AISpendConsumedToDate,
+    ROUND(c.ContractCommitmentQuantity * date_diff('day', c.ContractCommitmentPeriodStart, params.d)
+          / date_diff('day', c.ContractCommitmentPeriodStart, c.ContractCommitmentPeriodEnd), 2) AS StraightLineTarget,
+    ROUND(s.ConsumedToDate + s.Last30DaySpend / 30 * date_diff('day', params.d, c.ContractCommitmentPeriodEnd), 2) AS ProjectedAtTermEnd,
+    ROUND(c.ContractCommitmentQuantity
+          - (s.ConsumedToDate + s.Last30DaySpend / 30 * date_diff('day', params.d, c.ContractCommitmentPeriodEnd)), 2) AS ProjectedShortfall
+  FROM ContractCommitment c
+  JOIN spend s USING (ContractCommitmentId)
+  CROSS JOIN params
+  WHERE c.ContractCommitmentCategory = 'Spend'
+  ORDER BY ProjectedShortfall DESC
+params: []
+adaptation: ContractApplied path uses the FOCUS 1.4 Elements structure
+notes: MACC and EDP are drawn down by all eligible cloud spend, not just AI. Run this on the full multi-cloud FOCUS dataset
+  for the true position. Consumption before your FOCUS history starts must be loaded or entered as an opening balance.

@@ -1,0 +1,35 @@
+id: RA-05
+source: MM CostIQ AI extension
+title: Tokens per request and output ratio by application
+category: Reporting & Analytics
+module: explorer
+business_question: How large are each application’s prompts and responses, and what does a request cost?
+personas:
+- cloud_ops
+- finops_analyst
+catalog_persona: Engineering, FinOps Practitioner
+datasets:
+- Cost and Usage
+description: 'Looks at the shape of each application''s requests: average input context, average output, and output''s share
+  of total tokens. Very large contexts point to caching or retrieval tuning. Very short outputs on frontier models point to
+  model right-sizing (see UO-04).'
+columns: 'FOCUS columns: Tags, EffectiveCost · AI extension: x_RequestCount, x_ModelName, x_*Tokens'
+keywords: []
+products: Claude API
+sql: |-
+  SELECT
+    json_extract_string(Tags, '$.application') AS Application,
+    x_ModelName,
+    SUM(x_RequestCount) AS Requests,
+    ROUND(SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens) / NULLIF(SUM(x_RequestCount), 0)) AS AvgInputTokensPerRequest,
+    ROUND(SUM(x_OutputTokens) / NULLIF(SUM(x_RequestCount), 0)) AS AvgOutputTokensPerRequest,
+    ROUND(SUM(x_OutputTokens) / NULLIF(SUM(x_InputTokens + x_CacheReadTokens + x_CacheWriteTokens), 0), 3) AS OutputToInputRatio,
+    ROUND(SUM(EffectiveCost) / NULLIF(SUM(x_RequestCount), 0), 5) AS CostPerRequest
+  FROM CostAndUsage
+  WHERE x_AIProduct = 'claude_api' AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  HAVING SUM(x_RequestCount) > 0
+  ORDER BY CostPerRequest DESC
+params: []
+notes: The Usage API doesn't return a request count. x_RequestCount comes from your gateway or application logs, or from OpenTelemetry.
+  Leave it null where you don't have it.

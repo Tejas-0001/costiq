@@ -1,0 +1,59 @@
+id: UO-09
+source: MM CostIQ Utilities extension
+title: 'Idle GPU and model endpoints'
+category: 'Optimization · AI'
+module: optimization
+business_question: 'Which GPU or model endpoints billed for capacity on days they served no requests?'
+personas:
+- ai_program_owner
+- finops_analyst
+- tech_exec
+- cfo
+catalog_persona: 'AI Program Owner, FinOps Practitioner'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Hourly-billed AI endpoints (real-time inference, GPU hosting) by day, counting days with zero requests. Scale-to-zero, serverless inference or a schedule removes most of the idle cost.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'gpu'
+- 'endpoint'
+- 'idle'
+- 'sagemaker'
+- 'inference endpoint'
+- 'scale to zero'
+- 'model hosting'
+products: Any provider
+sql: |-
+  WITH d AS (
+    SELECT CAST(ChargePeriodStart AS DATE) AS Day, ResourceName,
+           json_extract_string(Tags, '$.application') AS Application,
+           json_extract_string(Tags, '$.cost_center') AS CostCenter,
+           SUM(EffectiveCost) AS Cost, SUM(COALESCE(x_RequestCount, 0)) AS Requests
+    FROM CostAndUsage
+    WHERE ServiceCategory = 'AI and Machine Learning' AND ConsumedUnit = 'Hours' AND x_AIProduct IS NOT NULL
+      AND ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+    GROUP BY CAST(ChargePeriodStart AS DATE), ResourceName, json_extract_string(Tags, '$.application'),
+             json_extract_string(Tags, '$.cost_center')
+  )
+  SELECT
+    ResourceName, Application, CostCenter,
+    COUNT(*) AS DaysBilled,
+    SUM(CASE WHEN Requests = 0 THEN 1 ELSE 0 END) AS IdleDays,
+    MIN(CASE WHEN Requests = 0 THEN Day END) AS FirstIdleDay,
+    ROUND(SUM(CASE WHEN Requests = 0 THEN Cost ELSE 0 END), 2) AS IdleCost,
+    ROUND(SUM(Cost), 2) AS TotalCost
+  FROM d
+  GROUP BY ResourceName, Application, CostCenter
+  HAVING SUM(CASE WHEN Requests = 0 THEN 1 ELSE 0 END) > 0
+  ORDER BY IdleCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-23'
+  label: 'End of the period (exclusive)'
+notes: 'Request counts come from the endpoint''s metrics (x_RequestCount).'

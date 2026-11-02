@@ -1,0 +1,63 @@
+id: F-64
+source: FinOps Foundation FOCUS 1.4
+title: Report on initial contract commitments
+category: Reporting & Analytics
+module: explorer
+business_question: What did we commit to at contract signing, by provider and commitment?
+personas:
+- cfo
+- tech_exec
+- finops_analyst
+catalog_persona: Leadership, Procurement
+datasets:
+- Cost and Usage
+- Contract Commitment
+description: 'Aggregate initial contract commitment purchases to understand total contracted spend and usage commitments by
+  service ... Rest of the sentence : broken down by service provider and contract commitment ID over a specifi'
+columns: Charge Period Start, Charge Period End, Service Provider Name, Contract Applied, Contract Commitment ID
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/report-on-initial-contract-commitments/
+published_sql: |-
+  SELECT
+    MIN(CU.ChargePeriodStart) AS ChargePeriodStart,
+    MAX(CU.ChargePeriodEnd) AS ChargePeriodEnd,
+    CU.ServiceProviderName,
+    JSON_VALUE(CA, '$.ContractCommitmentID') AS ContractCommitmentId,
+    SUM(CAST(JSON_VALUE(CA, '$.ContractCommitmentAppliedCost') AS FLOAT64)) AS ContractCommitmentAppliedCost
+   FROM focus_data_table CU
+   CROSS JOIN
+    UNNEST(JSON_EXTRACT_ARRAY(CU.ContractApplied, '$.Elements')) AS CA
+   WHERE JSON_VALUE(CA, '$.ContractCommitmentAppliedCost') IS NOT NULL
+    AND ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+    AND ChargeCategory = 'Purchase'
+   GROUP BY
+    CU.ServiceProviderName,
+    JSON_VALUE(CA, '$.ContractCommitmentID')
+adaptation: Rewritten for portability (see notes)
+sql: |-
+  SELECT
+    MIN(CU.ChargePeriodStart) AS ChargePeriodStart,
+    MAX(CU.ChargePeriodEnd) AS ChargePeriodEnd,
+    CU.ServiceProviderName,
+    json_extract_string(CA.value, '$.ContractCommitmentID') AS ContractCommitmentId,
+    SUM(CAST(json_extract_string(CA.value, '$.ContractCommitmentAppliedCost') AS DOUBLE)) AS ContractCommitmentAppliedCost
+  FROM focus_data_table CU
+  CROSS JOIN json_each(CU.ContractApplied -> 'Elements') AS CA
+  WHERE json_extract_string(CA.value, '$.ContractCommitmentAppliedCost') IS NOT NULL
+    AND CU.ChargePeriodStart >= :period_start AND CU.ChargePeriodEnd < :period_end
+    AND CU.ChargeCategory = 'Purchase'
+  GROUP BY
+    CU.ServiceProviderName,
+    json_extract_string(CA.value, '$.ContractCommitmentID')
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The query uses BigQuery-style JSON functions (JSON_VALUE, JSON_EXTRACT_ARRAY, UNNEST, FLOAT64) to unpack the ContractApplied
+  column''s `Elements` array. It also filters on Charge Category = ''Purchase'', which the page does not list under FOCUS
+  columns.'

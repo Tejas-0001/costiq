@@ -1,0 +1,50 @@
+id: CO-03
+source: MM CostIQ Utilities extension
+title: 'Non-production running 24x7: off-hours scheduling candidates'
+category: 'Optimization · Cloud'
+module: optimization
+business_question: 'Which non-production resources run around the clock, and what would a business-hours schedule save?'
+personas:
+- finops_analyst
+- cloud_ops
+catalog_persona: 'Cloud Operations'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Resources tagged environment = nonprod that bill 20+ hours a day. Running them 12 hours on weekdays (60 of 168 hours) saves about 64% of their cost.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'schedule'
+- 'off hours'
+- 'nonprod'
+- 'dev'
+- 'test'
+- '24x7'
+- 'business hours'
+products: Any provider
+sql: |-
+  SELECT
+    ResourceName,
+    json_extract_string(Tags, '$.cost_center') AS CostCenter,
+    json_extract_string(Tags, '$.application') AS Application,
+    ServiceName,
+    COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) AS DaysRunning,
+    ROUND(SUM(ConsumedQuantity) / COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)), 1) AS AvgHoursPerDay,
+    ROUND(SUM(EffectiveCost), 2) AS PeriodCost,
+    ROUND(SUM(EffectiveCost) / COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) * 30 * (1 - 60.0 / 168), 2) AS MonthlySchedulingSavings
+  FROM CostAndUsage
+  WHERE json_extract_string(Tags, '$.environment') = 'nonprod' AND ConsumedUnit = 'Hours' AND ChargeCategory = 'Usage'
+    AND ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+  GROUP BY ResourceName, json_extract_string(Tags, '$.cost_center'), json_extract_string(Tags, '$.application'), ServiceName
+  HAVING SUM(ConsumedQuantity) / COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) >= 20
+  ORDER BY MonthlySchedulingSavings DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-23'
+  label: 'End of the period (exclusive)'
+notes: 'Assumes a 12 x 5 schedule. Exclude resources that serve overnight batch work.'

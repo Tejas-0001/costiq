@@ -1,0 +1,40 @@
+id: UE-02
+source: MM CostIQ AI extension
+title: Cost per prompt
+category: Unit Economics
+module: ai
+business_question: What does each AI product cost per prompt?
+personas:
+- cfo
+- tech_exec
+- ai_program_owner
+catalog_persona: Leadership, Adoption / Change Management
+datasets:
+- Cost and Usage
+- ai_user_activity
+description: Total monthly product cost divided by prompts submitted. Engagement goes up as adoption programs succeed, and
+  this unit cost should fall with it, even while the seat price stays the same.
+columns: 'Supporting: ai_user_activity.Prompts (Graph v2 "Prompts submitted for all apps"; Claude Enterprise Analytics; Claude
+  Code Analytics)'
+keywords: []
+products: M365 Copilot, Claude Enterprise, GitHub Copilot, Claude Code
+sql: |-
+  WITH cost AS (
+    SELECT BillingPeriodStart, x_AIProduct, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage WHERE x_AIProduct IS NOT NULL GROUP BY ALL
+  ),
+  prompts AS (
+    SELECT date_trunc('month', ActivityDate)::TIMESTAMP AS BillingPeriodStart, x_AIProduct, SUM(Prompts) AS Prompts
+    FROM ai_user_activity GROUP BY ALL
+  )
+  SELECT
+    strftime(c.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    c.x_AIProduct,
+    p.Prompts,
+    ROUND(c.Cost, 2) AS TotalCost,
+    ROUND(c.Cost / NULLIF(p.Prompts, 0), 4) AS CostPerPrompt
+  FROM cost c
+  JOIN prompts p USING (BillingPeriodStart, x_AIProduct)
+  ORDER BY x_AIProduct, BillingMonth
+params: []
+notes: ''

@@ -1,0 +1,51 @@
+id: IC-04
+source: MM CostIQ AI extension
+title: Chargeback statement for closed billing periods
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: What is each cost center’s AI chargeback for closed billing periods?
+personas:
+- finance_controller
+- fpa_analyst
+- pl_exec
+catalog_persona: Finance, Cost Center Owners
+datasets:
+- Cost and Usage
+- Billing Period
+description: Produces the monthly AI chargeback for each cost center and invoice issuer, only for billing periods the issuer
+  has closed. Tax is allocated in proportion to pre-tax charges, so the statement adds up to the invoices.
+columns: 'FOCUS columns: BillingPeriodStart, BillingPeriodStatus, InvoiceIssuerName, ChargeCategory, BilledCost, Tags'
+keywords:
+- chargeback statement
+- closed period chargeback
+products: All
+sql: |-
+  WITH closed AS (
+    SELECT InvoiceIssuerName, BillingPeriodStart FROM BillingPeriod WHERE BillingPeriodStatus = 'Closed'
+  ),
+  charges AS (
+    SELECT c.InvoiceIssuerName, c.BillingPeriodStart,
+           COALESCE(json_extract_string(c.Tags, '$.cost_center'), '(unallocated)') AS CostCenter,
+           SUM(c.BilledCost) AS PreTax
+    FROM CostAndUsage c JOIN closed USING (InvoiceIssuerName, BillingPeriodStart)
+    WHERE c.ChargeCategory <> 'Tax'
+    GROUP BY ALL
+  ),
+  tax AS (
+    SELECT c.InvoiceIssuerName, c.BillingPeriodStart, SUM(c.BilledCost) AS Tax
+    FROM CostAndUsage c JOIN closed USING (InvoiceIssuerName, BillingPeriodStart)
+    WHERE c.ChargeCategory = 'Tax'
+    GROUP BY ALL
+  )
+  SELECT
+    strftime(ch.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    ch.CostCenter,
+    ch.InvoiceIssuerName,
+    ROUND(ch.PreTax, 2) AS PreTaxCharges,
+    ROUND(COALESCE(t.Tax, 0) * ch.PreTax / SUM(ch.PreTax) OVER (PARTITION BY ch.InvoiceIssuerName, ch.BillingPeriodStart), 2) AS AllocatedTax,
+    ROUND(ch.PreTax + COALESCE(t.Tax, 0) * ch.PreTax / SUM(ch.PreTax) OVER (PARTITION BY ch.InvoiceIssuerName, ch.BillingPeriodStart), 2) AS TotalChargeback
+  FROM charges ch
+  LEFT JOIN tax t USING (InvoiceIssuerName, BillingPeriodStart)
+  ORDER BY BillingMonth, ch.CostCenter, ch.InvoiceIssuerName
+params: []
+notes: ''

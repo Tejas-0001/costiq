@@ -1,0 +1,51 @@
+id: UT-08
+source: MM CostIQ Utilities extension
+title: 'CIP-scoped vendors missing CIP-013 supply-chain clauses'
+category: 'Utilities · NERC CIP'
+module: utilities
+business_question: 'Which vendors supporting CIP-scoped systems lack required supply-chain contract clauses?'
+personas:
+- cip_compliance
+- auditor
+- tech_exec
+catalog_persona: 'NERC CIP Compliance, Vendor Management'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Checks each CIP-scoped vendor''s contract for the CIP-013 supply-chain risk-management elements: vulnerability disclosure, incident notification, remote-access controls and software integrity. FERC Order No. 919 extends these duties to vendor-supported virtualization and cloud platforms from 1 April 2028.'
+columns: 'FOCUS columns plus ut_* reference tables and ut_allocated_cost'
+keywords:
+- 'cip-013'
+- 'supply chain'
+- 'vendor risk'
+- 'contract clauses'
+- 'order 919'
+- 'nerc cip'
+products: Any provider
+sql: |-
+  WITH c AS (
+    SELECT Vendor, CipScoped, AnnualContractValue,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.vulnerability_disclosure') = 'true' THEN '' ELSE 'vulnerability disclosure; ' END AS m1,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.incident_notification') = 'true' THEN '' ELSE 'incident notification; ' END AS m2,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.remote_access_controls') = 'true' THEN '' ELSE 'remote-access controls; ' END AS m3,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.software_integrity') = 'true' THEN '' ELSE 'software integrity; ' END AS m4
+    FROM ut_vendor
+  )
+  SELECT
+    Vendor,
+    CipScoped,
+    CONCAT(m1, m2, m3, m4) AS MissingClauses,
+    ROUND(AnnualContractValue, 2) AS AnnualContractValue,
+    CASE WHEN CipScoped AND CONCAT(m1, m2, m3, m4) <> '' THEN 'Missing CIP-013 clauses'
+         WHEN CipScoped THEN 'Clauses in place'
+         ELSE 'Not CIP-scoped' END AS Status
+  FROM c
+  ORDER BY CASE WHEN CipScoped AND CONCAT(m1, m2, m3, m4) <> '' THEN 0 ELSE 1 END, AnnualContractValue DESC
+params: []
+notes: 'Contract clause flags come from vendor management (ut_vendor.Cip013Clauses).'
+compliance:
+  area: 'NERC CIP'
+  reference: 'CIP-013-2 R1.2 · FERC Order No. 919'
+  unit: 'vendors'
+  flag: 'Status = ''Missing CIP-013 clauses'''
+  amount: AnnualContractValue

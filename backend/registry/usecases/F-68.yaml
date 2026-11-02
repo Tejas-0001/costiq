@@ -1,0 +1,68 @@
+id: F-68
+source: FinOps Foundation FOCUS 1.4
+title: Analyze cost per compute service for a subaccount
+category: Usage Optimization
+module: anomalies
+business_question: Which compute services cost the most in a subaccount, and when did usage peak?
+personas:
+- cloud_ops
+catalog_persona: Engineering
+datasets:
+- Cost and Usage
+description: 'Compute spend tends to be the largest component of spend in most cloud bills. Second sentence : a resource-level
+  view of cost for a given day shows which compute resources spend the most and when their consumption peaked.'
+columns: Charge Period Start, Charge Period End, Service Name, Resource ID, Resource Name, Pricing Quantity, Effective Cost,
+  Sub Account ID, Service Category
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/cost-compute-subaccount/
+published_sql: |-
+  SELECT
+    Min(ChargePeriodStart),
+    Max(ChargePeriodEnd),
+    ServiceName,
+    ResourceId,
+    ResourceName,
+    SUM(PricingQuantity),
+    SUM(EffectiveCost) AS MonthlyEffectiveCost
+  FROM focus_data_table
+  WHERE SubAccountId = ?
+    AND ServiceCategory = 'Compute'
+    AND ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  GROUP BY
+    ServiceName,
+    ResourceId,
+    ResourceName
+  ORDER BY MonthlyEffectiveCost DESC
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    Min(ChargePeriodStart),
+    Max(ChargePeriodEnd),
+    ServiceName,
+    ResourceId,
+    ResourceName,
+    SUM(PricingQuantity),
+    SUM(EffectiveCost) AS MonthlyEffectiveCost
+  FROM focus_data_table
+  WHERE SubAccountId = :sub_account_id
+    AND ServiceCategory = 'Compute'
+    AND ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+  GROUP BY
+    ServiceName,
+    ResourceId,
+    ResourceName
+  ORDER BY MonthlyEffectiveCost DESC
+params:
+- name: sub_account_id
+  type: string
+  default: '222222222222'
+  label: Sub account (AWS account, subscription, project)
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

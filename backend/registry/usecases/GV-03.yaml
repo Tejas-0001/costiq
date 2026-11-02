@@ -1,0 +1,36 @@
+id: GV-03
+source: MM CostIQ AI extension
+title: AI vendor concentration
+category: Governance, Policy & Risk
+module: governance
+business_question: How concentrated is our AI spend by model vendor and invoice issuer?
+personas:
+- cfo
+- tech_exec
+- finops_analyst
+- auditor
+catalog_persona: Leadership, Procurement, Risk
+datasets:
+- Cost and Usage
+description: Shows how AI spend splits across model vendors and across the companies that invoice you. Heavy concentration
+  on one vendor is a resilience and negotiating-leverage risk. Spreading purchases across many channels can weaken your volume
+  discounts.
+columns: 'FOCUS columns: InvoiceIssuerName, EffectiveCost · AI extension: x_ModelVendor'
+keywords:
+- vendor concentration
+- vendor risk
+- dependency
+products: All
+sql: |-
+  SELECT
+    COALESCE(x_ModelVendor, '(seat/credit products)') AS ModelVendor,
+    InvoiceIssuerName,
+    ROUND(SUM(EffectiveCost), 2) AS EffectiveCost,
+    ROUND(100 * SUM(EffectiveCost) / SUM(SUM(EffectiveCost)) OVER (), 1) AS PctOfTotalAISpend,
+    ROUND(100 * SUM(SUM(EffectiveCost)) OVER (PARTITION BY x_ModelVendor) / SUM(SUM(EffectiveCost)) OVER (), 1) AS VendorSharePct
+  FROM CostAndUsage
+  WHERE x_AIProduct IS NOT NULL
+  GROUP BY x_ModelVendor, InvoiceIssuerName
+  ORDER BY VendorSharePct DESC, EffectiveCost DESC
+params: []
+notes: ''

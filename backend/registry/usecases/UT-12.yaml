@@ -1,0 +1,37 @@
+id: UT-12
+source: MM CostIQ Utilities extension
+title: 'Disallowance risk by docket, reason and vendor'
+category: 'Utilities · Prudence'
+module: prudence
+business_question: 'How much base-period technology spend could a commission challenge, and why?'
+personas:
+- regulatory_analyst
+- cfo
+- auditor
+- opco_finance
+catalog_persona: 'Regulatory Accounting & Rates, CFO'
+datasets:
+- 'Prudence evidence (computed)'
+- 'Utility reference tables'
+description: 'Spend in each docket''s base period that fails a prudence test: not used and useful (idle resources, unused commitments, unused seats) unless remediated, not reconciled to an invoice, allocated without an approved policy, missing a FERC account, or carrying a savings opportunity left unactioned for 60+ days.'
+columns: 'FOCUS columns plus ut_* reference tables and ut_allocated_cost'
+keywords:
+- 'disallowance'
+- 'prudence'
+- 'used and useful'
+- 'imprudent'
+- 'rate case risk'
+- 'evidence gaps'
+products: Any provider
+sql: |-
+  SELECT
+    Docket, LegalEntity, RiskReason, ServiceProviderName AS Vendor,
+    COUNT(*) AS Lines,
+    ROUND(SUM(AllocatedCost), 2) AS BasePeriodSpend,
+    ROUND(SUM(RiskAmount), 2) AS DisallowanceRisk
+  FROM prudence_evidence
+  WHERE RiskAmount > 0
+  GROUP BY Docket, LegalEntity, RiskReason, ServiceProviderName
+  ORDER BY DisallowanceRisk DESC
+params: []
+notes: 'Decision support, not a prediction of any commission''s ruling. Recomputed after allocation, ingestion and every policy or optimization decision.'

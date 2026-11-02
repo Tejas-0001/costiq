@@ -1,0 +1,38 @@
+id: IC-05
+source: MM CostIQ AI extension
+title: 'Data finality: open vs. closed AI spend'
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: Which AI spend is final, and which can still change?
+personas:
+- finance_controller
+- fpa_analyst
+- finops_analyst
+catalog_persona: Finance, FinOps Practitioner
+datasets:
+- Billing Period
+- Invoice Detail
+- Cost and Usage
+description: Shows which AI spend is final (billing period closed, invoice issued) and which can still change (billing period
+  open, or invoice not yet issued). This stops provisional numbers from being reported as actuals.
+columns: 'FOCUS columns: BillingPeriodStatus, BillingPeriodLastUpdated, InvoiceIssueStatus, InvoiceIssueDate, BilledCost'
+keywords: []
+products: All
+sql: |-
+  SELECT
+    b.InvoiceIssuerName,
+    strftime(b.BillingPeriodStart, '%Y-%m') AS BillingMonth,
+    b.BillingPeriodStatus,
+    CAST(b.BillingPeriodLastUpdated AS DATE) AS LastUpdated,
+    MAX(i.InvoiceIssueStatus) AS InvoiceIssueStatus,
+    MAX(CAST(i.InvoiceIssueDate AS DATE)) AS InvoiceIssueDate,
+    ROUND(SUM(i.BilledCost), 2) AS BilledCost,
+    CASE WHEN b.BillingPeriodStatus = 'Closed' AND MAX(i.InvoiceIssueStatus) = 'Issued' THEN 'Final'
+         ELSE 'Provisional – subject to change' END AS Finality
+  FROM BillingPeriod b
+  LEFT JOIN InvoiceDetail i USING (InvoiceIssuerName, BillingPeriodStart)
+  GROUP BY b.InvoiceIssuerName, b.BillingPeriodStart, b.BillingPeriodStatus, b.BillingPeriodLastUpdated
+  ORDER BY BillingMonth DESC, b.InvoiceIssuerName
+params: []
+notes: Anthropic's Enterprise cost endpoints can revise figures until about 7 days after the end of the month. Mark Anthropic-sourced
+  months as provisional until then, even if no FOCUS Billing Period has been delivered.

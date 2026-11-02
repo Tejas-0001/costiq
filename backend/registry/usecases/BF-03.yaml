@@ -1,0 +1,49 @@
+id: BF-03
+source: MM CostIQ AI extension
+title: Forecast when the Copilot Credit pack runs out
+category: Budgeting & Forecasting
+module: budgets
+business_question: When will this month’s Copilot Credit pack run out?
+personas:
+- finops_analyst
+- ai_program_owner
+catalog_persona: FinOps Practitioner, Business Application Owner
+datasets:
+- Contract Commitment
+- Cost and Usage
+description: For the current month, reports the date the credit pack ran out, or projects when it will from the last 7 days'
+  burn rate. Credits used after that date are billed at pay-as-you-go rates.
+columns: 'FOCUS columns: ContractCommitmentQuantity, ContractCommitmentPeriodStart/End, ChargePeriodStart · AI extension:
+  x_CreditQuantity'
+keywords:
+- credit pack run out
+- exhaustion
+products: Copilot Studio
+sql: |-
+  WITH params AS (SELECT MAX(ChargePeriodStart) AS d FROM CostAndUsage),
+  cc AS (
+    SELECT ContractCommitmentId,
+           ContractCommitmentQuantity / date_diff('month', ContractCommitmentPeriodStart, ContractCommitmentPeriodEnd) AS MonthlyAllowance
+    FROM ContractCommitment WHERE ContractCommitmentUnit = 'Copilot Credits'
+  ),
+  daily AS (
+    SELECT CAST(ChargePeriodStart AS DATE) AS UsageDate, SUM(x_CreditQuantity) AS Credits
+    FROM CostAndUsage, params
+    WHERE x_CreditUnit = 'Copilot Credits' AND ChargeCategory = 'Usage'
+      AND BillingPeriodStart = date_trunc('month', params.d)
+    GROUP BY 1
+  ),
+  cum AS (SELECT UsageDate, Credits, SUM(Credits) OVER (ORDER BY UsageDate) AS CumCredits FROM daily)
+  SELECT
+    cc.ContractCommitmentId,
+    cc.MonthlyAllowance,
+    (SELECT MAX(CumCredits) FROM cum) AS CreditsUsedMTD,
+    (SELECT MIN(UsageDate) FROM cum WHERE CumCredits >= cc.MonthlyAllowance) AS ExhaustedOn,
+    ROUND((SELECT SUM(Credits) FROM cum WHERE UsageDate > CAST(params.d AS DATE) - 7) / 7, 0) AS Last7DayDailyBurn,
+    CASE WHEN (SELECT MAX(CumCredits) FROM cum) >= cc.MonthlyAllowance THEN NULL
+         ELSE CAST(params.d AS DATE) + CAST(CEIL((cc.MonthlyAllowance - (SELECT MAX(CumCredits) FROM cum))
+               / NULLIF((SELECT SUM(Credits) FROM cum WHERE UsageDate > CAST(params.d AS DATE) - 7) / 7, 0)) AS INTEGER) END AS ProjectedExhaustionDate,
+    last_day(params.d) AS MonthEnd
+  FROM cc CROSS JOIN params
+params: []
+notes: ''

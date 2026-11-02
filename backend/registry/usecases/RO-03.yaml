@@ -1,0 +1,33 @@
+id: RO-03
+source: MM CostIQ AI extension
+title: Effective savings rate on AI
+category: Rate Optimization
+module: rates
+business_question: How far below list price do we actually pay for AI?
+personas:
+- cfo
+- tech_exec
+- finops_analyst
+catalog_persona: Leadership, Procurement
+datasets:
+- Cost and Usage
+description: Shows how much below list price you actually pay for AI, by provider and product, from negotiated discounts,
+  commitment rates, batch tiers and included allowances.
+columns: 'FOCUS columns: ServiceProviderName, ListCost, ContractedCost, EffectiveCost · AI extension: x_AIProduct'
+keywords: []
+products: All
+sql: |-
+  SELECT
+    ServiceProviderName,
+    x_AIProduct,
+    ROUND(SUM(ListCost), 2)       AS ListCost,
+    ROUND(SUM(ContractedCost), 2) AS ContractedCost,
+    ROUND(SUM(EffectiveCost), 2)  AS EffectiveCost,
+    ROUND(100 * (1 - SUM(EffectiveCost) / NULLIF(SUM(ListCost), 0)), 1) AS EffectiveSavingsRatePct
+  FROM CostAndUsage
+  WHERE x_AIProduct IS NOT NULL AND ChargeCategory IN ('Usage', 'Purchase')
+  GROUP BY ALL
+  ORDER BY ListCost DESC
+params: []
+notes: Batch-tier discounts are already in ListUnitPrice, because providers publish batch as a separate price. Compare UO-03
+  for batch savings you haven't captured yet.

@@ -1,0 +1,61 @@
+id: F-70
+source: FinOps Foundation FOCUS 1.4
+title: Analyze costs of components of a resource
+category: Usage Optimization
+module: anomalies
+business_question: What are the cost components of a single resource?
+personas:
+- cloud_ops
+catalog_persona: Engineering
+datasets:
+- Cost and Usage
+description: Using FOCUS data, an Engineer can deep dive on cost details for a single resource.
+columns: Resource ID, Resource Name, Charge Description, SKU ID, Effective Cost, Charge Period Start, Charge Period End, Resource
+  Type
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/resource-component-costs/
+published_sql: |-
+  SELECT ResourceId,
+    ResourceName,
+    ResourceType,
+    ChargeDescription,
+    SkuId,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ?  AND ChargePeriodEnd < ?
+    AND ResourceId=?
+  GROUP BY ResourceId,
+    ResourceName,
+    ResourceType,
+    ChargeDescription,
+    SkuId
+adaptation: Placeholders named
+sql: |-
+  SELECT ResourceId,
+    ResourceName,
+    ResourceType,
+    ChargeDescription,
+    SkuId,
+    SUM(EffectiveCost) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start  AND ChargePeriodEnd < :period_end
+    AND ResourceId=:resource_id
+  GROUP BY ResourceId,
+    ResourceName,
+    ResourceType,
+    ChargeDescription,
+    SkuId
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+- name: resource_id
+  type: string
+  default: arn:aws:ec2:us-east-1:111111111111:instance/i-0a13prodapi01
+  label: Resource ID
+notes: ''

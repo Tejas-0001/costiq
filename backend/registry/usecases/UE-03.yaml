@@ -1,0 +1,42 @@
+id: UE-03
+source: MM CostIQ AI extension
+title: Claude Code productivity unit costs
+category: Unit Economics
+module: ai
+business_question: What does Claude Code cost per pull request, commit and 1,000 lines?
+personas:
+- tech_exec
+- finance_controller
+- fpa_analyst
+catalog_persona: Engineering Leadership, Finance
+datasets:
+- ai_user_activity
+description: 'Puts Claude Code cost next to engineering output for each developer and month: sessions, commits, pull requests,
+  lines added and the tool acceptance rate. The results are cost per pull request, per commit and per 1,000 lines added.'
+columns: 'Supporting: ai_user_activity (Claude Code Analytics API: num_sessions, lines_of_code, commits_by_claude_code, pull_requests_by_claude_code,
+  tool_actions, model_breakdown.estimated_cost)'
+keywords:
+- cost per pr
+- pull request
+- developer productivity
+products: Claude Code
+sql: |-
+  SELECT
+    strftime(ActivityDate, '%Y-%m') AS ActivityMonth,
+    UserPrincipal,
+    SUM(Sessions)     AS Sessions,
+    SUM(Commits)      AS Commits,
+    SUM(PullRequests) AS PullRequests,
+    SUM(LinesAdded)   AS LinesAdded,
+    ROUND(100.0 * SUM(ToolAccepted) / NULLIF(SUM(ToolAccepted + ToolRejected), 0), 1) AS ToolAcceptanceRatePct,
+    ROUND(SUM(EstimatedCost), 2) AS EstimatedCost,
+    ROUND(SUM(EstimatedCost) / NULLIF(SUM(PullRequests), 0), 2) AS CostPerPR,
+    ROUND(SUM(EstimatedCost) / NULLIF(SUM(Commits), 0), 2)      AS CostPerCommit,
+    ROUND(SUM(EstimatedCost) / NULLIF(SUM(LinesAdded), 0) * 1000, 2) AS CostPer1KLinesAdded
+  FROM ai_user_activity
+  WHERE x_AIProduct = 'claude_code'
+  GROUP BY ALL
+  ORDER BY ActivityMonth, EstimatedCost DESC
+params: []
+notes: Lines of code is a weak productivity measure on its own. Read it alongside pull requests and acceptance rate, and never
+  use it alone for performance management.

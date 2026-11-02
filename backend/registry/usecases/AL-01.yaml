@@ -1,0 +1,36 @@
+id: AL-01
+source: MM CostIQ AI extension
+title: Allocate AI spend to cost centers across every provider
+category: Allocation
+module: allocation
+business_question: What does each cost center spend on AI across every provider?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+catalog_persona: FinOps Practitioner, Finance
+datasets:
+- Cost and Usage
+description: Finance wants one view of what each cost center spends on AI each month, whether it bills through Microsoft,
+  AWS, Google Cloud, Anthropic or GitHub. The `cost_center` tag is the allocation key. Untagged spend is reported separately
+  so it can be fixed instead of disappearing.
+columns: 'FOCUS columns: BillingPeriodStart, Tags, EffectiveCost, BilledCost · AI extension: x_AIProduct'
+keywords:
+- ai by cost center
+- ai chargeback
+- who spends on ai
+products: All
+sql: |-
+  SELECT
+    strftime(BillingPeriodStart, '%Y-%m')                          AS BillingMonth,
+    COALESCE(json_extract_string(Tags, '$.cost_center'), '(untagged)') AS CostCenter,
+    x_AIProduct,
+    ROUND(SUM(EffectiveCost), 2)                                   AS EffectiveCost,
+    ROUND(SUM(BilledCost), 2)                                      AS BilledCost
+  FROM CostAndUsage
+  WHERE x_AIProduct IS NOT NULL
+  GROUP BY ALL
+  ORDER BY BillingMonth, EffectiveCost DESC
+params: []
+notes: Seat purchases arrive tagged to the buying cost center, IT in the sample. Use AL-05 to move seat cost to the departments
+  of the people who hold the seats.

@@ -1,0 +1,53 @@
+id: AL-03
+source: MM CostIQ AI extension
+title: Allocate invoiced Claude Code cost to individual developers
+category: Allocation
+module: allocation
+business_question: What does each developer’s Claude Code usage cost at our negotiated rate?
+personas:
+- finops_analyst
+- tech_exec
+catalog_persona: FinOps Practitioner, Engineering Leadership
+datasets:
+- Cost and Usage
+- ai_user_activity
+description: On the invoice, Claude Code usage shows up as one workspace. The Claude Code Analytics API reports an estimated
+  cost per user per model per day, at list price. This use case splits each day's invoiced cost, which includes the negotiated
+  discount, across developers in proportion to their estimated cost. The result is a per-developer number that ties back to
+  the invoice.
+columns: 'FOCUS columns: ChargePeriodStart, EffectiveCost · AI extension: x_AIProduct · Supporting: ai_user_activity.EstimatedCost,
+  ai_user_directory'
+keywords: []
+products: Claude Code (API-billed)
+sql: |-
+  WITH invoiced AS (
+    SELECT CAST(ChargePeriodStart AS DATE) AS UsageDate, SUM(EffectiveCost) AS InvoicedCost
+    FROM CostAndUsage
+    WHERE x_AIProduct = 'claude_code' AND ChargeCategory = 'Usage'
+    GROUP BY 1
+  ),
+  estimated AS (
+    SELECT ActivityDate AS UsageDate, UserPrincipal, SUM(EstimatedCost) AS EstimatedCost
+    FROM ai_user_activity
+    WHERE x_AIProduct = 'claude_code'
+    GROUP BY ALL
+  ),
+  shares AS (
+    SELECT *, EstimatedCost / SUM(EstimatedCost) OVER (PARTITION BY UsageDate) AS Share
+    FROM estimated
+  )
+  SELECT
+    strftime(s.UsageDate, '%Y-%m')               AS UsageMonth,
+    s.UserPrincipal,
+    d.Department,
+    ROUND(SUM(s.EstimatedCost), 2)               AS EstimatedListCost,
+    ROUND(SUM(s.Share * i.InvoicedCost), 2)      AS AllocatedInvoicedCost
+  FROM shares s
+  JOIN invoiced i USING (UsageDate)
+  LEFT JOIN ai_user_directory d USING (UserPrincipal)
+  GROUP BY ALL
+  ORDER BY UsageMonth, AllocatedInvoicedCost DESC
+params: []
+notes: The Claude Code Analytics API covers only Claude Code usage authenticated against a Claude Console organization. Claude
+  Code used on a Team or Enterprise subscription is reported through the Claude Enterprise Analytics API. Usage through Bedrock,
+  Vertex or Foundry is not covered by either.

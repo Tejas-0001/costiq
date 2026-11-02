@@ -1,0 +1,69 @@
+id: F-15
+source: FinOps Foundation FOCUS 1.4
+title: Compare resource usage month over month
+category: Anomaly Management
+module: anomalies
+business_question: Which resources changed most in usage and cost from last month?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Cost and Usage
+- Contract Commitment
+- Invoice Detail
+description: FinOps Practitioners can compare usage and costs across charge periods to identify changes in usage month over
+  month.
+columns: Charge Period Start, Service Provider Name, Service Name, Resource ID, SKU ID, Consumed Unit, Consumed Quantity,
+  Charge Category, Charge Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/compare-resource-usage-month-over-month-2/
+published_sql: |-
+  SELECT
+    MONTH(ChargePeriodStart),
+    ServiceProviderName,
+    ServiceName,
+    ResourceId,
+    SkuId,
+    ConsumedUnit,
+    SUM(ConsumedQuantity) AS TotalConsumedQuantity
+  FROM focus_data_table
+  WHERE ChargeCategory='Usage'
+    AND ChargePeriodStart >= ? and ChargePeriodEnd  < ?
+  GROUP BY
+    MONTH(ChargePeriodStart),
+    ServiceProviderName,
+    ServiceName,
+    ResourceId,
+    SkuId,
+    ConsumedUnit
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    MONTH(ChargePeriodStart),
+    ServiceProviderName,
+    ServiceName,
+    ResourceId,
+    SkuId,
+    ConsumedUnit,
+    SUM(ConsumedQuantity) AS TotalConsumedQuantity
+  FROM focus_data_table
+  WHERE ChargeCategory='Usage'
+    AND ChargePeriodStart >= :period_start and ChargePeriodEnd  < :period_end
+  GROUP BY
+    MONTH(ChargePeriodStart),
+    ServiceProviderName,
+    ServiceName,
+    ResourceId,
+    SkuId,
+    ConsumedUnit
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: '- The `?` placeholders are the start and end of the date range. - Previous use case: "Analyze service costs by region".
+  Next: "Identify anomalous daily spending by subaccount".'

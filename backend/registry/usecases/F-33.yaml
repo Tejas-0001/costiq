@@ -1,0 +1,89 @@
+id: F-33
+source: FinOps Foundation FOCUS 1.4
+title: Reconcile Cost and Usage to Invoice Detail by Invoice ID
+category: Invoicing & Chargeback
+module: reconciliation
+business_question: Does the usage behind each invoice ID add up to the invoice?
+personas:
+- finops_analyst
+- finance_controller
+- fpa_analyst
+catalog_persona: FinOps Practitioner, Finance
+datasets:
+- Cost and Usage
+- Invoice Detail
+- Contract Commitment
+description: Verifies that the total billed cost for all service usage in the Cost and Usage dataset matches the total non-tax
+  billed cost in the Invoice Detail dataset for a specific invoice.
+columns: Billed Cost, Invoice ID, Invoice Detail ID, Payment Currency Billed Cost, Payment Currency Invoice Detail ID, Billing
+  Currency, Charge Category, Invoice Issue Status, Payment Currency, Service Category
+keywords:
+- invoice reconcile
+- invoice match
+- does the invoice match
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/reconcile-cost-and-usage-to-invoice-detail-by-invoice-id/
+published_sql: |-
+  SELECT
+    COALESCE(ID.InvoiceId, CU.InvoiceId) AS InvoiceId,
+    ID.TotalBilledCost_InvoiceDetail,
+    CU.TotalBilledCost_CostAndUsage,
+    (COALESCE(ID.TotalBilledCost_InvoiceDetail, 0) - COALESCE(CU.TotalBilledCost_CostAndUsage, 0)) AS Variance
+  FROM (
+    SELECT
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost_InvoiceDetail
+    FROM InvoiceDetail
+    WHERE
+      ChargeCategory <> 'Tax'
+    GROUP BY
+      InvoiceId
+  ) AS ID
+  FULL OUTER JOIN (
+    SELECT
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost_CostAndUsage
+    FROM CostAndUsage
+    WHERE
+      ChargeCategory <> 'Tax'
+    GROUP BY
+      InvoiceId
+  ) AS CU
+    ON ID.InvoiceId = CU.InvoiceId
+  WHERE
+    COALESCE(ID.InvoiceId, CU.InvoiceId) = ?
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    COALESCE(ID.InvoiceId, CU.InvoiceId) AS InvoiceId,
+    ID.TotalBilledCost_InvoiceDetail,
+    CU.TotalBilledCost_CostAndUsage,
+    (COALESCE(ID.TotalBilledCost_InvoiceDetail, 0) - COALESCE(CU.TotalBilledCost_CostAndUsage, 0)) AS Variance
+  FROM (
+    SELECT
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost_InvoiceDetail
+    FROM InvoiceDetail
+    WHERE
+      ChargeCategory <> 'Tax'
+    GROUP BY
+      InvoiceId
+  ) AS ID
+  FULL OUTER JOIN (
+    SELECT
+      InvoiceId,
+      SUM(BilledCost) AS TotalBilledCost_CostAndUsage
+    FROM CostAndUsage
+    WHERE
+      ChargeCategory <> 'Tax'
+    GROUP BY
+      InvoiceId
+  ) AS CU
+    ON ID.InvoiceId = CU.InvoiceId
+  WHERE
+    COALESCE(ID.InvoiceId, CU.InvoiceId) = :invoice_id
+params:
+- name: invoice_id
+  type: string
+  default: INV-ANTHROPIC-ant-org-4004-202609
+  label: Invoice ID
+notes: ''

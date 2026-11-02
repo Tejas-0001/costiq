@@ -1,0 +1,35 @@
+id: RA-03
+source: MM CostIQ AI extension
+title: Effective unit price per 1M tokens by model, channel and token type
+category: Reporting & Analytics
+module: explorer
+business_question: What do we pay per 1M tokens for the same model on each channel?
+personas:
+- finops_analyst
+- cfo
+catalog_persona: FinOps Practitioner, Procurement
+datasets:
+- Cost and Usage
+description: The same Claude model can be bought directly from Anthropic or through AWS, Google Cloud or Microsoft. This use
+  case compares the effective price per million tokens for each token type across channels after negotiated discounts (Anthropic
+  commit, AWS EDP, Azure MACC) and service tier.
+columns: 'FOCUS columns: ServiceProviderName, ConsumedQuantity, ConsumedUnit, ListCost, EffectiveCost · AI extension: x_ModelName,
+  x_AIProduct, x_TokenType, x_ServiceTier'
+keywords: []
+products: Claude (API, Bedrock, Vertex, Foundry), Azure OpenAI
+sql: |-
+  SELECT
+    x_ModelName,
+    x_TokenType,
+    x_AIProduct AS Channel,
+    ServiceProviderName,
+    x_ServiceTier,
+    ROUND(SUM(ListCost)      / SUM(ConsumedQuantity) * 1e6, 4) AS ListPricePer1M,
+    ROUND(SUM(EffectiveCost) / SUM(ConsumedQuantity) * 1e6, 4) AS EffectivePricePer1M,
+    SUM(ConsumedQuantity) AS Tokens
+  FROM CostAndUsage
+  WHERE ConsumedUnit = 'Tokens' AND ChargeCategory = 'Usage'
+  GROUP BY ALL
+  ORDER BY x_ModelName, x_TokenType, EffectivePricePer1M
+params: []
+notes: ''

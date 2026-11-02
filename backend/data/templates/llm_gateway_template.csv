@@ -1,0 +1,3 @@
+usage_date,application,model,requests,failed_requests,retried_requests,avg_input_tokens,avg_output_tokens,max_tokens_setting,truncated_responses,accepted_outcomes,latency_p95_ms
+2026-11-01,customer-outage-assistant,claude-sonnet-5-5,1950,40,120,8800,410,1024,15,1400,1380
+2026-11-01,outage-summary-bot,claude-haiku-5-5,2300,10,20,6000,340,1024,0,2190,900

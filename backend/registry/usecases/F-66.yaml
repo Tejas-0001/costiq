@@ -1,0 +1,79 @@
+id: F-66
+source: FinOps Foundation FOCUS 1.4
+title: Report spending across billing periods for a service provider by service category
+category: Reporting & Analytics
+module: explorer
+business_question: How does a provider’s spend by service category move across billing periods?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Invoice Detail
+- Billing Period
+description: 'Understanding costs across service providers, billing periods, billing accounts, and service categories ...
+  Rest of the paragraph : this gives insight into total costs, and Procurement can use it to negotiate with spec'
+columns: Service Provider Name, Billing Account Name, Billing Account ID, Billing Currency, Billing Period Start, Service
+  Category, Service Name, Billed Cost, Charge Period Start, Charge Period End
+keywords: []
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/report-spending-across-billing-periods-for-a-service-provider-by-service-category/
+published_sql: |-
+  SELECT
+  ServiceProviderName,
+  BillingAccountName,
+  BillingAccountId,
+  BillingCurrency,
+  BillingPeriodStart,
+  ServiceCategory,
+  ServiceName,
+  SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? and ChargePeriodEnd < ?
+  AND ServiceProviderName = ?
+  GROUP BY
+  ServiceProviderName,
+  BillingAccountName,
+  BillingAccountId,
+  BillingCurrency,
+  BillingPeriodStart,
+  ServiceCategory,
+  ServiceName
+  ORDER BY TotalBilledCost DESC
+adaptation: Placeholders named
+sql: |-
+  SELECT
+  ServiceProviderName,
+  BillingAccountName,
+  BillingAccountId,
+  BillingCurrency,
+  BillingPeriodStart,
+  ServiceCategory,
+  ServiceName,
+  SUM(BilledCost) AS TotalBilledCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start and ChargePeriodEnd < :period_end
+  AND ServiceProviderName = :provider
+  GROUP BY
+  ServiceProviderName,
+  BillingAccountName,
+  BillingAccountId,
+  BillingCurrency,
+  BillingPeriodStart,
+  ServiceCategory,
+  ServiceName
+  ORDER BY TotalBilledCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+- name: provider
+  type: string
+  default: AWS
+  label: Service provider name
+notes: ''

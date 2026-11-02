@@ -1,0 +1,59 @@
+id: BF-04
+source: MM CostIQ Utilities extension
+title: 'AI budget burn-down and projected exhaustion date'
+category: 'Budgeting & Forecasting'
+module: budgets
+business_question: 'Which teams will run out of their monthly AI budget before month end, and when?'
+personas:
+- finops_analyst
+- fpa_analyst
+- ai_program_owner
+- cfo
+catalog_persona: 'FinOps Practitioner, FP&A'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Month-to-date AI spend against each cost center''s AI budget, the daily burn rate and the date the budget runs out at that rate. Feeds the token-budget alert.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'ai budget'
+- 'token budget'
+- 'burn rate'
+- 'run out'
+- 'exhaustion'
+- 'budget alert'
+products: Any provider
+sql: |-
+  WITH b AS (
+    SELECT CostCenter, BudgetAmount FROM ai_budget WHERE BudgetPeriodStart = :month
+  ),
+  s AS (
+    SELECT COALESCE(json_extract_string(Tags, '$.cost_center'), '(untagged)') AS CostCenter,
+           SUM(EffectiveCost) AS MonthToDate, COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) AS DaysElapsed
+    FROM CostAndUsage
+    WHERE x_AIProduct IS NOT NULL AND BillingPeriodStart = :month AND ChargePeriodStart <= :as_of
+    GROUP BY COALESCE(json_extract_string(Tags, '$.cost_center'), '(untagged)')
+  )
+  SELECT
+    b.CostCenter,
+    ROUND(b.BudgetAmount, 2) AS BudgetAmount,
+    ROUND(s.MonthToDate, 2) AS MonthToDate,
+    ROUND(100 * s.MonthToDate / NULLIF(b.BudgetAmount, 0), 1) AS BurnPct,
+    ROUND(s.MonthToDate / NULLIF(s.DaysElapsed, 0), 2) AS DailyBurn,
+    CAST(:month AS DATE) + CAST(FLOOR(b.BudgetAmount / NULLIF(s.MonthToDate / NULLIF(s.DaysElapsed, 0), 0)) AS INTEGER) AS ProjectedExhaustion,
+    CASE WHEN s.MonthToDate >= b.BudgetAmount THEN 'Exhausted'
+         WHEN b.BudgetAmount / NULLIF(s.MonthToDate / NULLIF(s.DaysElapsed, 0), 0) < 31 THEN 'Will run out this month'
+         ELSE 'Within budget' END AS Status
+  FROM b
+  JOIN s ON s.CostCenter = b.CostCenter
+  ORDER BY BurnPct DESC
+params:
+- name: month
+  type: date
+  default: '2026-10-01'
+  label: 'Budget month'
+- name: as_of
+  type: date
+  default: '2026-10-22'
+  label: 'Evaluate as of'
+notes: 'Budgets come from ai_budget; seats bought at month start burn the budget on day one.'

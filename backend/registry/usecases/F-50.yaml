@@ -1,0 +1,71 @@
+id: F-50
+source: FinOps Foundation FOCUS 1.4
+title: Analyze marketplace vendors costs
+category: Reporting & Analytics
+module: explorer
+business_question: How much are we spending on marketplace vendor products each month?
+personas:
+- finops_analyst
+catalog_persona: FinOps Practitioner
+datasets:
+- Contract Commitment
+- Cost and Usage
+- Billing Period
+- Invoice Detail
+description: 'FinOps Practitioners want to be able to answer the question: How much are we spending each month on vendor products
+  that were purchased via a Cloud Service Provider''s marketplace?'
+columns: Service Provider Name, Charge Period Start, Charge Period End, Host Provider Name, Effective Cost, Invoice Issuer
+  Name
+keywords:
+- marketplace
+- third party
+- datadog
+- fortinet
+reference_url: https://focus.finops.org/docs/use-cases/v1-4/analyze-marketplace-vendors-costs/
+published_sql: |-
+  SELECT
+    ChargePeriodStart,
+    ChargePeriodEnd,
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName,
+    ROUND(SUM(EffectiveCost),2) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= ? AND ChargePeriodEnd < ?
+    AND InvoiceIssuerName != ServiceProviderName
+  GROUP BY
+    ChargePeriodStart,
+    ChargePeriodEnd,
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName
+  ORDER BY TotalEffectiveCost ASC
+adaptation: Placeholders named
+sql: |-
+  SELECT
+    ChargePeriodStart,
+    ChargePeriodEnd,
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName,
+    ROUND(SUM(EffectiveCost),2) AS TotalEffectiveCost
+  FROM focus_data_table
+  WHERE ChargePeriodStart >= :period_start AND ChargePeriodEnd < :period_end
+    AND InvoiceIssuerName != ServiceProviderName
+  GROUP BY
+    ChargePeriodStart,
+    ChargePeriodEnd,
+    ServiceProviderName,
+    HostProviderName,
+    InvoiceIssuerName
+  ORDER BY TotalEffectiveCost ASC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: Start of the period (inclusive)
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: End of the period (exclusive)
+notes: ''

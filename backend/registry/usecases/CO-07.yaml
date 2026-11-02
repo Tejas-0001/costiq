@@ -1,0 +1,39 @@
+id: CO-07
+source: MM CostIQ Utilities extension
+title: 'Kubernetes cluster idle capacity'
+category: 'Optimization · Cloud'
+module: optimization
+business_question: 'How much of each shared Kubernetes cluster''s cost is capacity no workload requested?'
+personas:
+- finops_analyst
+- cloud_ops
+- tech_exec
+catalog_persona: 'Cloud Operations, Platform Engineering'
+datasets:
+- 'Cost and Usage'
+- 'Monitoring tables'
+description: 'Uses FOCUS split-cost allocation rows: the share allocated to ''(idle capacity)'' is cluster cost no pod requested. Bin-packing, autoscaler limits or smaller node groups reduce it.'
+columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
+keywords:
+- 'kubernetes'
+- 'eks'
+- 'aks'
+- 'gke'
+- 'idle capacity'
+- 'cluster'
+- 'split cost allocation'
+- 'bin packing'
+products: Any provider
+sql: |-
+  SELECT
+    ResourceName AS Cluster,
+    strftime(BillingPeriodStart, '%Y-%m') AS Month,
+    ROUND(SUM(EffectiveCost), 2) AS ClusterCost,
+    ROUND(SUM(CASE WHEN AllocatedResourceId = 'idle' THEN EffectiveCost ELSE 0 END), 2) AS IdleCost,
+    ROUND(100 * SUM(CASE WHEN AllocatedResourceId = 'idle' THEN EffectiveCost ELSE 0 END) / NULLIF(SUM(EffectiveCost), 0), 1) AS IdlePct
+  FROM CostAndUsage
+  WHERE AllocatedMethodId IS NOT NULL
+  GROUP BY ResourceName, strftime(BillingPeriodStart, '%Y-%m')
+  ORDER BY Month, Cluster
+params: []
+notes: 'The idle share is reported by the split-cost allocation export as AllocatedResourceId = ''idle''.'
