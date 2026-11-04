@@ -1,5 +1,5 @@
 id: CO-05
-source: MM CostIQ Utilities extension
+source: MM CostIQ Pharma extension
 title: 'Storage growth and tiering opportunities'
 category: 'Optimization · Cloud'
 module: optimization
@@ -53,4 +53,4 @@ params:
   type: date
   default: '2026-09-01'
   label: 'Last full month'
-notes: 'Grid data (SCADA, AMI) often has retention rules from regulators; check them before moving tiers.'
+notes: 'Clinical trial data has GxP retention rules (often 25 years after the trial); check them before moving tiers.'

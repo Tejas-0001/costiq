@@ -43,7 +43,7 @@ export const STAGES: Stage[] = [
     { name: "Dynamic scan", tool: "ZAP baseline and API scan", rule: "No high alerts; full scan in QA", std: "ASVS L2 · OWASP Top 10" },
   ] },
   { id: "sign", name: "Sign and release", where: "Your CI, with your key", gates: [
-    { name: "Signature", tool: "Sigstore cosign 3, key in your vault or HSM", rule: "Image, SBOM and provenance signed with your key", std: "SSDF PS.2 · CIP-013 R1.2.5" },
+    { name: "Signature", tool: "Sigstore cosign 3, key in your vault or HSM", rule: "Image, SBOM and provenance signed with your key", std: "SSDF PS.2 · SLSA Build L3" },
     { name: "Version and notes", tool: "Semantic Versioning 2.0", rule: "Tagged release with notes and change list", std: "ISO A.8.32" },
     { name: "Stored by digest", tool: "Your registry", rule: "Pushed and referenced by digest, never by tag", std: "SSDF PS.3" },
   ] },
@@ -52,13 +52,6 @@ export const STAGES: Stage[] = [
     { name: "Approved change", tool: "Your ITSM (ServiceNow or similar)", rule: "Production needs an approved change linked to this build", std: "ISO A.8.32" },
   ] },
 ];
-
-export const FAIL_AT = {
-  stage: "scan", gate: 0,
-  message: "A newly added library carries a critical vulnerability (CVSS 9.8) and a fixed version exists. Policy allows none, so the merge is blocked and a fix ticket is opened.",
-};
-
-export const DIGEST = "sha256:7f3c…e91a";
 
 export const STANDARDS: Standard[] = [
   { id: "ssdf", name: "NIST Secure Software Development Framework", version: "SP 800-218 v1.1", what: "The secure-development practices US federal software attestation was built on.",
@@ -77,8 +70,8 @@ export const STANDARDS: Standard[] = [
     how: "SPDX and CycloneDX SBOMs for every image, signed and delivered with each release.", url: "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom" },
   { id: "sp800190", name: "NIST Application Container Security", version: "SP 800-190", what: "Image, registry, orchestrator and host risks for containers.",
     how: "Minimal non-root images on CIS-hardened hosts, scanned, signed and admitted only by digest.", url: "https://csrc.nist.gov/pubs/sp/800/190/final" },
-  { id: "cip013", name: "NERC CIP-013-2", version: "R1.2.5", what: "Verifying software integrity and authenticity, the utility supply-chain standard.",
-    how: "CostIQ is not a BES Cyber System, but every release can be verified the way CIP-013 asks.", url: "https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-013-2.pdf" },
+  { id: "gamp5", name: "ISPE GAMP 5", version: "Second Edition", what: "Risk-based assurance for GxP computerized systems.",
+    how: "CostIQ is not a GxP system, but every release carries the requirements, risk assessment and test evidence a quality unit asks for.", url: "https://ispe.org/publications/guidance-documents/gamp-5-guide-2nd-edition" },
   { id: "iso25010", name: "ISO/IEC 25010", version: "2023", what: "Product quality: suitability, reliability, security, maintainability and more.",
     how: "Each quality characteristic has an automated measure in the pipeline.", url: "https://www.iso.org/standard/78176.html" },
   { id: "pentest", name: "Independent penetration test", version: "NIST SP 800-115", what: "Technical security testing method.",
@@ -169,10 +162,10 @@ export const ROUTES: Record<string, Route> = {
     security: ["Repeatable, reviewed playbooks", "Signature checked on every host before start", "Runs from your automation, with its logs"],
     cons: ["Less self-healing than Kubernetes", "Host-by-host rollout takes longer"], scores: { assurance: 4, speed: 3, effort: 2 } },
   pam: { name: "We deploy through your PAM", airgap: "no", fit: "Networks that allow vendor sessions",
-    short: "Our engineer runs the release from your jump host in a time-boxed, recorded session you approve and can end at any time, following the CIP-005-7 R2 vendor-access pattern.",
+    short: "Our engineer runs the release from your jump host in a time-boxed, recorded session you approve and can end at any time.",
     flow: ["Access request", "Your approval", "Your PAM jump host with MFA", "Recorded session", "Test", "Production"],
     needs: ["On-prem privileged access management (for example a BeyondTrust appliance)", "Just-in-time accounts with MFA", "Session recording and a kill switch"],
-    security: ["Approved per session and time-boxed", "Every session recorded", "You can see and end active sessions (CIP-005-7 R2.4, R2.5)"],
+    security: ["Approved per session and time-boxed", "Every session recorded", "You can see and end active sessions"],
     cons: ["A person holds production rights during the session", "Cloud-hosted vendor PAM would route through a vendor cloud"], scores: { assurance: 3, speed: 3, effort: 2 } },
 };
 
@@ -304,7 +297,7 @@ export const THREATS: Threat[] = [
   { id: "exfil", name: "An insider takes the data", technique: "T1567 Exfiltration Over Web Service", url: "https://attack.mitre.org/techniques/T1567/",
     attack: "Someone with access tries to bulk-export cost data and upload it outside.",
     steps: [
-      { layer: "access", outcome: "contain", text: "Each persona sees only its scope; OpCo users can't see other OpCos." },
+      { layer: "access", outcome: "contain", text: "Each persona sees only its scope; a country affiliate can't see another's data." },
       { layer: "firewall", outcome: "block", text: "CostIQ has no route to the internet, so uploads to file-sharing sites fail." },
       { layer: "detect", outcome: "detect", text: "Every export is written to the hash-chained ledger; out-of-hours bulk exports raise an alert." },
     ] },
@@ -333,7 +326,6 @@ export const RELEASE_SOURCES: [string, string][] = [
   ["OWASP ASVS 5.0", "https://asvs.owasp.org/"],
   ["NSA/CISA/ODNI: securing the software supply chain for customers", "https://www.cisa.gov/sites/default/files/2024-08/ESF_SECURING_THE_SOFTWARE_SUPPLY_CHAIN_CUSTOMER_508.pdf"],
   ["NIST SP 1334, portable storage media in OT", "https://csrc.nist.gov/news/2025/cyber-risks-of-portable-storage-media-in-ot"],
-  ["NERC CIP-005-7 (vendor remote access, R2)", "https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-005-7.pdf"],
   ["Reproducible builds: definition", "https://reproducible-builds.org/docs/definition/"],
   ["F5 BIG-IP LTM pool reference", "https://clouddocs.f5.com/cli/tmsh-reference/latest/modules/ltm/ltm_pool.html"],
   ["F5 BIG-IP Zero Trust Access (formerly APM)", "https://www.f5.com/company/blog/hello-f5-big-ip-zero-trust-access-long-live-f5-big-ip-apm"],

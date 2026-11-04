@@ -1,5 +1,5 @@
 id: F-16
-source: FinOps Foundation FOCUS 1.4
+source: FinOps Foundation FOCUS 1.0
 title: Identify anomalous daily spending by subaccount
 category: Anomaly Management
 module: anomalies

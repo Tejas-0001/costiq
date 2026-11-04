@@ -66,18 +66,21 @@ class Engines:
                 f"json_extract_string(Tags, '$.cost_center'), {rules}, 'Unallocated')")
         return expr, params
 
-    def allocation_summary(self, scope):
+    def allocation_summary(self, scope, win=None):
         cc, p = self.cost_center_expr()
+        wf = f"WHERE {win.pred()}" if win else ""
+        if win:
+            p.update(win.params())
         method = ("CASE WHEN json_extract_string(AllocatedTags, '$.cost_center') IS NOT NULL THEN 'Split-cost allocation' "
                   "WHEN json_extract_string(Tags, '$.cost_center') IS NOT NULL THEN 'Resource tag' "
                   f"WHEN {cc} <> 'Unallocated' THEN 'Approved rule' ELSE 'Unallocated' END")
         by_method = rows(self.db.query(f"""
             SELECT {method} AS Method, COUNT(*) AS ChargeLines, SUM(EffectiveCost) AS EffectiveCost
-            FROM CostAndUsage GROUP BY 1 ORDER BY 3 DESC""", p, scope))
+            FROM CostAndUsage {wf} GROUP BY 1 ORDER BY 3 DESC""", p, scope))
         by_cc = rows(self.db.query(f"""
             SELECT {cc} AS CostCenter, SUM(EffectiveCost) AS EffectiveCost,
                    SUM(CASE WHEN x_AIProduct IS NOT NULL THEN EffectiveCost ELSE 0 END) AS AICost
-            FROM CostAndUsage GROUP BY 1 ORDER BY 2 DESC""", p, scope))
+            FROM CostAndUsage {wf} GROUP BY 1 ORDER BY 2 DESC""", p, scope))
         total = sum(r["EffectiveCost"] or 0 for r in by_method)
         unalloc = sum(r["EffectiveCost"] or 0 for r in by_method if r["Method"] == "Unallocated")
         return {"rules": self.allocation_rules(), "by_method": by_method, "by_cost_center": by_cc,
@@ -140,9 +143,11 @@ class Engines:
             }}
 
     # ------------------------------------------------------------------ explorer
-    def explorer(self, scope, month=None, provider=None, cost_center=None, limit=25):
+    def explorer(self, scope, month=None, provider=None, cost_center=None, limit=25, win=None):
         cc, p = self.cost_center_expr()
         where = ["1 = 1"]
+        if win and not month:  # a chosen month overrides the period selector
+            where.append(win.pred()); p.update(win.params())
         if month:
             where.append("strftime(BillingPeriodStart, '%Y-%m') = :month"); p["month"] = month
         if provider:
@@ -193,29 +198,29 @@ class Engines:
                                                          f"billed {c['BilledCost']:.2f} · effective {c['EffectiveCost']:.2f} {c['BillingCurrency']}"},
             {"step": "Allocation", "detail": how},
             {"step": "Allocated to", "detail": c["__cc"]},
-            *self.utility_lineage(key),
+            *self.entity_lineage(key),
             {"step": "Invoice line", "detail": (f"{inv[0]['InvoiceId']} / {inv[0]['InvoiceDetailId']} · {inv[0]['InvoiceIssueStatus']}"
                                                 if inv else "Not yet invoiced (open period)")}],
             "charge": {k: v for k, v in c.items() if not k.startswith("__") and v not in (None, "")}}
 
-    def utility_lineage(self, key):
-        """Steps 3-5 of the utility allocation chain for one charge (OpCo split, jurisdiction, FERC account)."""
+    def entity_lineage(self, key):
+        """Steps 3-5 of the entity allocation chain for one charge (entity split, jurisdiction, GL account)."""
         parts = rows(self.db.query("""
             SELECT LegalEntity, OpcoPolicy, OpcoPolicyVersion, DriverName, OpcoShare, Jurisdiction, JurisdictionFactor,
-                   FercAccount, FercTitle, CostClass, AllocatedCost, Exception
-            FROM ut_allocated_cost WHERE ChargeKey = :k ORDER BY AllocatedCost DESC""", {"k": key}, None, limit=None))
+                   GlAccount, GlTitle, CostClass, AllocatedCost, Exception
+            FROM allocated_cost WHERE ChargeKey = :k ORDER BY AllocatedCost DESC""", {"k": key}, None, limit=None))
         if not parts:
             return []
         p0 = parts[0]
         basis = f"driver {p0['DriverName']}" if p0["DriverName"] else "fixed entity"
         opco = "; ".join(f"{e} {100 * s:.1f}%" for e, s in dict((r["LegalEntity"], r["OpcoShare"]) for r in parts).items())
         jur = "; ".join(sorted({f"{r['LegalEntity']} → {r['Jurisdiction']} {100 * r['JurisdictionFactor']:.0f}%" for r in parts}))
-        ferc = "; ".join(sorted({f"{r['FercAccount'] or 'UNMAPPED'} {r['FercTitle'] or ''} ({r['CostClass']})".strip() for r in parts}))
+        gl = "; ".join(sorted({f"{r['GlAccount'] or 'UNMAPPED'} {r['GlTitle'] or ''} ({r['CostClass']})".strip() for r in parts}))
         return [
-            {"step": "OpCo split", "detail": (f"Policy {p0['OpcoPolicy']} v{p0['OpcoPolicyVersion']} ({basis}): {opco}"
-                                              if p0["OpcoPolicy"] else "No approved policy matched: stays on the service company")},
+            {"step": "Entity split", "detail": (f"Policy {p0['OpcoPolicy']} v{p0['OpcoPolicyVersion']} ({basis}): {opco}"
+                                              if p0["OpcoPolicy"] else "No approved policy matched: stays on the shared-services entity")},
             {"step": "Jurisdiction", "detail": jur},
-            {"step": "FERC account and cost class", "detail": ferc + (f" · exception: {p0['Exception']}" if p0["Exception"] else "")},
+            {"step": "GL account and cost class", "detail": gl + (f" · exception: {p0['Exception']}" if p0["Exception"] else "")},
         ]
 
     # ------------------------------------------------------------------ AI economics
@@ -289,16 +294,16 @@ class Engines:
         if r:
             add("UO-02", "Prompt cache writes that never pay back", "estimate", "low",
                 -sum(x["NetCacheBenefitAtList"] for x in r), f"{r[0]['Workspace']} · {r[0]['ReadsPerWrite']} reads per write",
-                "Grid Operations", "Cache write premium − cache read savings, at list price.", r)
+                "Clinical Operations", "Cache write premium − cache read savings, at list price.", r)
         r = self._uc("UO-03", scope)
         if r:
             add("UO-03", "Workloads eligible for the Batch API", "estimate", "low", sum(x["PotentialBatchSavings"] or 0 for x in r),
-                f"{len(r)} standard-tier workloads", "Grid Operations", "Standard-tier cost × 50% (batch discount). Over the data window.", r)
+                f"{len(r)} standard-tier workloads", "Clinical Operations", "Standard-tier cost × 50% (batch discount). Over the data window.", r)
         r = self._uc("UO-04", scope)
         if r:
             pos = [x for x in r if (x["EstimatedListSavings"] or 0) > 0]
             add("UO-04", "Frontier models on simple tasks", "estimate", "low", sum(x["EstimatedListSavings"] for x in pos),
-                f"{len(pos)} application/model pairs", "Grid Operations", "Current list cost − same tokens at the vendor's balanced-tier price.", pos)
+                f"{len(pos)} application/model pairs", "Clinical Operations", "Current list cost − same tokens at the vendor's balanced-tier price.", pos)
         r = self._uc("F-46", scope)
         if r:
             add("F-46", "Commitment-eligible spend not covered", "estimate", "low",
@@ -313,7 +318,7 @@ class Engines:
         if r:
             add("GV-02", "Regulated workload served outside the US", "compliance", "high", sum(x["EffectiveCost"] or 0 for x in r),
                 f"{r[0]['Application']} · {r[0]['DaysInViolation']} days", "AI Governance",
-                "CEII-tagged usage where inference_geo ≠ us. Compliance exposure (the cost shown is the affected spend).", r)
+                "Genomic-data usage where inference_geo ≠ us. Compliance exposure (the cost shown is the affected spend).", r)
         if scope is None:
             r = self._uc("IC-01", scope)
             if r:
@@ -331,7 +336,7 @@ class Engines:
                 f"{sum(x['PaygCredits'] for x in r):,.0f} credits billed pay-as-you-go", "Business application owner",
                 "Σ billed cost of credits consumed beyond the monthly pack.", r)
         if scope is None:
-            for detect in (self._utility_findings, ):
+            for detect in (self._pharma_findings, ):
                 try:
                     detect(scope, add)
                 except Exception as e:  # noqa: BLE001 - one detector never breaks the list
@@ -341,28 +346,28 @@ class Engines:
         out.sort(key=lambda f: (order[f["severity"]], -f["exposure"]))
         return out
 
-    def _utility_findings(self, scope, add):
-        """Regulatory-accounting and NERC CIP findings from the Utilities module (enterprise scope only)."""
-        r = [x for x in self._uc("UT-03", scope) if (x["CrossSubsidy"] or 0) > 0]
+    def _pharma_findings(self, scope, add):
+        """Transfer-pricing, GxP and patient-data findings from the pharma use cases (enterprise scope only)."""
+        r = [x for x in self._uc("PH-03", scope) if (x["CrossCharge"] or 0) > 0]
         if r:
-            add("UT-03", "Regulated OpCos carrying non-regulated work (cross-subsidy)", "compliance", "high",
-                sum(x["CrossSubsidy"] for x in r), f"{r[0]['CostCenter']} via {r[0]['OpcoPolicy']} · {len(r)} allocations",
-                "Service-Company Accounting", "Allocated cost from non-regulated cost centers that landed on regulated entities.", r)
-        r = [x for x in self._uc("UT-07", scope) if x["Status"] == "Provider can decrypt BCSI"]
+            add("PH-03", "GxP entities carrying Consumer Health work (cross-charging)", "compliance", "high",
+                sum(x["CrossCharge"] for x in r), f"{r[0]['CostCenter']} via {r[0]['OpcoPolicy']} · {len(r)} allocations",
+                "Transfer Pricing", "Allocated cost from Consumer Health cost centers that landed on GxP entities.", r)
+        r = [x for x in self._uc("PH-07", scope) if x["Status"] == "Provider can decrypt patient data"]
         if r:
-            add("UT-07", "BCSI in cloud without customer-held keys", "compliance", "high", sum(x["EffectiveCost"] or 0 for x in r),
-                ", ".join(x["Application"] for x in r), "NERC CIP Compliance",
-                "Workloads holding BES Cyber System Information where the provider manages the keys (spend shown).", r)
-        r = [x for x in self._uc("UT-01", scope) if x["Status"] == "Unmapped"]
+            add("PH-07", "Patient data in cloud without customer-managed keys", "compliance", "high", sum(x["EffectiveCost"] or 0 for x in r),
+                ", ".join(x["Application"] for x in r), "GxP Quality & Data Privacy",
+                "Workloads holding patient data where the provider manages the keys (spend shown).", r)
+        r = [x for x in self._uc("PH-01", scope) if x["Status"] == "Unmapped"]
         if r:
-            add("UT-01", "Technology spend with no FERC account", "exception", "medium", sum(x["AllocatedCost"] or 0 for x in r),
-                f"{len(r)} entity lines unmapped", "Regulatory Accounting",
-                "Allocated O&M with no ut_ferc_account_map match; cannot be presented in a filing without a manual entry.", r)
-        r = [x for x in self._uc("UT-06", scope) if x["Timing"] == "In test year"]
+            add("PH-01", "Technology spend with no GL account", "exception", "medium", sum(x["AllocatedCost"] or 0 for x in r),
+                f"{len(r)} entity lines unmapped", "Internal Controller",
+                "Allocated opex with no ref_gl_account_map match; needs a manual entry before close and filing.", r)
+        r = [x for x in self._uc("PH-06", scope) if x["Timing"] == "In forecast year"]
         if r:
-            add("UT-06", "Contract escalators landing in the test year", "estimate", "low", sum(x["AnnualEscalation"] or 0 for x in r),
-                f"{len(r)} renewals in {r[0]['Docket']}'s test year", "Regulatory Accounting",
-                "Annual contract value × escalator for renewals inside the forecast test year. Renegotiate or file as known and measurable.", r)
+            add("PH-06", "Contract escalators landing in the forecast year", "estimate", "low", sum(x["AnnualEscalation"] or 0 for x in r),
+                f"{len(r)} renewals in {r[0]['FilingId']}'s forecast year", "FP&A Analyst",
+                "Annual contract value × escalator for renewals inside the forecast year. Renegotiate or budget for it.", r)
 
     def _daily_spikes(self, scope):
         return rows(self.db.query("""
@@ -440,8 +445,8 @@ class Engines:
     # ------------------------------------------------------------------ compliance scorecards (any module)
     # Areas come from the use cases' `compliance.area` values, in catalog order. One disclaimer per module.
     DISCLAIMERS = {
-        "utilities": "Decision support for Regulatory Accounting, Affiliate Accounting and NERC CIP teams. CostIQ does not "
-                     "determine regulatory or NERC CIP compliance; the reference registers are maintained by those teams.",
+        "compliance": "Decision support for Tax, Transfer Pricing, GxP Quality and Data Privacy teams. CostIQ does not "
+                      "determine GxP, privacy or tax compliance; the reference registers are maintained by those teams.",
     }
 
     def compliance_score(self, uc, scope, params=None):
@@ -506,31 +511,31 @@ class Engines:
              "evidence": f"{dup} duplicates"},
             {"id": "C-07", "control": "Decision ledger hash chain verifies", "result": "pass" if ledger_verify["verified"] else "fail",
              "evidence": f"{ledger_verify.get('entries', ledger_verify.get('broken_at'))} entries"},
-        ] + self.utility_controls(), "manifests": man}
+        ] + self.allocation_controls(), "manifests": man}
 
-    def utility_controls(self):
-        """C-08..C-11: the regulatory-accounting controls over the allocation chain (ut_allocated_cost)."""
+    def allocation_controls(self):
+        """C-08..C-11: the controls over the entity allocation chain (allocated_cost)."""
         q = lambda sql: self.db.query(sql, {}, None, limit=None)["rows"]
-        total, unmapped = q("""SELECT SUM(AllocatedCost), SUM(CASE WHEN FercAccount IS NULL THEN AllocatedCost ELSE 0 END)
-                               FROM ut_allocated_cost""")[0]
+        total, unmapped = q("""SELECT SUM(AllocatedCost), SUM(CASE WHEN GlAccount IS NULL THEN AllocatedCost ELSE 0 END)
+                               FROM allocated_cost""")[0]
         total, unmapped = float(total or 0), float(unmapped or 0)
-        xsub = float(q("""SELECT COALESCE(SUM(a.AllocatedCost), 0) FROM ut_allocated_cost a
-                          JOIN ut_cost_center c ON c.CostCenter = a.CostCenter
+        xsub = float(q("""SELECT COALESCE(SUM(a.AllocatedCost), 0) FROM allocated_cost a
+                          JOIN ref_cost_center c ON c.CostCenter = a.CostCenter
                           WHERE NOT c.Regulated AND a.Regulated""")[0][0] or 0)
         ties = q("""SELECT s.p, s.src, COALESCE(a.alloc, 0) FROM
                       (SELECT BillingPeriodStart AS p, SUM(EffectiveCost) AS src FROM CostAndUsage GROUP BY 1) s
-                      LEFT JOIN (SELECT PeriodStart AS p, SUM(AllocatedCost) AS alloc FROM ut_allocated_cost GROUP BY 1) a ON a.p = s.p""")
+                      LEFT JOIN (SELECT PeriodStart AS p, SUM(AllocatedCost) AS alloc FROM allocated_cost GROUP BY 1) a ON a.p = s.p""")
         off = [r for r in ties if abs(float(r[1] or 0) - float(r[2] or 0)) > 0.01]
-        pol = rows(self.db.query("SELECT PolicyId, Version, Status, ApprovedBy, EffectiveFrom FROM ut_allocation_policy", {}, None, limit=None))
+        pol = rows(self.db.query("SELECT PolicyId, Version, Status, ApprovedBy, EffectiveFrom FROM ref_allocation_policy", {}, None, limit=None))
         applied = [r for r in pol if r["Status"] == "approved"]
         bad = [r for r in applied if not (r["ApprovedBy"] and r["EffectiveFrom"])]
         pending = [r for r in pol if r["Status"] == "submitted"]
         return [
-            {"id": "C-08", "control": "Every allocated dollar has a FERC account",
+            {"id": "C-08", "control": "Every allocated dollar has a GL account",
              "result": "pass" if unmapped < 0.01 else "exceptions",
              "evidence": f"${unmapped:,.2f} of ${total:,.2f} unmapped ({100 * unmapped / total if total else 0:.2f}%)"},
-            {"id": "C-09", "control": "No regulated entity carries non-regulated cost centers' work (cross-subsidy)",
-             "result": "pass" if xsub < 0.01 else "exceptions", "evidence": f"${xsub:,.2f} on regulated entities"},
+            {"id": "C-09", "control": "No GxP entity carries Consumer Health cost centers' work (cross-charging)",
+             "result": "pass" if xsub < 0.01 else "exceptions", "evidence": f"${xsub:,.2f} on GxP entities"},
             {"id": "C-10", "control": "Allocated total ties to source total for every period (±$0.01)",
              "result": "pass" if not off else "fail", "evidence": f"{len(ties)} periods, {len(off)} out of balance"},
             {"id": "C-11", "control": "Allocation policies applied are approved and effective-dated",

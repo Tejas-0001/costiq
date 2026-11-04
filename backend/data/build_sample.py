@@ -1,10 +1,10 @@
-"""Build the synthetic Meridian Energy sample database end to end.
+"""Build the sample database end to end.
 
   python data/build_sample.py            -> sample/costiq_sample.duckdb (source) and sample/costiq.duckdb (served)
 
-Steps: generate the FOCUS + AI base dataset, apply the add-on generators (utility registers, optimization
+Steps: generate the FOCUS + AI base dataset, apply the add-on generators (pharma registers, optimization
 telemetry) to the source file, then migrate, load and seed the database in COSTIQ_DB_URL (default: the served
-DuckDB file). Everything is synthetic: Meridian Energy is a fictional utility.
+DuckDB file). The sample is generated, not customer data.
 """
 from __future__ import annotations
 import glob, os, subprocess, sys
@@ -14,7 +14,7 @@ SAMPLE = os.path.join(ROOT, "sample")
 SOURCE = os.path.join(SAMPLE, "costiq_sample.duckdb")
 SERVED = os.path.join(SAMPLE, "costiq.duckdb")
 # Add-on generators run in this order against the source file; each takes the DuckDB path as its argument.
-ADDONS = ["utility.py", "optimization.py"]
+ADDONS = ["pharma.py", "optimization.py"]
 
 
 def run(*args):

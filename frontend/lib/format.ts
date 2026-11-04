@@ -1,8 +1,8 @@
 // Number formatting shared by tables, KPIs and charts (ported from the CostIQ web app).
-export const PALETTE = ["#2f6bff", "#8a5cff", "#12a594", "#ff7a45", "#ffb020", "#00b8d9", "#8e8e93", "#e5484d"];
+export const PALETTE = ["#0f6ec8", "#454d53", "#97b5c3", "#ca4528", "#2e7d6b", "#b8c1cb", "#0a4a87", "#d6d6d6"];
 
 const MONEY =
-  /cost|spend|billed|amount|savings|variance|exposure|budget|forecast|overage|shortfall|effective|invoiced|charge(total)?$|actual|todate|risk|return|fees|annualized|measurable|escalation|value|baseline|o?andm$|percustomer|perrequest|peroutcome|perstudy|equivalent|billing|deferred|amortization|balance|subsidy|burn$/i;
+  /cost|spend|billed|amount|savings|variance|exposure|budget|forecast|overage|shortfall|effective|invoiced|charge(total)?$|actual|todate|risk|return|fees|annualized|measurable|escalation|value|baseline|o?andm$|perpatient|persite|perrequest|peroutcome|perstudy|equivalent|billing|credit$|qre|balance|crosscharge|burn$/i;
 
 export function money(v: unknown, d = 0): string {
   const n = typeof v === "number" ? v : v == null ? NaN : Number(v);
@@ -31,7 +31,7 @@ export function pct(v: unknown, signed = true): string {
 }
 
 export function isMoneyCol(c: string): boolean {
-  return MONEY.test(c) && !/pct|rate|ratio|percent|tokens|quantity|count|credits$|days$|units$|months$|lines$|meters$|customers$|studies$/i.test(c);
+  return MONEY.test(c) && !/pct|rate|ratio|percent|tokens|quantity|count|credits$|days$|units$|months$|lines$|sites$|patients$|studies$/i.test(c);
 }
 
 export function label(s: string): string {

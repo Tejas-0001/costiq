@@ -9,6 +9,7 @@ psycopg-pool==3.3.3
 PyJWT[crypto]==2.15.0
 PyYAML==6.0.3
 httpx==0.28.1
+anthropic==2.4.0  # optional Claude writer for the AI summary (COSTIQ_SUMMARY_WRITER=claude)
 python-multipart
 pyarrow
 pandas

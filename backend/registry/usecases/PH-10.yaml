@@ -1,0 +1,45 @@
+id: PH-10
+source: MM CostIQ Pharma extension
+title: 'Technology unit costs: per enrolled patient, per trial site, per active study'
+category: 'Pharma · Clinical operations & AI'
+module: tax
+business_question: 'What does technology cost per enrolled patient, per trial site and per active study, by entity?'
+personas:
+- tax_analyst
+- cfo
+catalog_persona: 'CFO, Clinical Operations'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Allocated technology opex (including claimed qualifying research) divided by each entity''s volume drivers.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'unit cost'
+- 'cost per patient'
+- 'cost per site'
+- 'cost per study'
+- 'clinical trial'
+- 'benchmark'
+products: Any provider
+sql: |-
+  WITH cost AS (
+    SELECT PeriodStart, LegalEntity, SUM(AllocatedCost) AS ItCost
+    FROM allocated_cost
+    WHERE CostClass IN ('opex', 'qre')
+    GROUP BY PeriodStart, LegalEntity
+  )
+  SELECT
+    strftime(c.PeriodStart, '%Y-%m') AS Month,
+    c.LegalEntity,
+    ROUND(c.ItCost, 2) AS TechnologyOpex,
+    v.EnrolledPatients,
+    v.TrialSites,
+    v.ActiveStudies,
+    ROUND(c.ItCost * 12 / NULLIF(v.EnrolledPatients, 0), 2) AS AnnualizedPerPatient,
+    ROUND(c.ItCost / NULLIF(v.TrialSites, 0), 2) AS PerSiteMonth,
+    ROUND(c.ItCost / NULLIF(v.ActiveStudies, 0), 2) AS PerActiveStudy
+  FROM cost c
+  JOIN ref_volume v ON v.PeriodStart = c.PeriodStart AND v.LegalEntity = c.LegalEntity
+  ORDER BY Month, c.LegalEntity
+params: []
+notes: 'October is a partial month (data through 22 Oct).'

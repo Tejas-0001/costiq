@@ -1,4 +1,4 @@
-"""Synthetic cloud FOCUS 1.4 rows (AWS, Azure, GCP, Snowflake, marketplace) for the Meridian sample.
+"""Synthetic cloud FOCUS 1.4 rows (AWS, Azure, GCP, Snowflake, marketplace) for the sample.
 
 Called by generate_sample.py before invoices, tax and billing periods are derived, so cloud rows
 flow through the same invoice / reconciliation logic as the AI rows.
@@ -11,7 +11,7 @@ Every scenario that a FinOps Foundation FOCUS use case needs is seeded deliberat
   - virtual currency: Snowflake credits purchased and consumed (PricingCurrency = credits)
   - EKS split-cost allocation (AllocatedMethodId / AllocatedResourceId / AllocatedTags)
   - availability zones, SkuPriceDetails core counts, data transfer in GB
-  - an EC2 spend spike in meridian-dev us-west-2 on 2026-10-09 (anomaly use cases)
+  - an EC2 spend spike in pharma-dev us-west-2 on 2026-10-09 (anomaly use cases)
   - a September AWS correction posted after invoicing, an Azure correction, AWS promotional credits
 All prices are illustrative, not vendor list prices.
 """
@@ -30,23 +30,23 @@ ELIG_GCP = {"CommitmentPrograms": [
     {"ProgramType": "ZonalResourceCommitment", "ProgramName": "Zonal reservations"}]}
 
 ACCTS = {
-    "AWS": ("aws-payer-2002", "Meridian AWS Payer", "USD"),
-    "Microsoft": ("ms-mca-1001", "Meridian MCA", "USD"),
-    "MicrosoftEU": ("ms-mca-eu-1002", "Meridian MCA Europe", "EUR"),
-    "Google Cloud": ("gcp-billing-3003", "Meridian GCP Billing", "USD"),
-    "Snowflake": ("snow-org-6006", "Meridian Snowflake", "USD"),
+    "AWS": ("aws-payer-2002", "AWS Payer", "USD"),
+    "Microsoft": ("ms-mca-1001", "MCA", "USD"),
+    "MicrosoftEU": ("ms-mca-eu-1002", "MCA Europe", "EUR"),
+    "Google Cloud": ("gcp-billing-3003", "GCP Billing", "USD"),
+    "Snowflake": ("snow-org-6006", "Snowflake", "USD"),
 }
 # sub account id, name, cost center, application, application id, issuer key, provider
 SUBS = {
-    "aws-prod": ("111111111111", "meridian-prod", "Grid Operations", "web-store", "APP-1001", "AWS"),
-    "aws-data": ("222222222222", "meridian-data", "Data & Analytics", "analytics-lake", "APP-2002", "AWS"),
-    "aws-dev":  ("333333333333", "meridian-dev", "Grid Operations", "dev-sandbox", "APP-1003", "AWS"),
-    "az-crm":   ("sub-0a1b-crm", "Meridian-CRM-Prod", "Customer Operations", "crm-portal", "APP-3001", "Microsoft"),
-    "az-erp":   ("sub-0c2d-erp", "Meridian-ERP", "Finance", "erp-finance", "APP-3002", "Microsoft"),
-    "az-eu":    ("sub-0e3f-eu", "Meridian-EU-Web", "Transmission Planning", "eu-web", "APP-3003", "MicrosoftEU"),
-    "gcp-mktg": ("meridian-tplan-analytics", "Marketing Analytics", "Transmission Planning", "marketing-analytics", "APP-4001", "Google Cloud"),
-    "gcp-hr":   ("meridian-hr-apps", "HR Apps", "HR", "hr-portal", "APP-4002", "Google Cloud"),
-    "snow":     ("MERIDIAN_PROD", "Meridian Snowflake Prod", "Data & Analytics", "analytics-lake", "APP-2002", "Snowflake"),
+    "aws-prod": ("111111111111", "pharma-prod", "Clinical Operations", "web-store", "APP-1001", "AWS"),
+    "aws-data": ("222222222222", "pharma-data", "Data & Analytics", "analytics-lake", "APP-2002", "AWS"),
+    "aws-dev":  ("333333333333", "pharma-dev", "Clinical Operations", "dev-sandbox", "APP-1003", "AWS"),
+    "az-crm":   ("sub-0a1b-crm", "CRM-Prod", "Patient Data", "crm-portal", "APP-3001", "Microsoft"),
+    "az-erp":   ("sub-0c2d-erp", "ERP", "Finance", "erp-finance", "APP-3002", "Microsoft"),
+    "az-eu":    ("sub-0e3f-eu", "EU-Web", "Research & Discovery", "eu-web", "APP-3003", "MicrosoftEU"),
+    "gcp-mktg": ("pharma-rd-analytics", "Marketing Analytics", "Research & Discovery", "marketing-analytics", "APP-4001", "Google Cloud"),
+    "gcp-hr":   ("pharma-hr-apps", "HR Apps", "HR", "hr-portal", "APP-4002", "Google Cloud"),
+    "snow":     ("PHARMA_PROD", "Snowflake Prod", "Data & Analytics", "analytics-lake", "APP-2002", "Snowflake"),
 }
 PROVIDER = {"AWS": "AWS", "Microsoft": "Microsoft", "MicrosoftEU": "Microsoft", "Google Cloud": "Google Cloud",
             "Snowflake": "Snowflake"}
@@ -77,16 +77,16 @@ AZ_VMS = [  # id, name, sub, region, zone, size, series, cores, list/hr, hours, 
     ("/subscriptions/sub-0e3f-eu/vm/eu-web-02", "eu-web-02", "az-eu", "westeurope", "3", "D4s_v5", "Dsv5", 4, 0.176, 24, False),
 ]
 GCE = [
-    ("projects/meridian-tplan-analytics/instances/mktg-etl-01", "mktg-etl-01", "gcp-mktg", "us-central1", "us-central1-a", "n2-standard-8", "n2", 8, 0.3885, 24, True),
-    ("projects/meridian-tplan-analytics/instances/mktg-etl-02", "mktg-etl-02", "gcp-mktg", "us-central1", "us-central1-b", "n2-standard-8", "n2", 8, 0.3885, 16, False),
-    ("projects/meridian-hr-apps/instances/hr-portal-01", "hr-portal-01", "gcp-hr", "us-east4", "us-east4-a", "e2-standard-4", "e2", 4, 0.1508, 24, False),
+    ("projects/pharma-rd-analytics/instances/mktg-etl-01", "mktg-etl-01", "gcp-mktg", "us-central1", "us-central1-a", "n2-standard-8", "n2", 8, 0.3885, 24, True),
+    ("projects/pharma-rd-analytics/instances/mktg-etl-02", "mktg-etl-02", "gcp-mktg", "us-central1", "us-central1-b", "n2-standard-8", "n2", 8, 0.3885, 16, False),
+    ("projects/pharma-hr-apps/instances/hr-portal-01", "hr-portal-01", "gcp-hr", "us-east4", "us-east4-a", "e2-standard-4", "e2", 4, 0.1508, 24, False),
 ]
 SP_ARN = "arn:aws:savingsplans::111111111111:savingsplan/sp-0compute2026"
 CR_USED = "arn:aws:ec2:us-east-1:111111111111:capacity-reservation/cr-0a1used"
 CR_IDLE = "arn:aws:ec2:us-east-1:111111111111:capacity-reservation/cr-0b2idle"
 RI_RDS = "arn:aws:rds:us-east-1:111111111111:ri:ri-rds-erp-2026"
 AZ_RES = "/providers/Microsoft.Capacity/reservationOrders/ro-crm-erp/reservations/res-dsv5-esv5"
-GCP_CUD = "projects/meridian-tplan-analytics/regions/us-central1/commitments/cud-n2-2026"
+GCP_CUD = "projects/pharma-rd-analytics/regions/us-central1/commitments/cud-n2-2026"
 
 
 def generate(ctx):
@@ -243,8 +243,8 @@ def generate(ctx):
              CommitmentDiscountQuantity=24, CommitmentDiscountUnit="Hours")
 
         # -------------------------------------------------------------- S3 storage, requests and data transfer
-        for sub, bucket, gb in (("aws-prod", "meridian-web-assets", 18000), ("aws-data", "meridian-datalake-raw", 420000),
-                                ("aws-data", "meridian-datalake-curated", 160000), ("aws-dev", "meridian-dev-scratch", 9000)):
+        for sub, bucket, gb in (("aws-prod", "pharma-web-assets", 18000), ("aws-data", "pharma-datalake-raw", 420000),
+                                ("aws-data", "pharma-datalake-curated", 160000), ("aws-dev", "pharma-dev-scratch", 9000)):
             gbd = gb * growth(d) / 30.0  # GB-month accrued per day
             lp = 0.023
             crow(d, sub, "Amazon S3", "Storage", "Object Storage", "S3 Standard storage", consumed=round(gbd, 3),
@@ -269,9 +269,9 @@ def generate(ctx):
         # -------------------------------------------------------------- EKS shared cluster with split cost allocation
         cluster = "arn:aws:eks:us-east-1:111111111111:cluster/shared-eks"
         node_cost = 6 * 24 * 0.4032 * (1 - EDP_DISC) * growth(d)
-        for ns, share, cc, app in (("checkout", 0.45, "Grid Operations", "web-store"),
+        for ns, share, cc, app in (("checkout", 0.45, "Clinical Operations", "web-store"),
                                    ("ml-serving", 0.35, "Data & Analytics", "ml-serving"),
-                                   ("personalization", 0.20, "Transmission Planning", "personalization")):
+                                   ("personalization", 0.20, "Research & Discovery", "personalization")):
             amt = node_cost * share
             crow(d, "aws-prod", "Amazon Elastic Kubernetes Service", "Compute", "Containers",
                  f"EKS split cost: namespace {ns}", consumed=round(6 * 24 * share, 2), cunit="Hours",
@@ -358,7 +358,7 @@ def generate(ctx):
         tb = 14 * growth(d) * wkf(d, True) * rnd.uniform(0.7, 1.3)
         crow(d, "gcp-mktg", "BigQuery", "Analytics", "Data Warehouses", "BigQuery on-demand analysis", consumed=round(tb, 3),
              cunit="TiB", list_up=6.25, contr_up=6.25, list_cost=tb * 6.25, contr_cost=tb * 6.25, eff_cost=tb * 6.25,
-             billed=tb * 6.25, region="us", res_id="projects/meridian-tplan-analytics/datasets/marketing",
+             billed=tb * 6.25, region="us", res_id="projects/pharma-rd-analytics/datasets/marketing",
              res_name="marketing", res_type="Dataset", sku="BQ-Analysis-OnDemand")
         for sub, gb in (("gcp-mktg", 64000), ("gcp-hr", 3500)):
             g = gb / 30 * growth(d)
@@ -374,12 +374,12 @@ def generate(ctx):
              consumed=round(cr_used / 8, 3), cunit="Warehouse-Hours", pqty=round(cr_used / 8, 3), punit="Warehouse-Hours",
              list_up=8 * 2.60, contr_up=8 * 2.20, list_cost=cr_used * 2.60, contr_cost=cr_used * 2.20,
              eff_cost=cr_used * 2.20, billed=0, pricing_cat="Committed", region="aws_us_east_1",
-             res_id="MERIDIAN_PROD.ANALYTICS_WH", res_name="ANALYTICS_WH", res_type="Warehouse",
+             res_id="PHARMA_PROD.ANALYTICS_WH", res_name="ANALYTICS_WH", res_type="Warehouse",
              sku="SNOW-COMPUTE-ENTERPRISE", provider="Snowflake", host="AWS", pricing_currency="Snowflake Credits",
              pc_list=8.0, pc_contr=7.2, pc_eff=r6(cr_used * 0.9))
         crow(d, "snow", "Snowflake Storage", "Storage", "Data Warehouses", "Database storage", consumed=round(85 / 30, 4),
              cunit="TB-Month", list_up=23.0, contr_up=23.0, list_cost=85 / 30 * 23, contr_cost=85 / 30 * 23,
-             eff_cost=85 / 30 * 23, billed=85 / 30 * 23, region="aws_us_east_1", res_id="MERIDIAN_PROD.STORAGE",
+             eff_cost=85 / 30 * 23, billed=85 / 30 * 23, region="aws_us_east_1", res_id="PHARMA_PROD.STORAGE",
              res_name="STORAGE", res_type="Storage", sku="SNOW-STORAGE", provider="Snowflake", host="AWS")
         if d.day == 1 and d.month in (7, 10):
             crow(d, "snow", "Snowflake Capacity", "Analytics", "Data Warehouses", "Capacity purchase: 20,000 credits",

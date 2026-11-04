@@ -1,7 +1,7 @@
 -- MM CostIQ monitoring and optimization tables. FOCUS billing data says what was spent; these tables say how well it
 -- was used (provider recommendations, utilization, LLM application telemetry, provisioned AI capacity) and track what
 -- was done about it (optimization lifecycle, alerts). Loaded by adapters in costiq/adapters/; the sample ships synthetic
--- Meridian Energy rows (data/optimization.py).
+-- sample rows (data/optimization.py).
 
 -- Provider-native recommendations: AWS Cost Optimization Hub data export, Google Recommender BigQuery export,
 -- Azure Advisor API.

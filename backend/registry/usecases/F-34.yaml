@@ -1,5 +1,5 @@
 id: F-34
-source: FinOps Foundation FOCUS 1.4
+source: FinOps Foundation FOCUS 1.0
 title: Reconcile Multi-Currency Settlement using Lineage IDs
 category: Invoicing & Chargeback
 module: reconciliation

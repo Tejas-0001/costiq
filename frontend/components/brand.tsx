@@ -1,21 +1,30 @@
-import Link from "next/link";
+import { useId } from "react";
 
-/** CostIQ mark: a grid signal that resolves into a check ("provable"). The tile gradient is CSS, so no SVG ids can collide. */
-export function Mark({ size = 24 }: { size?: number }) {
+/** Miracle Minds mark: two figures joined as an "M" (the MM CostIQ platform's logo). */
+export function MMMark({ size = 34 }: { size?: number }) {
+  const id = `mmg${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`; // one gradient per instance, so a hidden copy never blanks another
   return (
-    <span className="mark" style={{ width: size, height: size, borderRadius: size * 0.27 }} aria-hidden>
-      <svg width={size} height={size} viewBox="0 0 32 32">
-        <path d="M6.5 17.5h4.2l2.6-6 4 10.5 3-6.3 1.6 2.6 4-6.3" fill="none" stroke="#fff" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    </span>
+    <svg width={size} height={size * 0.76} viewBox="0 0 132 100" aria-label="Miracle Minds" role="img">
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#3d8fe0" /><stop offset="1" stopColor="#0a4a87" />
+        </linearGradient>
+      </defs>
+      <circle cx="18" cy="14" r="12" fill={`url(#${id})`} />
+      <circle cx="114" cy="14" r="12" fill={`url(#${id})`} />
+      <path d="M6 96V48c0-8 4-13 12-13 5 0 8 2 11 6l37 44 37-44c3-4 6-6 11-6 8 0 12 5 12 13v48a4 4 0 0 1-4 4h-16a4 4 0 0 1-4-4V62L79 92c-3 4-7 6-13 6s-10-2-13-6L30 62v34a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4z" fill={`url(#${id})`} />
+    </svg>
   );
 }
 
-export function Wordmark({ href = "/", size = 24, tone = "auto" }: { href?: string; size?: number; tone?: "auto" | "light" | "dark" }) {
+/** Miracle Minds lockup: mark, "MIRACLE MINDS", divider, CostIQ. Used in the landing header. */
+export function MMLockup({ sub }: { sub?: string }) {
   return (
-    <Link href={href} className={`wordmark ${tone}`} aria-label="CostIQ home">
-      <Mark size={size} />
-      <span>Cost<b>IQ</b></span>
-    </Link>
+    <span className="mm-lockup">
+      <MMMark size={38} />
+      <span className="mm-word">MIRACLE<br />MINDS</span>
+      <span className="mm-div" />
+      <span className="ciq"><span className="ciq-name">Cost<em>IQ</em></span>{sub && <span className="ciq-sub">{sub}</span>}</span>
+    </span>
   );
 }

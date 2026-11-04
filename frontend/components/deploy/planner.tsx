@@ -1,16 +1,39 @@
 "use client";
 // Guided on-prem deployment planner: one question at a time. Every option previews what it would change before you pick
-// it, the live plan on the right redraws as you answer, and the last step produces the blueprint. Works as an overlay
-// on the home page and as the /deploy page.
+// it, the live plan on the right redraws as you answer, and the last step produces the blueprint. Mounted by the
+// /deploy page.
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Mark } from "@/components/brand";
+import { MMMark } from "@/components/brand";
 import { EASE, EASE_IN } from "@/components/motion";
 import { Blueprint, decodeAnswers } from "./blueprint";
 import { Diagram, gb, Meters, ReuseBar, Weeks, type Delta } from "./canvas";
-import { BLOCKS, CARD, CHAPTERS, DEFAULTS, normalize, plan as makePlan, QUESTIONS, type Answers, type Key, type Plan } from "./model";
+import { BLOCKS, CHAPTERS, DEFAULTS, normalize, plan as makePlan, QUESTIONS, type Answers, type Key, type Plan } from "./model";
 import { CUSTODY, CUTOVERS, ROUTES } from "./release";
 import { RouteFlow, TrafficSplit } from "./release-viz";
+
+/** The MM CostIQ mark, sized for the planner's guide tiles and headers. */
+const Mark = ({ size }: { size: number }) => <span className="mark"><MMMark size={size} /></span>;
+
+/** One plain sentence per building-block card: what happens if you have it, and what we add if you don't. */
+const CARD: Record<string, { yours: string; missing: string }> = {
+  firewall: { yours: "We add our rules to your firewall.", missing: "We lock down each host and the network ourselves." },
+  waf: { yours: "We publish CostIQ through your WAF.", missing: "We add an open-source WAF in front of CostIQ." },
+  lb: { yours: "CostIQ gets a virtual IP on your load balancer.", missing: "We add a load-balancer pair." },
+  gateway: { yours: "We attach CostIQ to your routes or gateway.", missing: "We add Envoy Gateway to route traffic." },
+  pki: { yours: "You issue one TLS certificate for CostIQ.", missing: "We run a private certificate authority." },
+  registry: { yours: "We push signed images into your registry.", missing: "We add a Harbor registry for the images." },
+  vault: { yours: "Passwords and keys stay in your vault.", missing: "We add OpenBao to hold passwords and keys." },
+  siem: { yours: "We send audit logs to your SIEM.", missing: "We add Grafana Loki to keep the logs." },
+  monitoring: { yours: "Your monitoring watches CostIQ too.", missing: "We add Prometheus and Grafana dashboards." },
+  backup: { yours: "Your backup tool covers CostIQ's data.", missing: "We add database and platform backups." },
+  storage: { yours: "Billing files land on your NFS, SMB or S3 storage.", missing: "We add an S3-compatible store for billing files." },
+  proxy: { yours: "Outbound calls go through your proxy.", missing: "We add an allow-list proxy for outbound calls." },
+  cicd: { yours: "Upgrades ship through your pipeline.", missing: "We apply upgrades from an admin jump host." },
+  edr: { yours: "Your EDR agent watches CostIQ's hosts too.", missing: "We add Falco to catch suspicious runtime behaviour." },
+  pam: { yours: "Admin and vendor sessions go through your PAM.", missing: "We keep break-glass accounts in the vault, two-person." },
+  itsm: { yours: "Releases arrive in your ITSM as standard changes.", missing: "Release records go to CostIQ's tamper-evident ledger." },
+};
 
 type Phase = "intro" | "ask" | "build" | "blueprint";
 const TYPICAL: Answers = { ...DEFAULTS, have: BLOCKS.map((b) => b.id) };
@@ -311,13 +334,13 @@ function Intro({ onStart, onTypical }: { onStart: () => void; onTypical: () => v
         <li><b>Infrastructure and software</b>, with what&apos;s yours and what we bring</li>
         <li><b>Firewall rules, F5 and Cisco configuration, identity and data connections</b></li>
         <li><b>Cyber defense</b> layer by layer, tested against real attack techniques</li>
-        <li><b>Compliance controls</b> checked against NERC, NIST, CISA and ISO texts</li>
+        <li><b>Compliance controls</b> checked against 21 CFR Part 11, EU GMP Annex 11, HIPAA, GDPR, NIST and ISO texts</li>
         <li><b>Quality gates, code custody and the release route</b> from first commit to production</li>
         <li><b>Development plan, team and a prerequisites checklist</b> you can hand to IT</li>
       </motion.ul>
       <motion.div {...rise(0.36)} className="dp-intro-cta">
         <motion.button type="button" className="dp-btn primary" whileTap={{ scale: 0.97 }} onClick={onStart}>Start planning<span className="enter">↵</span></motion.button>
-        <button type="button" className="dp-btn" onClick={onTypical}>Skip to a typical utility blueprint</button>
+        <button type="button" className="dp-btn" onClick={onTypical}>Skip to a typical pharma blueprint</button>
       </motion.div>
     </div>
   );
@@ -405,7 +428,7 @@ function QuestionCard({ index, pos, total, answers, effective, plan, answered, c
               {on && <motion.span layoutId={q.multi ? undefined : `sel-${q.key}`} className="dp-opt-bg" transition={{ duration: 0.4, ease: EASE }} />}
               <span className="dp-opt-hd">
                 <b>{o.label}</b>
-                {o.recommended && !why && <em className="rec">Most utilities</em>}
+                {o.recommended && !why && <em className="rec">Most common</em>}
                 <span className={`tick ${on ? "on" : ""} ${q.multi ? "box" : ""}`}><Check /></span>
               </span>
               {isHave && card ? (

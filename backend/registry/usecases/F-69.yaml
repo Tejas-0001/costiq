@@ -1,5 +1,5 @@
 id: F-69
-source: FinOps Foundation FOCUS 1.4
+source: FinOps Foundation FOCUS 1.0
 title: Analyze costs by availability zone for a subaccount
 category: Usage Optimization
 module: anomalies

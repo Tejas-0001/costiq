@@ -3,7 +3,7 @@
 // API :8080, /api/health) and the Client Deployment Playbook (prerequisites P1-P14, roles, FOCUS export steps).
 // Component choices were checked against project and vendor sources in Nov 2026 (ingress-nginx retired Mar 2026, MinIO
 // community edition archived Apr 2026, PostgreSQL 14 end of life Nov 12 2026, Entra/Okta signing keys rotate without notice).
-// Compliance text was checked against NERC standard PDFs, the Federal Register (Order 919: enforceable Jul 1 2028), NIST OSCAL
+// Compliance text follows 21 CFR Part 11, EU GMP Annex 11, GAMP 5 (2nd ed.), the HIPAA Security Rule, GDPR, NIST OSCAL
 // baselines, CISA (CPG 2.0, 2026 SBOM minimum elements) and NIST CMVP (FIPS 140-2 historical after Sep 21 2026).
 // Sizing is a starting point to confirm in a load test, and the UI says so.
 
@@ -22,8 +22,8 @@ export type Answers = {
   have: string[];
   identity: "entra" | "okta" | "adfs" | "keycloak" | "local";
   compliance: string[];
-  placement: "dedicated" | "shared-corp" | "shared-cip";
-  bcsi: "no" | "yes" | "unsure";
+  placement: "dedicated" | "shared-corp";
+  phi: "no" | "yes" | "unsure";
   ledger: "gl" | "mgmt";
   fips: "required" | "preferred" | "no";
   retention: "90d" | "1y" | "3y" | "7y";
@@ -45,7 +45,7 @@ export type Key = keyof Answers;
 
 export const DEFAULTS: Answers = {
   users: "ent", spend: "l", entities: "few", hosting: "dc", platform: "k8s", distro: "openshift", database: "pg", have: [], transfer: "server",
-  identity: "entra", compliance: ["nerc-cip", "sox"], placement: "dedicated", bcsi: "no", ledger: "gl", fips: "preferred", retention: "3y", egress: "proxy", sources: ["aws", "azure", "saas", "m365"],
+  identity: "entra", compliance: ["gxp", "sox"], placement: "dedicated", phi: "no", ledger: "gl", fips: "preferred", retention: "3y", egress: "proxy", sources: ["aws", "azure", "saas", "m365"],
   availability: "ha", environments: "prod-test", operations: "client",
   edge: "f5-cisco", soc: "24x7", testing: "yearly", custody: "client-repo", testdata: "synthetic", route: "gitops", cutover: "bluegreen",
 };
@@ -61,25 +61,6 @@ export type Question = {
 
 // ------------------------------------------------------------------------------------------------ building blocks
 export type Block = { id: string; label: string; yours: string; provided: string; product?: string; version?: string; layer: "edge" | "platform" | "data" | "operate" };
-/** One plain sentence per card in the planner: what happens if you have it, and what we add if you don't. */
-export const CARD: Record<string, { yours: string; missing: string }> = {
-  firewall: { yours: "We add our rules to your firewall.", missing: "We lock down each host and the network ourselves." },
-  waf: { yours: "We publish CostIQ through your WAF.", missing: "We add an open-source WAF in front of CostIQ." },
-  lb: { yours: "CostIQ gets a virtual IP on your load balancer.", missing: "We add a load-balancer pair." },
-  gateway: { yours: "We attach CostIQ to your routes or gateway.", missing: "We add Envoy Gateway to route traffic." },
-  pki: { yours: "You issue one TLS certificate for CostIQ.", missing: "We run a private certificate authority." },
-  registry: { yours: "We push signed images into your registry.", missing: "We add a Harbor registry for the images." },
-  vault: { yours: "Passwords and keys stay in your vault.", missing: "We add OpenBao to hold passwords and keys." },
-  siem: { yours: "We send audit logs to your SIEM.", missing: "We add Grafana Loki to keep the logs." },
-  monitoring: { yours: "Your monitoring watches CostIQ too.", missing: "We add Prometheus and Grafana dashboards." },
-  backup: { yours: "Your backup tool covers CostIQ's data.", missing: "We add database and platform backups." },
-  storage: { yours: "Billing files land on your NFS, SMB or S3 storage.", missing: "We add an S3-compatible store for billing files." },
-  proxy: { yours: "Outbound calls go through your proxy.", missing: "We add an allow-list proxy for outbound calls." },
-  cicd: { yours: "Upgrades ship through your pipeline.", missing: "We apply upgrades from an admin jump host." },
-  edr: { yours: "Your EDR agent watches CostIQ's hosts too.", missing: "We add Falco to catch suspicious runtime behaviour." },
-  pam: { yours: "Admin and vendor sessions go through your PAM.", missing: "We keep break-glass accounts in the vault, two-person." },
-  itsm: { yours: "Releases arrive in your ITSM as standard changes.", missing: "Release records go to CostIQ's tamper-evident ledger." },
-};
 export const BLOCKS: Block[] = [
   { id: "firewall", layer: "edge", label: "Perimeter firewall", yours: "We add the rules in this blueprint to your firewall; nothing new to buy.",
     provided: "Host firewalls on every node (firewalld on RHEL, ufw on Ubuntu, both on nftables) plus a default-deny network policy." },
@@ -125,7 +106,7 @@ export const SOURCES: { id: string; label: string; kind: "cloud" | "saas" | "ai"
     how: "Detailed billing export to BigQuery, a FOCUS view on top, and a scheduled query that writes Parquet to Cloud Storage.", cadence: "Daily" },
   { id: "oci", label: "Oracle Cloud", kind: "cloud", endpoint: "objectstorage.<region>.oraclecloud.com",
     how: "Copy the FOCUS cost reports from the Oracle reporting bucket with a cross-tenancy policy or scheduled job.", cadence: "Daily" },
-  { id: "saas", label: "SaaS invoices (SAP, Salesforce, ServiceNow, Oracle)", kind: "saas",
+  { id: "saas", label: "SaaS invoices (SAP, Veeva, ServiceNow, Oracle)", kind: "saas",
     how: "One CSV per invoice period using the saas_invoice template, dropped in the landing zone.", cadence: "Monthly" },
   { id: "anthropic", label: "Anthropic (Claude)", kind: "ai", endpoint: "api.anthropic.com",
     how: "An organization admin creates an Admin API key used only for the usage and cost reports.", cadence: "Daily" },
@@ -140,7 +121,8 @@ export const SOURCES: { id: string; label: string; kind: "cloud" | "saas" | "ai"
 ];
 
 export const FRAMEWORKS: { id: string; label: string; detail: string }[] = [
-  { id: "nerc-cip", label: "NERC CIP", detail: "BCSI protection, supply chain, access and logging" },
+  { id: "gxp", label: "GxP (21 CFR Part 11, EU Annex 11)", detail: "Validation scope, audit trails, supplier quality" },
+  { id: "hipaa-gdpr", label: "HIPAA and GDPR", detail: "Patient data protection and residency" },
   { id: "sox", label: "SOX ITGC", detail: "Change, access and operations controls over financial reporting" },
   { id: "nist-csf", label: "NIST CSF 2.0", detail: "Govern, Identify, Protect, Detect, Respond, Recover" },
   { id: "nist-800-53", label: "NIST SP 800-53 (Moderate)", detail: "Federal-grade control baseline" },
@@ -169,13 +151,13 @@ export const QUESTIONS: Question[] = [
       { value: "l", label: "$50M to $200M", detail: "About 8M rows a month", recommended: true },
       { value: "xl", label: "Over $200M", detail: "About 25M rows a month" },
     ] },
-  { key: "entities", chapter: CHAPTERS[0], ask: "How many operating companies and affiliates share these costs?",
-    why: "Every entity adds allocation policies, drivers and a Form 60 schedule to compute each night.",
+  { key: "entities", chapter: CHAPTERS[0], ask: "How many legal entities share these costs?",
+    why: "Every entity adds allocation policies, drivers and an intercompany recharge schedule to compute each night.",
     options: [
       { value: "one", label: "One company", detail: "No affiliate allocation" },
-      { value: "few", label: "2 to 5", detail: "A service company and a few OpCos", recommended: true },
-      { value: "many", label: "6 to 15", detail: "Multi-state holding company" },
-      { value: "lots", label: "16 or more", detail: "Large holding company" },
+      { value: "few", label: "2 to 5", detail: "A shared-services entity and a few country affiliates", recommended: true },
+      { value: "many", label: "6 to 15", detail: "Regional affiliates" },
+      { value: "lots", label: "16 or more", detail: "Global affiliate network" },
     ] },
   { key: "hosting", chapter: CHAPTERS[1], ask: "Where should CostIQ run?",
     why: "CostIQ is self-hosted. Your billing data never leaves the boundary you choose.",
@@ -239,21 +221,21 @@ export const QUESTIONS: Question[] = [
   { key: "compliance", chapter: CHAPTERS[3], ask: "Which frameworks must the deployment satisfy?", multi: true,
     why: "Each one adds specific controls to the blueprint, and evidence you can hand to auditors.",
     options: FRAMEWORKS.map((f) => ({ value: f.id, label: f.label, detail: f.detail })) },
-  { key: "placement", chapter: CHAPTERS[3], ask: "Where will CostIQ's hosts sit relative to your CIP systems?",
-    why: "Either way, CostIQ never shares a hypervisor, cluster or SAN with BES Cyber Systems: under FERC Order 919 (enforceable July 1, 2028) that would pull the shared infrastructure into CIP scope.",
+  { key: "placement", chapter: CHAPTERS[3], ask: "Where will CostIQ's hosts sit relative to your validated GxP systems?",
+    why: "CostIQ is not a GxP system. Keeping it off validated infrastructure leaves that infrastructure's validation untouched.",
     options: [
       { value: "dedicated", label: "Dedicated corporate infrastructure", detail: "Its own cluster or VMs in the corporate zone", recommended: true },
-      { value: "shared-corp", label: "Shared corporate cluster", detail: "Shared only with other corporate workloads" },
+      { value: "shared-corp", label: "Shared corporate cluster", detail: "Shared only with non-GxP workloads" },
     ],
-    skip: (a) => (!a.compliance.includes("nerc-cip") ? { value: "dedicated" } : null) },
-  { key: "bcsi", chapter: CHAPTERS[3], ask: "Could billing or tag data include network addresses, topology or security settings for BES Cyber Systems?",
-    why: "Device names alone aren't BES Cyber System Information. Collections of network addresses, topology or security settings are, and they switch on BCSI handling.",
+    skip: (a) => (!a.compliance.includes("gxp") ? { value: "dedicated" } : null) },
+  { key: "phi", chapter: CHAPTERS[3], ask: "Could billing or tag data include patient or trial-subject identifiers?",
+    why: "Cost data should name workloads, not people. Any patient identifier switches on HIPAA and GDPR handling.",
     options: [
-      { value: "no", label: "No", detail: "Cost data names assets at most", recommended: true },
-      { value: "yes", label: "Yes", detail: "Turn on BCSI handling" },
-      { value: "unsure", label: "Not sure", detail: "Plan for BCSI until a data review says otherwise" },
+      { value: "no", label: "No", detail: "Tags name workloads and studies at most", recommended: true },
+      { value: "yes", label: "Yes", detail: "Turn on patient-data handling" },
+      { value: "unsure", label: "Not sure", detail: "Plan for it until a data review says otherwise" },
     ],
-    skip: (a) => (!a.compliance.includes("nerc-cip") ? { value: "no" } : null) },
+    skip: (a) => (!a.compliance.includes("hipaa-gdpr") ? { value: "no" } : null) },
   { key: "ledger", chapter: CHAPTERS[3], ask: "Does CostIQ output post to your general ledger?",
     why: "If chargebacks or accruals flow into the GL, auditors treat CostIQ as part of financial reporting and test its IT general controls.",
     options: [
@@ -269,11 +251,11 @@ export const QUESTIONS: Question[] = [
       { value: "no", label: "Not required", detail: "Standard TLS 1.2+ and AES-256" },
     ] },
   { key: "retention", chapter: CHAPTERS[3], ask: "How long must audit logs be kept?",
-    why: "Sizes log storage in your SIEM (or ours). NERC CIP evidence is commonly kept three years; some SOX programs keep seven.",
+    why: "Sizes log storage in your SIEM (or ours). GxP and SOX programs commonly keep audit evidence for years.",
     options: [
-      { value: "90d", label: "90 days", detail: "The CIP-007 R4 logging benchmark" },
+      { value: "90d", label: "90 days", detail: "Short operational window" },
       { value: "1y", label: "1 year", detail: "Common IT default" },
-      { value: "3y", label: "3 years", detail: "Matches CIP evidence retention", recommended: true },
+      { value: "3y", label: "3 years", detail: "Common audit evidence retention", recommended: true },
       { value: "7y", label: "7 years", detail: "Financial-records style" },
     ] },
   { key: "egress", chapter: CHAPTERS[3], ask: "Can CostIQ reach the internet?",
@@ -525,7 +507,7 @@ export function plan(a: Answers): Plan {
   // ---- diagram nodes
   const idpLabel = { entra: "Microsoft Entra ID", okta: "Okta", adfs: "AD FS / Ping", keycloak: "Keycloak", local: "Demo sign-in" }[a.identity];
   const nodes: Node[] = [
-    { id: "users", lane: "people", label: `${{ pilot: "≤50", dept: "50–250", ent: "250–1,000", large: "1,000+" }[a.users]} people`, sub: "14 personas", owner: "yours" },
+    { id: "users", lane: "people", label: `${{ pilot: "≤50", dept: "50–250", ent: "250–1,000", large: "1,000+" }[a.users]} people`, sub: "16 personas", owner: "yours" },
     { id: "idp", lane: "people", label: idpLabel, sub: a.identity === "local" ? "Pilot only" : "Single sign-on", owner: a.identity === "local" ? "provided" : "yours" },
     ...["firewall", "waf", "lb", ...(k8s ? ["gateway"] : []), "pki"].map((id) => {
       const b = BLOCKS.find((x) => x.id === id)!;
@@ -611,8 +593,8 @@ export function plan(a: Answers): Plan {
   // ---- identity (Playbook P5/P6)
   const identity = a.identity === "local" ? ["Demo sign-in (persona picker) for the pilot only; it has no passwords. Move to your SSO before wider use."] : [
     `Two app registrations in ${idpLabel}: "CostIQ API" (audience) and "CostIQ" (web, single-page app with your redirect URI).`,
-    "One app role per persona (14: CFO, controller, regulatory analyst, CIP compliance, FinOps analyst and the rest); users and groups assigned to roles.",
-    "One security group per cost center that needs scoped access; their object IDs map to cost centers. Entity-scoped groups for each OpCo's finance team.",
+    "One app role per persona (16: CFO, controller, tax analyst, GxP compliance, FinOps analyst, audit committee and the rest); users and groups assigned to roles.",
+    "One security group per cost center that needs scoped access; their object IDs map to cost centers. Entity-scoped groups for each country affiliate's finance team.",
     "Assignment required, so only assigned users can sign in; tokens carry a roles claim and a groups claim.",
     "Hand-over to the delivery team: tenant or issuer, API client ID, web client ID. No secrets.",
   ];
@@ -629,20 +611,22 @@ export function plan(a: Answers): Plan {
   }
 
   // ---- compliance controls (requirement numbers checked against the primary texts, Nov 2026)
-  const bcsiMode = a.compliance.includes("nerc-cip") && a.bcsi !== "no";
+  const phiMode = a.compliance.includes("hipaa-gdpr") && a.phi !== "no";
   const C: Record<string, string[]> = {
-    "nerc-cip": [
-      "Scope: CostIQ is not a BES Cyber System, EACMS, PACS or Protected Cyber Asset. It runs in the corporate zone, outside any Electronic Security Perimeter.",
-      "Order 919 (enforceable Jul 1, 2028): CostIQ stays off any hypervisor, cluster or SAN that also runs BES Cyber Systems, EACMS or PACS, so that infrastructure doesn't become Shared Cyber Infrastructure.",
-      ...(bcsiMode ? [
-        "BCSI handling on (CIP-011-3 R1): identify BCSI (R1.1) and protect and securely handle it (R1.2). Encryption with keys held in your HSM or KMS is the evidence we provide; whoever holds both keys and data has provisioned access.",
-        "CIP-004-7 R6: authorize BCSI access before provisioning (6.1), verify it at least every 15 calendar months (6.2), and remove it by the end of the next calendar day after a termination (6.3). CostIQ exports the access roster for each review.",
-        "CIP-011-3 R2: sanitize or destroy storage media before reuse or disposal.",
-      ] : [
-        "BCSI: device names alone aren't BCSI. Collections of network addresses, topology or security settings would be, so they stay out of cost tags; we re-check during the data review.",
-      ]),
-      "Vendor pack aligned to CIP-013-2 R1.2.1 to R1.2.6: incident notification and coordination, access-revocation notice, vulnerability disclosure, software integrity and authenticity (cosign verification steps and a SHA-256 digest per release) and remote-access controls.",
-      `Logging benchmark: CIP-007-6 R4 asks in-scope systems to log successful and failed sign-ins and keep logs 90 days. CostIQ sends these to ${has("siem") ? "your SIEM" : "Loki"} and keeps them ${retentionLabel}.`,
+    gxp: [
+      "Scope: CostIQ is not a GxP computerized system. It reads billing data, not clinical, manufacturing or safety records, so it stays outside your validated estate.",
+      "If your quality unit classifies it anyway, a risk-based approach (GAMP 5 Second Edition, FDA Computer Software Assurance) keeps testing proportionate; we supply requirements, risk assessment and test evidence.",
+      "Audit trail: approvals and exports are time-stamped, attributable and kept in a hash-chained ledger, in line with 21 CFR 11.10(e) and EU GMP Annex 11 section 9.",
+      "Supplier quality: a quality agreement with change notification, audit rights and data-integrity (ALCOA+) commitments.",
+      `Audit logs of sign-ins, approvals and exports go to ${has("siem") ? "your SIEM" : "Loki"} and are kept ${retentionLabel}.`,
+    ],
+    "hipaa-gdpr": phiMode ? [
+      "Patient-data handling on: identifiers are tokenized at ingest with keys held in your HSM or KMS; CostIQ never stores them in clear.",
+      "HIPAA Security Rule (45 CFR 164.312): unique user IDs, audit controls, integrity and transmission security through SSO, the ledger and TLS.",
+      "GDPR: EU personal data stays in the EU region you choose; a record of processing (Article 30) and a data processing agreement come with the deployment.",
+    ] : [
+      "Cost data names workloads and studies, not patients; tags are checked for identifiers in the data review.",
+      "No clinical or safety records are ever ingested; only billing and usage data.",
     ],
     sox: a.ledger === "gl" ? [
       "IT general controls evidence across the commonly used domains: access to programs and data, program changes and computer operations (audited under PCAOB AS 2201).",
@@ -690,18 +674,18 @@ export function plan(a: Answers): Plan {
   };
   const controls = FRAMEWORKS.filter((f) => a.compliance.includes(f.id)).map((f) => ({ framework: f.label, items: C[f.id] }));
 
-  // ---- assurance pack (what utilities' supplier reviews ask for)
+  // ---- assurance pack (what pharma supplier and quality reviews ask for)
   const assurance = [
     "SBOM for every release meeting CISA's 2026 minimum elements: signed, with component hashes, licences and generation context.",
     "SLSA v1.2 build provenance and a cosign signature for every image; verification steps and SHA-256 digests in the release notes.",
-    "Answers to the NATF Energy Sector Supply Chain Risk Questionnaire v7.0.",
-    "Contract terms mapped to the EEI Model Procurement Contract Language v4.0: incident notice, vulnerability documentation within 30 days, SBOM, file hashes and country of origin.",
+    "Answers to your supplier quality questionnaire and a standard security questionnaire (SIG or CAIQ).",
+    "A quality agreement covering change notification, audit rights, incident notice, vulnerability documentation within 30 days, SBOM and file hashes.",
     "Published vulnerability disclosure policy and CVE practice (CISA CPG 2.0 goal 1.D).",
     a.fips === "required" ? "FIPS 140-3: hosts and nodes run in FIPS mode and use validated cryptographic modules; FIPS 140-2 modules are historical after Sep 21, 2026."
       : a.fips === "preferred" ? "FIPS 140-3 validated modules wherever your OS provides them; FIPS mode can be turned on later without a reinstall."
       : "Standard cryptography: TLS 1.2 or later in transit and AES-256 at rest.",
   ];
-  if (a.operations !== "client") assurance.push("Support staff access is time-bound through your jump host; US-based staff on request, as EEI v4.0 contracts allow.");
+  if (a.operations !== "client") assurance.push("Support staff access is time-bound through your jump host; named staff in your region on request.");
 
   // ---- operations
   const operations = [
@@ -717,11 +701,11 @@ export function plan(a: Answers): Plan {
   ];
 
   // ---- team (client effort in person-days; Playbook roles)
-  const cip = a.compliance.includes("nerc-cip"), strict = cip || a.compliance.includes("nist-800-53") || a.fips === "required";
+  const gxp = a.compliance.includes("gxp"), strict = gxp || a.compliance.includes("nist-800-53") || a.fips === "required";
   const team: Plan["team"] = [
     { role: "Platform team", side: "Client", days: a.platform === "k8s" ? 3 : a.platform === "vms" ? 5 : 8, does: a.platform === "k8s" ? "Namespace, quota, ingress, registry access" : a.platform === "vms" ? "Provision and patch the VMs" : "Rack, cable and image the servers" },
     { role: "Network and security", side: "Client", days: 2 + (strict ? 3 : 0) + (has("firewall") ? 1 : 0), does: `${rules.length} firewall rules, security review${strict ? ", control evidence" : ""}` },
-    { role: "Identity team", side: "Client", days: a.identity === "local" ? 0 : a.identity === "entra" ? 1.5 : 2.5, does: "App registrations, 14 app roles, cost-center groups" },
+    { role: "Identity team", side: "Client", days: a.identity === "local" ? 0 : a.identity === "entra" ? 1.5 : 2.5, does: "App registrations, 16 app roles, cost-center groups" },
     { role: "Database team", side: "Client", days: a.database === "pg" ? 1 : a.database === "other" ? 2 : 0.5, does: a.database === "provide" || a.database === "embedded" ? "Review backup and access design" : "Database, two roles, TLS, backups" },
     { role: "Cloud, SaaS and AI owners", side: "Client", days: Math.max(0.5, a.sources.length * 0.5), does: `${a.sources.length} billing and usage exports` },
     { role: "Finance (FP&A, controller)", side: "Client", days: 3 + ENTITY_EXTRA[a.entities] * 2 + (a.entities === "few" ? 1 : 0), does: "Cost-center hierarchy, allocation policies, reconciliation sign-off" },
@@ -754,7 +738,7 @@ export function plan(a: Answers): Plan {
       exit: ["Non-production is deployed only by the pipeline", "Every image signed, with provenance and an SBOM carrying all 17 CISA 2026 fields", "No critical or high vulnerability with a fix available", "A restore from backup tested"],
       signoff: "Your platform owner" },
     { phase: "Build, connect and configure", weeks: 4 + Math.max(0, a.sources.length - 2) * 0.5 + (many ? 1 : 0), detail: `${a.sources.length} sources connected, allocation policies, extensions in sprints`,
-      work: [`${a.sources.length} data sources, one month each, totals matched to provider consoles`, "Allocation policies, Prudence Engine and dashboards configured", "Two-week sprints with a demo to finance, regulatory and IT", "Runbooks written alongside the code"],
+      work: [`${a.sources.length} data sources, one month each, totals matched to provider consoles`, "Allocation policies, tax-risk tests and dashboards configured", "Two-week sprints with a demo to finance, tax, quality and IT", "Runbooks written alongside the code"],
       exit: ["Every increment accepted by your product owner", "At least 80% test coverage on new code; every API endpoint contract-tested", "No high dynamic-scan findings", "Use-case conformance and reconciliation signed off by finance"],
       signoff: "Your product owner and controller" },
     { phase: "Hardening and independent assurance", weeks: 3 + (strict ? 1 : 0) + (dr ? 0.5 : 0), detail: "Load test, penetration test, recovery drill",
@@ -782,8 +766,8 @@ export function plan(a: Answers): Plan {
     { id: "P3", item: has("registry") ? "Repository path in your registry (with OCI referrers for signatures and SBOMs), push and pull rights" : "Space for the Harbor registry on the operations host", owner: "Platform", status: has("registry") ? "reuse" : "todo", week: wk(1) },
     { id: "P4", item: has("vault") ? "Image-signing key and secrets in your vault" : "Signing key for cosign (we set up encrypted secrets)", owner: "Security", status: has("vault") ? "reuse" : "todo", week: wk(1) },
     { id: "P5", item: a.database === "pg" || a.database === "other" ? "Database with TLS, a schema-owner role and an application role" : "Storage for the database we provide", owner: "Database", status: "todo", week: wk(1) },
-    { id: "P6", item: a.identity === "local" ? "Pilot users list (demo sign-in)" : `Two app registrations and 14 app roles in ${idpLabel}`, owner: "Identity", status: "todo", week: wk(1) },
-    { id: "P7", item: "Security groups for cost-center and OpCo scope", owner: "Identity and finance", status: "todo", week: wk(2) },
+    { id: "P6", item: a.identity === "local" ? "Pilot users list (demo sign-in)" : `Two app registrations and 16 app roles in ${idpLabel}`, owner: "Identity", status: "todo", week: wk(1) },
+    { id: "P7", item: "Security groups for cost-center and entity scope", owner: "Identity and finance", status: "todo", week: wk(2) },
     { id: "P8", item: `FOCUS exports for ${a.sources.filter((s) => SOURCES.find((x) => x.id === s)?.kind === "cloud").length || "no"} cloud provider(s) into the landing zone`, owner: "Cloud owners", status: "todo", week: wk(3) },
     { id: "P9", item: "Read-only reporting access to AI vendors", owner: "SaaS owners", status: "todo", week: wk(3) },
     { id: "P10", item: a.egress === "none" ? "Approval for file-drop exports instead of API calls" : `Outbound ${a.egress === "proxy" ? "proxy" : "firewall"} rules to provider endpoints`, owner: "Network", status: a.egress === "proxy" && has("proxy") ? "reuse" : "todo", week: wk(3) },
@@ -801,10 +785,10 @@ export function plan(a: Answers): Plan {
   }
   if (k8s && a.database === "provide") notes.push("CloudNativePG 1.30 supports Kubernetes 1.34 to 1.36; we match the operator to your cluster version.");
   if (!has("storage")) notes.push("Your own NFS, SMB or S3-compatible storage is the better landing zone; the bundled SeaweedFS store is a fallback.");
-  if (a.placement === "shared-corp") notes.push("A shared corporate cluster is fine, as long as it never also hosts BES Cyber Systems, EACMS or PACS.");
-  if (bcsiMode) pre.push({ id: "P16", item: "Key custody: your HSM or KMS holds the encryption and pseudonym keys for BCSI", owner: "Security and CIP compliance", status: has("vault") ? "reuse" : "todo", week: wk(1) });
-  if (bcsiMode) notes.push(a.bcsi === "yes" ? "BCSI handling is on: encryption with keys you hold, access verified every 15 months, removal by the next calendar day." : "BCSI handling stays on until a data review confirms cost data holds no network addresses, topology or security settings.");
-  if (cip) notes.push("For NERC CIP, keep CostIQ outside the Electronic Security Perimeter; it reads billing data, not BES Cyber System data.");
+  if (a.placement === "shared-corp") notes.push("A shared corporate cluster is fine, as long as it never also hosts validated GxP systems.");
+  if (phiMode) pre.push({ id: "P16", item: "Key custody: your HSM or KMS holds the tokenization and encryption keys for patient identifiers", owner: "Security and data privacy", status: has("vault") ? "reuse" : "todo", week: wk(1) });
+  if (phiMode) notes.push(a.phi === "yes" ? "Patient-data handling is on: identifiers tokenized at ingest with keys you hold, EU data kept in the EU region." : "Patient-data handling stays on until a data review confirms cost tags hold no patient identifiers.");
+  if (gxp) notes.push("Keep CostIQ outside your validated GxP estate; it reads billing data, not GxP records.");
   if (!has("firewall")) notes.push("We strongly recommend placing CostIQ behind a perimeter firewall; host firewalls and network policy are the minimum we deploy.");
   if (a.testdata === "prod-uat" && (a.cutover === "rolling" || a.cutover === "window")) {
     notes.push("Final acceptance in production needs the new version running beside the old one; that comes with a blue/green or canary cutover.");
@@ -829,7 +813,7 @@ export function plan(a: Answers): Plan {
     { id: "identity", label: "Sign-in", owner: a.identity === "local" ? "provided" : "yours", product: `${idpLabel}${f5 ? ", optionally behind F5 Zero Trust Access" : ""}`,
       does: "Single sign-on with MFA and conditional access; no local passwords in production" },
     { id: "access", label: "Roles and scope", owner: "provided", product: "CostIQ personas and scope",
-      does: "14 personas, cost-center and OpCo scope, separation of duties on approvals" },
+      does: "16 personas, cost-center and entity scope, separation of duties on approvals" },
     { id: "pam", label: "Privileged access", owner: own("pam"), product: has("pam") ? "Your PAM" : "Break-glass accounts in the vault",
       does: "Just-in-time admin and vendor sessions, recorded" },
     { id: "supply", label: "Signed, scanned releases", owner: has("cicd") ? "yours" : "provided", product: has("cicd") ? "Your pipeline with our gates" : "Our gates, signed with your key",

@@ -140,7 +140,7 @@ class Optimizer:
                         "provider_recommended", as_date(r["RefreshedAt"]))
         uc = self.eng._uc
         for x in sorted(uc("UO-11", None), key=lambda r: -(r["RetriedPct"] or 0))[:1]:
-            self.create("UO-11", "retries", f"Fix retry storm in {x['Application']} ({x['RetriedPct']}% retried)", "application",
+            self.create("UO-11", "retries", f"Fix retry spike in {x['Application']} ({x['RetriedPct']}% retried)", "application",
                         x["Application"], None, "AI Program Office", (x["WastedCost"] or 0) / self._months("UO-11"))
         for x in [x for x in uc("UO-14", None) if (x["Savings"] or 0) > 0 and x["AvgOutputTokens"] < 500][:1]:
             self.create("UO-14", "model_routing", f"Route {x['Application']} from {x['CurrentModel']} to {x['CandidateModel']}",

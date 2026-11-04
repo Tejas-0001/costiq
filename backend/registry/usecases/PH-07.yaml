@@ -1,0 +1,60 @@
+id: PH-07
+source: MM CostIQ Pharma extension
+title: 'Patient data in cloud services without customer-managed keys'
+category: 'Pharma · GxP & patient data'
+module: compliance
+business_question: 'Which cloud workloads hold patient data where the provider could decrypt it?'
+personas:
+- gxp_compliance
+- auditor
+- tech_exec
+catalog_persona: 'GxP Quality & Data Privacy'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Joins the GxP and patient-data register (ref_gxp_system) to cloud spend. Workloads that hold patient data with provider-managed keys are flagged.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'patient data'
+- 'phi'
+- 'hipaa'
+- 'gdpr'
+- 'encryption'
+- 'key management'
+- 'customer managed keys'
+products: Any provider
+sql: |-
+  WITH spend AS (
+    SELECT json_extract_string(Tags, '$.application') AS Application, SUM(EffectiveCost) AS EffectiveCost
+    FROM CostAndUsage
+    WHERE ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+    GROUP BY json_extract_string(Tags, '$.application')
+  ),
+  reg AS (
+    SELECT s.*, CASE WHEN s.HoldsPatientData AND s.KeyOwnership <> 'customer' THEN 'Provider can decrypt patient data'
+                     WHEN s.HoldsPatientData THEN 'Patient data with customer-managed keys'
+                     ELSE 'No patient data' END AS Status
+    FROM ref_gxp_system s
+  )
+  SELECT
+    r.Application, r.SystemName, r.GxpImpact, r.HoldsPatientData, r.KeyOwnership, r.Owner, r.Status,
+    ROUND(COALESCE(x.EffectiveCost, 0), 2) AS EffectiveCost
+  FROM reg r
+  LEFT JOIN spend x ON x.Application = r.Application
+  ORDER BY CASE WHEN r.Status = 'Provider can decrypt patient data' THEN 0 ELSE 1 END, EffectiveCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'The register is maintained by Data Privacy with GxP Quality. CostIQ supplies the spend; it does not determine compliance.'
+compliance:
+  area: 'GxP & patient data'
+  reference: 'HIPAA 45 CFR 164.312 · GDPR Art. 32'
+  unit: 'workloads'
+  flag: 'Status = ''Provider can decrypt patient data'''
+  amount: EffectiveCost

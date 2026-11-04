@@ -2,46 +2,47 @@
 import Link from "next/link";
 import { useState } from "react";
 import { BarChart } from "@/components/charts";
-import { Gate, useMe } from "@/components/shell";
+import { Gate, useMe, type PeriodInfo } from "@/components/shell";
 import { Findings, LineageDrawer, ModuleUseCases, type Finding } from "@/components/usecases";
 import { Formula, Head, Kpi, Loading, RecordTable, StatusBadge } from "@/components/ui";
 import { useApi, type Row } from "@/lib/api";
 import { money, pct } from "@/lib/format";
 
 // ------------------------------------------------------------------------------------------------ explorer
-type Explorer = { months: string[]; providers: string[]; by_provider: Row[]; by_cost_center: Row[]; by_service: Row[]; lines: Row[]; formula: string };
+type Explorer = { period: PeriodInfo | null; months: string[]; providers: string[]; by_provider: Row[]; by_cost_center: Row[]; by_service: Row[]; lines: Row[]; formula: string };
 
 export function ExplorerView() {
+  const { period } = useMe();
   const [f, setF] = useState({ month: "", provider: "", cost_center: "" });
   const [lineage, setLineage] = useState<string | null>(null);
-  const q = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
-  const state = useApi<Explorer>(`/explorer${q ? `?${q}` : ""}`);
+  const q = new URLSearchParams([...Object.entries(f).filter(([, v]) => v), ["range", period]]).toString();
+  const state = useApi<Explorer>(`/explorer?${q}`);
   return (
     <Gate module="explorer">
-      <Head title="Spend Explorer" sub="Every charge, by provider, cost center and service, with lineage to the invoice and the allocation chain" />
+      <Head title="Spend Explorer" />
       <Loading state={state}>
         {(d) => (
           <div className="stack">
             <div className="card row">
-              <select value={f.month} onChange={(e) => setF({ ...f, month: e.target.value })}><option value="">All months</option>{d.months.map((m) => <option key={m}>{m}</option>)}</select>
+              <select value={f.month} onChange={(e) => setF({ ...f, month: e.target.value })}><option value="">{d.period ? d.period.label : "All months"}</option>{d.months.map((m) => <option key={m}>{m}</option>)}</select>
               <select value={f.provider} onChange={(e) => setF({ ...f, provider: e.target.value })}><option value="">All providers</option>{d.providers.map((m) => <option key={m}>{m}</option>)}</select>
               <select value={f.cost_center} onChange={(e) => setF({ ...f, cost_center: e.target.value })}><option value="">All cost centers</option>
                 {d.by_cost_center.map((r) => <option key={String(r.CostCenter)}>{String(r.CostCenter)}</option>)}</select>
-              <button className="btn sm" onClick={() => setF({ month: "", provider: "", cost_center: "" })}>Reset</button>
-              <span className="small muted">{d.formula}</span>
+              <button className="btn" onClick={() => setF({ month: "", provider: "", cost_center: "" })}>Reset</button>
             </div>
             <div className="grid g3">
               <div className="card"><h2>By provider</h2><BarChart horizontal height="short" labels={d.by_provider.map((r) => String(r.Provider))} datasets={[{ label: "Effective", data: d.by_provider.map((r) => Number(r.Effective)) }]} /></div>
-              <div className="card"><h2>By cost center</h2><BarChart horizontal height="short" labels={d.by_cost_center.map((r) => String(r.CostCenter))} datasets={[{ label: "Effective", data: d.by_cost_center.map((r) => Number(r.Effective)), backgroundColor: "#8a5cff" }]} /></div>
-              <div className="card"><h2>Top services</h2><BarChart horizontal height="short" labels={d.by_service.map((r) => String(r.Service))} datasets={[{ label: "Effective", data: d.by_service.map((r) => Number(r.Effective)), backgroundColor: "#7fb0ff" }]} /></div>
+              <div className="card"><h2>By cost center</h2><BarChart horizontal height="short" labels={d.by_cost_center.map((r) => String(r.CostCenter))} datasets={[{ label: "Effective", data: d.by_cost_center.map((r) => Number(r.Effective)), backgroundColor: "#454d53" }]} /></div>
+              <div className="card"><h2>Top services</h2><BarChart horizontal height="short" labels={d.by_service.map((r) => String(r.Service))} datasets={[{ label: "Effective", data: d.by_service.map((r) => Number(r.Effective)), backgroundColor: "#0f6ec8" }]} /></div>
             </div>
             <div className="card flush">
-              <div style={{ padding: "14px 16px 4px" }} className="card-head"><h2 style={{ margin: 0 }}>Largest charge lines</h2><span className="small muted">click a line for its lineage</span></div>
+              <h2>Largest charge lines</h2>
               <RecordTable rows={d.lines} columns={["Day", "Provider", "Service", "Item", "CostCenter", "Billed", "Effective"]} onRow={(r) => {
                 const hit = d.lines.find((l) => l.Day === r.Day && l.Item === r.Item && l.Effective === r.Effective);
                 if (hit) setLineage(String(hit.ChargeKey));
               }} />
             </div>
+            <Formula>{d.formula}</Formula>
             <ModuleUseCases module="explorer" />
             {lineage && <LineageDrawer chargeKey={lineage} onClose={() => setLineage(null)} />}
           </div>
@@ -57,7 +58,7 @@ export function BudgetsView() {
   const [month, setMonth] = useState<string | null>(null);
   return (
     <Gate module="budgets">
-      <Head title="Budgets & Forecasts" sub="Technology budgets by cost center, run-rate forecasts and AI budget burn-down" />
+      <Head title="Budgets & Forecasts" />
       <Loading state={state}>
         {(b) => {
           const months = [...new Set(b.lines.map((l) => String(l.Month)))].sort();
@@ -68,7 +69,7 @@ export function BudgetsView() {
               <div className="row">{months.map((x) => <button key={x} className={`chip ${x === m ? "on" : ""}`} onClick={() => setMonth(x)}>{x}{x === b.open_month ? " (open)" : ""}</button>)}</div>
               <div className="card"><h2>Forecast and budget by cost center · {m}</h2>
                 <BarChart labels={lines.map((l) => String(l.CostCenter))} datasets={[{ label: "Forecast", data: lines.map((l) => Number(l.Forecast)) },
-                  { label: "Budget", data: lines.map((l) => Number(l.Budget)), backgroundColor: "#c7c7cc" }]} /></div>
+                  { label: "Budget", data: lines.map((l) => Number(l.Budget)), backgroundColor: "#b8c1cb" }]} /></div>
               <div className="card flush"><RecordTable rows={lines.map((l) => ({ ...l, VariancePct: pct(l.VariancePct as number) }))}
                 columns={["CostCenter", "Budget", "Actual", "Forecast", "Variance", "VariancePct", "Status"]} /></div>
               <Formula>{b.formula}</Formula>
@@ -82,26 +83,27 @@ export function BudgetsView() {
 }
 
 export function AllocationView() {
-  const state = useApi<{ rules: Row[]; by_method: Row[]; by_cost_center: Row[]; coverage: number; formula: string }>("/allocation");
+  const { period } = useMe();
+  const state = useApi<{ rules: Row[]; by_method: Row[]; by_cost_center: Row[]; coverage: number; formula: string; period: PeriodInfo | null }>(`/allocation?range=${period}`);
   return (
     <Gate module="allocation">
-      <Head title="Allocation & Chargeback" sub="Step 1-2 of the utility chain: cost-center pooling. Steps 3-5 (OpCo, jurisdiction, FERC account) are in Regulatory Accounting.">
-        <Link className="btn" href="/regulatory?tab=chain">Open the allocation chain</Link>
+      <Head title="Allocation & Chargeback">
+        <Link href="/tax?tab=chain">Entity, jurisdiction and GL steps</Link>
       </Head>
       <Loading state={state}>
         {(a) => (
           <div className="stack">
             <div className="grid g3">
-              <Kpi label="Allocation coverage" value={`${a.coverage}%`} tone={a.coverage >= 99 ? "good" : "bad"} formula={a.formula} />
+              <Kpi label="Allocation coverage" value={`${a.coverage ?? "—"}%`} tone={(a.coverage ?? 0) >= 99 ? "good" : "bad"} formula={a.formula} sub={a.period?.label} />
               <Kpi label="Approved rules" value={a.rules.length} />
               <Kpi label="Unallocated" value={money(a.by_method.find((m) => m.Method === "Unallocated")?.EffectiveCost ?? 0)} />
             </div>
             <div className="grid g2">
               <div className="card flush"><RecordTable rows={a.by_method} /></div>
-              <div className="card"><h2>By cost center</h2><BarChart horizontal labels={a.by_cost_center.map((r) => String(r.CostCenter))}
+              <div className="card"><h2>By cost center <span className="small muted">· {a.period?.long}</span></h2><BarChart horizontal labels={a.by_cost_center.map((r) => String(r.CostCenter))}
                 datasets={[{ label: "Effective", data: a.by_cost_center.map((r) => Number(r.EffectiveCost)) }]} /></div>
             </div>
-            <div className="card flush"><div style={{ padding: "14px 16px 4px" }}><h2 style={{ margin: 0 }}>Pooling rules</h2></div>
+            <div className="card flush"><h2>Pooling rules</h2>
               <RecordTable rows={a.rules} columns={["RuleId", "Version", "Name", "Priority", "MatchColumn", "MatchValue", "CostCenter", "EffectiveFrom", "ApprovedBy"]} /></div>
             <ModuleUseCases module="allocation" />
           </div>
@@ -114,7 +116,7 @@ export function AllocationView() {
 export function RatesView() {
   return (
     <Gate module="rates">
-      <Head title="Rates & Commitments" sub="Savings plans, reservations, enterprise discounts (EDP, MACC) and AI commit drawdown" />
+      <Head title="Rates & Commitments" />
       <ModuleUseCases module="rates" />
     </Gate>
   );
@@ -125,7 +127,7 @@ export function AnomaliesView() {
   const state = useApi<Finding[]>("/findings", version);
   return (
     <Gate module="anomalies">
-      <Head title="Anomalies & Findings" sub="Incurred anomalies, estimated savings and compliance findings, reported separately and never summed" />
+      <Head title="Anomalies & Findings" />
       <Loading state={state}>
         {(f) => (
           <div className="stack">
@@ -148,7 +150,7 @@ export function ReconciliationView() {
   const state = useApi<{ lines: Row[]; close: Row[]; formula: string }>("/reconciliation");
   return (
     <Gate module="reconciliation">
-      <Head title="Reconciliation & Close" sub="Every invoice line tied to its charges; exceptions become prudence risk in open rate cases" />
+      <Head title="Reconciliation & Close" />
       <Loading state={state}>
         {(r) => (
           <div className="stack">
@@ -169,19 +171,19 @@ export function GovernanceView() {
   const state = useApi<{ controls: Row[]; ledger: Row[]; manifests: Row[]; ledger_verified: { verified: boolean; entries?: number; broken_at?: number } }>("/evidence", version);
   return (
     <Gate module="governance">
-      <Head title="Governance & Evidence" sub="Controls C-01 to C-11, the hash-chained decision ledger and ingestion manifests" />
+      <Head title="Governance & Evidence" />
       <Loading state={state}>
         {(g) => (
           <div className="stack">
-            <div className="card flush"><div style={{ padding: "14px 16px 4px" }}><h2 style={{ margin: 0 }}>Controls</h2></div>
+            <div className="card flush"><h2>Controls</h2>
               <RecordTable rows={g.controls.map((c) => ({ ID: c.id, Control: c.control, Status: c.result, Evidence: c.evidence }))} /></div>
             <div className="card flush">
-              <div style={{ padding: "14px 16px 4px" }} className="card-head"><h2 style={{ margin: 0 }}>Decision ledger</h2>
+              <div className="card-head"><h2>Decision ledger</h2>
                 <StatusBadge s={g.ledger_verified.verified ? `Chain verified (${g.ledger_verified.entries} entries)` : `Broken at ${g.ledger_verified.broken_at}`} /></div>
               <RecordTable rows={[...g.ledger].reverse().map((e) => ({ ...e, Hash: String(e.Hash).slice(0, 16) + "…" }))}
                 columns={["Seq", "EntryAt", "Actor", "Persona", "Action", "Target", "Detail", "Hash"]} max={200} />
             </div>
-            <div className="card flush"><div style={{ padding: "14px 16px 4px" }}><h2 style={{ margin: 0 }}>Ingestion manifests</h2></div>
+            <div className="card flush"><h2>Ingestion manifests</h2>
               <RecordTable rows={g.manifests.map((m) => ({ ...m, Checks: (m.Checks as { status: string; check: string }[]).map((c) => `${c.status}: ${c.check}`).join("; ") }))}
                 columns={["SourceSystem", "BillingPeriodStart", "Maturity", "RecordCount", "Digest", "Checks", "Status"]} /></div>
             <ModuleUseCases module="governance" />
@@ -192,44 +194,38 @@ export function GovernanceView() {
   );
 }
 
-// ------------------------------------------------------------------------------------------------ utility compliance scorecard
+// ------------------------------------------------------------------------------------------------ GxP & patient-data scorecard
 type Area = { area: string; checks: number; attention: number; items: { id: string; title: string; reference: string; unit: string; checked: number;
   flagged: number; amount_affected: number; has_amount: boolean; status: string; error: string | null }[] };
 
-export function UtilitiesView() {
-  const state = useApi<{ areas: Area[]; as_of: string; formula: string; disclaimer: string }>("/compliance/utilities");
+export function ComplianceView() {
+  const state = useApi<{ areas: Area[]; as_of: string; formula: string; disclaimer: string }>("/compliance/compliance");
   return (
-    <Gate module="utilities">
-      <Head title="Utility Compliance" sub="Regulatory accounting, affiliate allocation, NERC CIP and operational AI checks over your technology spend" />
+    <Gate module="compliance">
+      <Head title="GxP & Patient Data" />
       <Loading state={state}>
         {(c) => {
           const items = c.areas.flatMap((a) => a.items);
           return (
             <div className="stack">
-              <div className="grid g4">
-                <Kpi label="Checks" value={items.length} sub={`${c.areas.length} areas · as of ${c.as_of}`} />
-                <Kpi label="Need attention" value={items.filter((i) => i.status !== "compliant").length} tone="bad" />
-                <Kpi label="Items flagged" value={items.reduce((a, i) => a + i.flagged, 0)} />
-                <Kpi label="Compliant" value={items.filter((i) => i.status === "compliant").length} tone="good" />
-              </div>
-              {c.areas.map((a) => (
-                <div key={a.area} className="card">
-                  <div className="card-head"><h2 style={{ margin: 0 }}>{a.area}</h2><span className="small muted">{a.attention} of {a.checks} need attention</span></div>
-                  <div className="reg-rules">
-                    {a.items.map((i) => (
-                      <Link key={i.id} href={`/catalog/${i.id}`} className={`reg-rule ${i.status}`}>
-                        <div className="reg-top"><span className="uc-id">{i.id}</span><span className="reg-ref">{i.reference}</span></div>
-                        <b style={{ fontSize: 14 }}>{i.title}</b>
-                        <div className="reg-nums">
-                          <span className={`reg-big ${i.flagged ? "bad" : "good"}`}>{i.flagged}</span>
-                          <span className="small muted">of {i.checked} {i.unit} flagged</span>
-                          {i.has_amount && i.flagged > 0 && <span className="reg-amt">{money(i.amount_affected)}</span>}
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <p>{items.length} checks · <b className="bad">{items.filter((i) => i.status !== "compliant").length} need attention</b> ·{" "}
+                {items.reduce((a, i) => a + i.flagged, 0)} items flagged · as of {c.as_of}</p>
+              <table>
+                <thead><tr><th>Area</th><th>Check</th><th>Reference</th><th className="num">Flagged</th><th className="num">Checked</th><th className="num">Amount</th><th>Status</th></tr></thead>
+                <tbody>
+                  {c.areas.flatMap((a) => a.items.map((i, k) => (
+                    <tr key={i.id}>
+                      {k === 0 && <td rowSpan={a.items.length}><b>{a.area}</b></td>}
+                      <td><Link href={`/catalog/${i.id}`}>{i.id}</Link> {i.title}</td>
+                      <td className="small">{i.reference}</td>
+                      <td className={`num ${i.flagged ? "bad" : ""}`}>{i.flagged}</td>
+                      <td className="num">{i.checked} {i.unit}</td>
+                      <td className="num">{i.has_amount && i.flagged > 0 ? money(i.amount_affected) : ""}</td>
+                      <td><StatusBadge s={i.error ? "error" : i.status} /></td>
+                    </tr>
+                  )))}
+                </tbody>
+              </table>
               <Formula>{c.formula} {c.disclaimer}</Formula>
             </div>
           );

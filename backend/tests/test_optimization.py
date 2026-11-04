@@ -20,22 +20,22 @@ def run(uid, persona="cfo", params=None):
 
 def test_cloud_checks_find_seeded_waste():
     idle = {r["ResourceName"]: r for r in run("CO-02")}
-    assert "oms-test-ec2" in idle and "vol-oms-test-orphan-01" in idle
-    assert idle["vol-oms-test-orphan-01"]["Finding"] == "Unattached volume"
-    assert {r["ResourceName"] for r in run("CO-03")} >= {"adms-dev-ec2", "oms-test-ec2"}
+    assert "edc-test-ec2" in idle and "vol-edc-test-orphan-01" in idle
+    assert idle["vol-edc-test-orphan-01"]["Finding"] == "Unattached volume"
+    assert {r["ResourceName"] for r in run("CO-03")} >= {"edc-dev-ec2", "edc-test-ec2"}
     assert any(r["IdleCost"] > 0 for r in run("CO-07"))
 
 
 def test_ai_checks_find_seeded_waste():
-    gpu = {r["ResourceName"]: r for r in run("UO-09")}["gridplan-gpu-endpoint"]
+    gpu = {r["ResourceName"]: r for r in run("UO-09")}["molgen-gpu-endpoint"]
     assert gpu["IdleDays"] > 30 and str(gpu["FirstIdleDay"]) <= "2026-07-05"
     ptu = run("UO-10")[0]
     assert ptu["AvgUtilizationPct"] < 50 and ptu["Finding"].startswith("Under-utilized") and ptu["MonthlySavingsIfPayg"] > 0
     retries = {r["Application"]: r for r in run("UO-11")}
-    assert retries["customer-outage-assistant"]["RetriedPct"] > 10
+    assert retries["patient-support-assistant"]["RetriedPct"] > 10
     bloat = {r["Application"]: r for r in run("UO-12")}
-    assert bloat["interconnection-study-agent"]["InputGrowthPct"] > 50
-    routes = [r for r in run("UO-14") if r["Application"] == "outage-summary-bot"]
+    assert bloat["csr-drafting-agent"]["InputGrowthPct"] > 50
+    routes = [r for r in run("UO-14") if r["Application"] == "ae-intake-bot"]
     assert routes and routes[0]["CandidateModel"] == "claude-haiku-5-5" and routes[0]["Savings"] > 0
     burn = {r["CostCenter"]: r for r in run("BF-04")}
     assert burn["Corporate IT"]["Status"] == "Will run out this month"
@@ -46,22 +46,22 @@ def test_verified_savings_equal_baseline_minus_post_run_rate():
     a = opt.action("OPT-003")
     assert a["Status"] == "verified" and a["VerificationBasis"] == "measured"
     impl = dt.date.fromisoformat(str(a["ImplementedOn"])[:10])
-    base, _ = opt.run_rate("resource", "siting-gis-ec2", impl - dt.timedelta(days=30), impl)
-    post, _ = opt.run_rate("resource", "siting-gis-ec2", impl, eng.as_of() + dt.timedelta(days=1))
+    base, _ = opt.run_rate("resource", "insights-ec2", impl - dt.timedelta(days=30), impl)
+    post, _ = opt.run_rate("resource", "insights-ec2", impl, eng.as_of() + dt.timedelta(days=1))
     assert abs(float(a["VerifiedMonthlySavings"]) - round(base - post, 2)) < 0.02
     assert float(a["VerifiedMonthlySavings"]) > 0
 
 
 def test_lifecycle_and_separation_of_duties():
-    oid = "OPT-002"  # approved, Grid Operations
+    oid = "OPT-002"  # approved, Clinical Operations
     assert client.post(f"/api/optimization/{oid}/decision", json={"action": "verify"}, headers=h("finops_analyst")).status_code == 409
     r = client.post(f"/api/optimization/{oid}/decision", json={"action": "implement"}, headers=h("cloud_ops"))
     assert r.status_code == 200 and r.json()["action"]["Status"] == "implemented"
     # the implementer cannot verify their own change
-    db.query("UPDATE optimization_action SET ImplementedBy = 'demo.finops_analyst@meridian.example' WHERE OptimizationId = :i",
+    db.query("UPDATE optimization_action SET ImplementedBy = 'demo.finops_analyst@company.example' WHERE OptimizationId = :i",
              {"i": oid}, limit=None)
     assert client.post(f"/api/optimization/{oid}/decision", json={"action": "verify"}, headers=h("finops_analyst")).status_code == 409
-    db.query("UPDATE optimization_action SET ImplementedBy = 'demo.cloud_ops@meridian.example' WHERE OptimizationId = :i",
+    db.query("UPDATE optimization_action SET ImplementedBy = 'demo.cloud_ops@company.example' WHERE OptimizationId = :i",
              {"i": oid}, limit=None)
     r = client.post(f"/api/optimization/{oid}/decision", json={"action": "verify"}, headers=h("finops_analyst")).json()
     assert r["action"]["Status"] == "verified" and r["action"]["VerificationBasis"] == "provisional"
@@ -71,14 +71,14 @@ def test_lifecycle_and_separation_of_duties():
 
 
 def test_scoped_cloud_ops_cannot_act_outside_its_cost_centers():
-    # OPT-006 belongs to Transmission Planning; cloud_ops is scoped to Grid Operations and Data & Analytics
+    # OPT-006 belongs to Research & Discovery; cloud_ops is scoped to Clinical Operations and Data & Analytics
     client.post("/api/optimization/OPT-006/decision", json={"action": "approve"}, headers=h("cfo"))
     assert client.post("/api/optimization/OPT-006/decision", json={"action": "implement"}, headers=h("cloud_ops")).status_code == 403
 
 
 def test_add_to_tracker_is_idempotent():
-    body = {"origin": "CO-06", "lever": "egress", "title": "Cache public outage map tiles at the CDN", "scope_type": "resource",
-            "scope_key": "eu-web-door", "cost_center": "Customer Operations", "estimated_monthly_savings": 900}
+    body = {"origin": "CO-06", "lever": "egress", "title": "Cache patient portal static assets at the CDN", "scope_type": "resource",
+            "scope_key": "eu-web-door", "cost_center": "Patient Data", "estimated_monthly_savings": 900}
     a = client.post("/api/optimization", json=body, headers=h("finops_analyst")).json()
     b = client.post("/api/optimization", json=body, headers=h("finops_analyst")).json()
     assert a["OptimizationId"] == b["OptimizationId"] and a["Status"] == "identified"
@@ -105,7 +105,7 @@ def test_monitors_and_permissions():
     assert cloud["kpis"]["opportunity_monthly"] > 0 and cloud["daily"] and cloud["opportunities"]
     ai = client.get("/api/ai-monitor", headers=h("ai_program_owner")).json()
     apps = {a["Application"]: a for a in ai["apps"]}
-    assert any(l.startswith("Provisioned") for l in apps["interconnection-study-agent"]["SuggestedLevers"])
+    assert any(l.startswith("Provisioned") for l in apps["csr-drafting-agent"]["SuggestedLevers"])
     assert ai["kpis"]["cost_per_accepted_outcome"] > 0
     assert client.get("/api/ai-monitor", headers=h("cloud_ops")).status_code == 403
     assert client.get("/api/optimization", headers=h("auditor")).status_code == 403

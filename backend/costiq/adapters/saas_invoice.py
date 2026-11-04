@@ -1,4 +1,4 @@
-"""SaaS invoice file-drop adapter: vendor invoices (SAP, Salesforce, ServiceNow, Oracle ...) -> FOCUS rows.
+"""SaaS invoice file-drop adapter: vendor invoices (SAP, Veeva, ServiceNow, Oracle ...) -> FOCUS rows.
 
 Enterprise SaaS rarely publishes FOCUS billing data, so the client drops one CSV per invoice period using
 data/templates/saas_invoice_template.csv. This adapter maps it to FOCUS-shaped rows, loads them through the standard

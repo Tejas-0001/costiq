@@ -1,21 +1,17 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { Suspense } from "react";
-import { SignIn } from "@/components/views/sign-in";
-import "../../site.css";
+import { Landing } from "@/components/site/landing";
+import "../../landing.css";
 
-export const metadata: Metadata = { title: "Sign in · CostIQ" };
+export const metadata: Metadata = { title: "CostIQ" };
 
-// The session cookie is http-only, so whether someone is already signed in is read here and handed to the client view.
+// The role page: sign in by choosing a role. `?next=` (set by the sign-in gate) decides where a chosen persona lands.
 async function RoleScreen() {
   const signedIn = Boolean((await cookies()).get("costiq_persona"));
-  return <SignIn signedIn={signedIn} />;
+  return <Landing signedIn={signedIn} roles />;
 }
 
 export default function SignInPage() {
-  return (
-    <Suspense fallback={<div className="auth" />}>
-      <RoleScreen />
-    </Suspense>
-  );
+  return <Suspense fallback={null}><RoleScreen /></Suspense>;
 }

@@ -1,0 +1,36 @@
+id: PH-12
+source: MM CostIQ Pharma extension
+title: 'Deduction at risk by filing, reason and vendor'
+category: 'Pharma · Tax risk'
+module: risk
+business_question: 'How much review-period technology spend could a tax examiner disallow, and why?'
+personas:
+- tax_analyst
+- cfo
+- auditor
+catalog_persona: 'Tax, CFO'
+datasets:
+- 'Filing evidence (computed)'
+- 'Pharma reference tables'
+description: 'Recharged spend in each filing''s review period that fails an evidence test: no benefit shown (idle resources, unused commitments, unused seats) unless remediated, not reconciled to an invoice, allocated without an approved policy, missing a GL account, or carrying a savings opportunity left unactioned for 60+ days.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'deduction at risk'
+- 'disallowed deduction'
+- 'benefit test'
+- 'tax risk'
+- 'substantiation'
+- 'evidence gaps'
+products: Any provider
+sql: |-
+  SELECT
+    FilingId, LegalEntity, RiskReason, ServiceProviderName AS Vendor,
+    COUNT(*) AS Lines,
+    ROUND(SUM(AllocatedCost), 2) AS ReviewPeriodSpend,
+    ROUND(SUM(RiskAmount), 2) AS DeductionAtRisk
+  FROM filing_evidence
+  WHERE RiskAmount > 0
+  GROUP BY FilingId, LegalEntity, RiskReason, ServiceProviderName
+  ORDER BY DeductionAtRisk DESC
+params: []
+notes: 'Decision support, not a prediction of any tax authority''s ruling. Recomputed after allocation, ingestion and every policy or optimization decision.'

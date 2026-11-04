@@ -52,6 +52,6 @@ sql: |-
   WHERE c.ContractCommitmentCategory = 'Spend'
   ORDER BY ProjectedShortfall DESC
 params: []
-adaptation: ContractApplied path uses the FOCUS 1.4 Elements structure
+adaptation: ContractApplied path uses the FOCUS 1.0 Elements structure
 notes: MACC and EDP are drawn down by all eligible cloud spend, not just AI. Run this on the full multi-cloud FOCUS dataset
   for the true position. Consumption before your FOCUS history starts must be loaded or entered as an opening balance.

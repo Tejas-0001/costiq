@@ -1,0 +1,60 @@
+id: PH-04
+source: MM CostIQ Pharma extension
+title: 'Cloud fees eligible as qualifying R&D expenditure'
+category: 'Pharma · R&D credit'
+module: tax
+business_question: 'Which recurring cloud and SaaS fees qualify for an R&D credit, by jurisdiction, and which are not yet claimed?'
+personas:
+- tax_analyst
+- cfo
+- finance_controller
+catalog_persona: 'Tax, CFO'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Per jurisdiction and vendor: recurring fees already claimed as qualifying research expenditure (qre) and fees still expensed where they qualify but no claim is made.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'r&d credit'
+- 'qualifying expenditure'
+- 'qre'
+- 'cloud computing'
+- 'research credit'
+- 'section 41'
+- 'rdec'
+products: Any provider
+sql: |-
+  SELECT
+    a.Jurisdiction,
+    p.CreditStatus,
+    a.ServiceProviderName AS Vendor,
+    ROUND(SUM(a.AllocatedCost), 2) AS SubscriptionFees,
+    ROUND(SUM(CASE WHEN a.CostClass = 'qre' THEN a.AllocatedCost ELSE 0 END), 2) AS Claimed,
+    ROUND(SUM(CASE WHEN a.CostClass = 'opex' THEN a.AllocatedCost ELSE 0 END), 2) AS NotClaimed,
+    MAX(p.Reference) AS Reference,
+    CASE WHEN p.CreditStatus = 'claimed' THEN 'Claimed'
+         WHEN p.CreditStatus = 'eligible' THEN 'Eligible: not yet claimed'
+         WHEN p.CreditStatus = 'ineligible' THEN 'Not eligible'
+         ELSE 'Not applicable' END AS Opportunity
+  FROM allocated_cost a
+  JOIN ref_jurisdiction_policy p ON p.Jurisdiction = a.Jurisdiction
+  WHERE a.ChargeCategory = 'Purchase' AND a.ChargeFrequency = 'Recurring' AND a.CostClass IN ('opex', 'qre')
+    AND a.PeriodStart >= :period_start AND a.PeriodStart < :period_end
+  GROUP BY a.Jurisdiction, p.CreditStatus, a.ServiceProviderName
+  ORDER BY NotClaimed DESC, Claimed DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'Credit rules are illustrative; the tax team owns ref_jurisdiction_policy.'
+compliance:
+  area: 'R&D credit'
+  reference: 'IRC §41 · UK R&D relief (data and cloud costs from April 2023)'
+  unit: 'jurisdiction-vendor pairs'
+  flag: 'Opportunity = ''Eligible: not yet claimed'''
+  amount: NotClaimed

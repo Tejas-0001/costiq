@@ -1,7 +1,7 @@
 """Schema migration and data loading for any supported database.
 
   costiq migrate                       create FOCUS 1.4 + AI extension + CostIQ app tables
-  costiq load-sample <file.duckdb>     copy the synthetic Meridian dataset into the configured database
+  costiq load-sample <file.duckdb>     copy the sample dataset into the configured database
   costiq seed                          allocation rules, manifests and the ledger genesis entry
 """
 from __future__ import annotations
@@ -12,14 +12,14 @@ from .db import Database
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # mvp/backend
 SCHEMA_FILES = [os.path.join(ROOT, "schema", "focus_1_4_ai_schema.sql"),
                 os.path.join(ROOT, "schema", "costiq_app_schema.sql"),
-                os.path.join(ROOT, "schema", "costiq_utility_schema.sql"),
+                os.path.join(ROOT, "schema", "costiq_pharma_schema.sql"),
                 os.path.join(ROOT, "schema", "costiq_optimization_schema.sql")]
 TABLES = ["CostAndUsage", "BillingPeriod", "ContractCommitment", "InvoiceDetail", "ai_seat_assignment",
           "ai_user_activity", "ai_model_catalog", "ai_user_directory", "ai_budget", "cost_budget",
-          # utility registers (ut_allocated_cost is computed by `costiq allocate`, never loaded)
-          "ut_legal_entity", "ut_cost_center", "ut_allocation_driver", "ut_allocation_policy", "ut_jurisdiction_factor",
-          "ut_ferc_account_map", "ut_jurisdiction_policy", "ut_rate_case", "ut_cip_system", "ut_vendor", "ut_storm_event",
-          "ut_volume", "ut_ai_use",
+          # pharma registers (allocated_cost is computed by `costiq allocate`, never loaded)
+          "ref_legal_entity", "ref_cost_center", "ref_allocation_driver", "ref_allocation_policy", "ref_jurisdiction_factor",
+          "ref_gl_account_map", "ref_jurisdiction_policy", "ref_tax_filing", "ref_gxp_system", "ref_vendor", "ref_study_event",
+          "ref_volume", "ref_ai_use", "ref_program", "ref_program_application",
           # monitoring and optimization (cost_alert_event is computed by `costiq alerts`)
           "optimization_recommendation", "resource_utilization_daily", "ai_app_telemetry_daily", "ai_provisioned_capacity",
           "optimization_action", "cost_alert_rule"]
@@ -70,8 +70,8 @@ DEFAULT_RULES = [
     # (rule id, name, priority, column, value, cost center)
     ("R-TAX", "Tax lines to shared corporate", 10, "ChargeCategory", "Tax", "Shared Services"),
     ("R-DEFAULT-WS", "Claude Default Workspace to IT until owners are assigned", 20, "x_WorkspaceName", "Default Workspace", "Corporate IT"),
-    ("R-AWS-DEV", "meridian-dev account to Engineering", 30, "SubAccountId", "333333333333", "Grid Operations"),
-    ("R-SNOW", "Snowflake account to Data Science", 30, "SubAccountId", "MERIDIAN_PROD", "Data & Analytics"),
+    ("R-AWS-DEV", "pharma-dev account to Engineering", 30, "SubAccountId", "333333333333", "Clinical Operations"),
+    ("R-SNOW", "Snowflake account to Data Science", 30, "SubAccountId", "PHARMA_PROD", "Data & Analytics"),
 ]
 
 
@@ -110,7 +110,7 @@ def seed(db: Database, actor="system"):
 
 def refresh(db: Database):
     """Rebuild the derived tables from current data. Unlike seed, keeps rules, manifests and the ledger."""
-    # Utility allocation chain for every billing period
+    # Entity allocation chain for every billing period
     from .allocation import Allocator
     from .engines import Engines
     Allocator(db, Engines(db, None)).run()

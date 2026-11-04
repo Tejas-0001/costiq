@@ -8,6 +8,8 @@ from .auth import Principal, access, current_principal
 from .config import settings
 from .context import asker, audit, db, eng, ledger, protect, reg, run_use_case
 from . import dialect
+from .board import BoardPack, confidence as forecast_confidence
+from .window import use_case_params, window
 
 app = FastAPI(title="MM CostIQ API", version="1.0.0", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
@@ -27,7 +29,7 @@ _highlights_cache: dict = {}
 
 
 def landing_highlights() -> dict | None:
-    """Three headline figures for the demo landing page (synthetic data, demo mode only)."""
+    """Three headline figures for the landing page (persona sign-in mode only)."""
     if settings.auth_mode != "demo":
         return None
     if _highlights_cache:
@@ -47,17 +49,17 @@ def landing_highlights() -> dict | None:
             "optimization_series": sorted(round(x["exposure"], 2) for x in f if x["kind"] == "estimate")[-4:],
             "as_of": eng.as_of().isoformat(),
         })
-        try:  # the three Prudence Engine numbers for the landing page (synthetic sample)
+        try:  # the three tax-risk numbers for the landing page
             from .optimization import Optimizer
             opt = Optimizer(db, eng)
             hl = _prudence.headline(None, opt)
-            _highlights_cache["prudence"] = {k: hl[k] for k in ("disallowance_risk", "earnings_unlock", "verified_savings_annual")}
+            _highlights_cache["risk"] = {k: hl[k] for k in ("deduction_at_risk", "credit_unlock", "verified_savings_annual")}
             # breakdowns for the landing-page carousel visuals
-            _highlights_cache["prudence"]["by_reason"] = [{"Label": r["Label"], "Risk": r["Risk"]} for r in hl["by_reason"]]
-            _highlights_cache["prudence"]["jurisdictions"] = [
-                {k: j.get(k) for k in ("Jurisdiction", "SteadyStateReturn", "Earned", "DeferralStatus")}
-                for j in _prudence.earnings_unlock(None)["jurisdictions"]]
-            _highlights_cache["prudence"]["stages"] = [{"Stage": s["Stage"], "MonthlySavings": s["MonthlySavings"]}
+            _highlights_cache["risk"]["by_reason"] = [{"Label": r["Label"], "Risk": r["Risk"]} for r in hl["by_reason"]]
+            _highlights_cache["risk"]["jurisdictions"] = [
+                {k: j.get(k) for k in ("Jurisdiction", "Credit", "Claimed", "CreditStatus")}
+                for j in _prudence.credit_unlock(None)["jurisdictions"]]
+            _highlights_cache["risk"]["stages"] = [{"Stage": s["Stage"], "MonthlySavings": s["MonthlySavings"]}
                                                       for s in opt.summary(None)["stages"]]
         except Exception:
             pass
@@ -90,6 +92,7 @@ def me(p: Principal = Depends(current_principal)):
 # ---------------------------------------------------------------------------------------- use cases
 class RunRequest(BaseModel):
     params: dict = {}
+    range: str | None = None  # the period selected at the top of the page; used unless the dates are given
 
 
 @app.get("/api/usecases")
@@ -116,7 +119,13 @@ def run(uid: str, body: RunRequest, p: Principal = Depends(current_principal)):
     except KeyError:
         raise HTTPException(404, "Unknown use case")
     p.require(uc["module"])
-    return run_use_case(p, uc, body.params)
+    params, note = dict(body.params or {}), None
+    if body.range and not {"period_start", "period_end"} & set(params):  # dates not set by hand: use the selected period
+        wp, note = use_case_params(uc, window(body.range, eng.as_of()))
+        params.update({k: v.isoformat()[:10] for k, v in wp.items()})
+    res = run_use_case(p, uc, params)
+    res["period_note"] = note
+    return res
 
 
 @app.get("/api/usecases/{uid}/export.csv")
@@ -137,8 +146,14 @@ def export(uid: str, request: Request, p: Principal = Depends(current_principal)
 
 # ---------------------------------------------------------------------------------------- modules
 @app.get("/api/command")
-def command(p: Principal = Depends(current_principal)):
+def command(range: str = "mtd", p: Principal = Depends(current_principal)):
     k = eng.kpis(p.scope)
+    w = window(range, eng.as_of())
+    cc, cp = eng.cost_center_expr()  # each cost center's spend in the selected window, next to its month position
+    spent = {r[0]: float(r[1] or 0) for r in db.query(f"SELECT {cc}, SUM(EffectiveCost) FROM CostAndUsage WHERE {w.pred()} GROUP BY 1",
+                                                       {**cp, **w.params()}, p.scope, limit=None)["rows"]}
+    k["units"] = [{**u, "SpendInPeriod": round(spent.get(u["CostCenter"], 0.0), 2)} for u in k["units"]]
+    k["period"] = w.as_dict()
     f = eng.findings(p.scope)
     k["findings"] = f[:8]
     k["exposure_incurred"] = round(sum(x["exposure"] for x in f if x["kind"] == "incurred"), 2)
@@ -147,25 +162,14 @@ def command(p: Principal = Depends(current_principal)):
     if p.scope is None:
         rec = eng.reconciliation()
         k["reconciliation_exceptions"] = sum(1 for l in rec["lines"] if l["Status"] == "exception" and l["IssueStatus"] == "Issued")
-        alloc = eng.allocation_summary(None)
-        man = eng.controls(ledger.verify())
-        impl = db.query("""SELECT SUM(CASE WHEN m.Maturity = 'implemented' THEN c.EffectiveCost ELSE 0 END) / SUM(c.EffectiveCost)
-                           FROM CostAndUsage c JOIN ingest_manifest m ON m.SourceSystem = c.x_SourceSystem
-                           AND m.BillingPeriodStart = c.BillingPeriodStart""")["rows"][0][0] or 0
-        closed = [l for l in rec["lines"] if l["IssueStatus"] == "Issued"]
-        tie = sum(1 for l in closed if l["Status"] == "matched") / len(closed) if closed else 1
-        parts = {"month_elapsed": k["days_elapsed"] / k["days_in_month"], "implemented_adapter_coverage": impl,
-                 "allocation_coverage": (alloc["coverage"] or 0) / 100, "prior_period_tie_out": tie}
-        k["confidence"] = {"score": round(100 * sum(parts.values()) / 4, 1),
-                           "parts": {a: round(100 * b, 1) for a, b in parts.items()},
-                           "formula": "Unweighted mean of four observable inputs."}
-    if p.scope is None and (p.can("prudence") or p.can("regulatory")):
+        k["confidence"] = forecast_confidence(db, eng, ledger, k)
+    if p.scope is None and (p.can("risk") or p.can("tax")):
         from .optimization import Optimizer
         opt = Optimizer(db, eng)
         k["headline"] = _prudence.headline(None, opt)  # the three numbers: risk, unlock, verified savings
-        # breakdowns the Command Center draws (state-by-state return, savings by lifecycle stage)
-        k["headline"]["jurisdictions"] = [{x: j.get(x) for x in ("Jurisdiction", "SteadyStateReturn", "Earned", "DeferralStatus")}
-                                          for j in _prudence.earnings_unlock(None)["jurisdictions"]]
+        # breakdowns the Command Center draws (credit by jurisdiction, savings by lifecycle stage)
+        k["headline"]["jurisdictions"] = [{x: j.get(x) for x in ("Jurisdiction", "Credit", "Claimed", "CreditStatus")}
+                                          for j in _prudence.credit_unlock(None)["jurisdictions"]]
         k["headline"]["stages"] = [{"Stage": st["Stage"], "MonthlySavings": st["MonthlySavings"]} for st in opt.summary(None)["stages"]]
     k["formulas"]["exposure"] = "Incurred exposure, estimated opportunity and compliance findings are reported separately and never summed."
     audit(p, "view", module="command")
@@ -173,11 +177,14 @@ def command(p: Principal = Depends(current_principal)):
 
 
 @app.get("/api/explorer")
-def explorer(month: str | None = None, provider: str | None = None, cost_center: str | None = None,
+def explorer(month: str | None = None, provider: str | None = None, cost_center: str | None = None, range: str | None = None,
              p: Principal = Depends(current_principal)):
     p.require("explorer")
-    audit(p, "view", module="explorer", month=month, provider=provider, cost_center=cost_center)
-    return eng.explorer(p.scope, month, provider, cost_center)
+    w = window(range, eng.as_of()) if range else None
+    audit(p, "view", module="explorer", month=month, provider=provider, cost_center=cost_center, period=range)
+    out = eng.explorer(p.scope, month, provider, cost_center, win=w)
+    out["period"] = w.as_dict() if w and not month else None
+    return out
 
 
 @app.get("/api/lineage/{key}")
@@ -229,9 +236,12 @@ def budgets(p: Principal = Depends(current_principal)):
 
 
 @app.get("/api/allocation")
-def allocation(p: Principal = Depends(current_principal)):
+def allocation(range: str | None = None, p: Principal = Depends(current_principal)):
     p.require("allocation")
-    return eng.allocation_summary(p.scope)
+    w = window(range, eng.as_of()) if range else None
+    out = eng.allocation_summary(p.scope, w)
+    out["period"] = w.as_dict() if w else None
+    return out
 
 
 @app.get("/api/reconciliation")
@@ -263,6 +273,7 @@ def evidence(p: Principal = Depends(current_principal)):
 
 class AskRequest(BaseModel):
     question: str
+    range: str | None = None  # the period selected at the top of the page, used when the question names none
 
 
 @app.post("/api/ask")
@@ -270,12 +281,25 @@ def ask(body: AskRequest, p: Principal = Depends(current_principal)):
     p.require("ask")
     if len(body.question) > 500:
         raise HTTPException(400, "Question too long")
-    ans = asker.ask(body.question, p, lambda uc, params: run_use_case(p, uc, params, limit=200))
+    w = window(body.range, eng.as_of()) if body.range else None
+    ans = asker.ask(body.question, p, lambda uc, params: run_use_case(p, uc, params, limit=200), w)
     audit(p, "ask", matched=ans.get("use_case", {}).get("id"))
     return ans
 
 
-# ---------------------------------------------------------------------------------------- utility and monitoring modules
+@app.get("/api/board")
+def board(p: Principal = Depends(current_principal)):
+    """Board Pack: thirteen sections for the board and audit committee, each marked live, partial or needs data."""
+    p.require("board")
+    if p.scope is not None:
+        raise HTTPException(403, "The Board Pack needs enterprise scope")
+    from .optimization import Optimizer
+    out = BoardPack(db, eng, _prudence, Optimizer(db, eng), ledger).build()
+    audit(p, "view", module="board")
+    return out
+
+
+# ---------------------------------------------------------------------------------------- tax, risk and monitoring modules
 from .routes_monitoring import router as monitoring_router  # noqa: E402
 from .routes_prudence import prudence as _prudence, router as prudence_router  # noqa: E402
 from .routes_regulatory import router as regulatory_router  # noqa: E402
@@ -283,6 +307,23 @@ from .routes_regulatory import router as regulatory_router  # noqa: E402
 app.include_router(regulatory_router)
 app.include_router(monitoring_router)
 app.include_router(prudence_router)
+
+
+# ---------------------------------------------------------------------------------------- AI summary
+from .routes_monitoring import alerts as _alerts, optimizer as _optimizer  # noqa: E402
+from .summary import Summarizer  # noqa: E402
+
+_summarizer = Summarizer(db, eng, _prudence, _optimizer, _alerts, ledger)
+
+
+@app.get("/api/summary")
+def summary(fresh: bool = False, range: str = "mtd", p: Principal = Depends(current_principal)):
+    """AI summary for the caller's role and scope: headline, sections and next actions. Every figure is a fact linked to
+    the page (and row) that shows it; see summary.py for the writers."""
+    label = access()["personas"].get(p.persona, {}).get("label", p.persona)
+    out = _summarizer.build(p, label, fresh, window(range, eng.as_of()))
+    audit(p, "view", module="summary", writer=out["writer"])
+    return out
 
 
 # ---------------------------------------------------------------------------------------- optional static web

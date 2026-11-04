@@ -110,7 +110,7 @@ function Chip({ n, pulse }: { n: Node; pulse: boolean }) {
   );
 }
 
-/** Compact architecture map: one row per lane on a rail with current running down it. */
+/** Compact architecture map: one row per lane on a rail with a pulse running down it. */
 export function Diagram({ plan, changed }: { plan: Plan; changed: string[] }) {
   const runtime = plan.answers.platform === "k8s" ? "Kubernetes" : plan.answers.platform === "vms" ? "Docker on your VMs" : "Hardened servers";
   return (

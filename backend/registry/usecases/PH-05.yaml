@@ -1,0 +1,88 @@
+id: PH-05
+source: MM CostIQ Pharma extension
+title: 'Forecast bridge: review period to forecast year by vendor'
+category: 'Pharma · Tax & accounting'
+module: tax
+business_question: 'How does each vendor''s cloud, SaaS and AI cost move from the review period to the forecast year, and does it tie to invoices?'
+personas:
+- tax_analyst
+- cfo
+- finance_controller
+catalog_persona: 'Tax, CFO'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Review-period actuals for the filing''s entity and jurisdiction, annualized, then carried to the forecast year with renewal escalators. Each vendor''s review period is tied to its invoices; an invoice exception is flagged because it weakens the substantiation.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'forecast year'
+- 'review period'
+- 'bridge'
+- 'subscription costs'
+- 'vendor'
+- 'invoice'
+- 'annualized'
+products: Any provider
+sql: |-
+  WITH rc AS (SELECT * FROM ref_tax_filing WHERE FilingId = :filing),
+  base AS (
+    SELECT a.ServiceProviderName AS Vendor, SUM(a.AllocatedCost) AS BaseActual
+    FROM allocated_cost a JOIN rc ON a.LegalEntity = rc.LegalEntity AND a.Jurisdiction = rc.Jurisdiction
+    WHERE a.CostClass IN ('opex', 'qre') AND a.PeriodStart >= rc.ReviewPeriodStart AND a.PeriodStart < rc.ReviewPeriodEnd
+    GROUP BY a.ServiceProviderName
+  ),
+  mo AS (
+    SELECT COUNT(DISTINCT a.PeriodStart) AS n FROM allocated_cost a JOIN rc
+      ON a.PeriodStart >= rc.ReviewPeriodStart AND a.PeriodStart < rc.ReviewPeriodEnd
+  ),
+  inv AS (
+    SELECT i.InvoiceIssuerName AS Vendor, SUM(i.BilledCost) AS Invoiced
+    FROM InvoiceDetail i JOIN rc ON i.BillingPeriodStart >= rc.ReviewPeriodStart AND i.BillingPeriodStart < rc.ReviewPeriodEnd
+    GROUP BY i.InvoiceIssuerName
+  ),
+  chg AS (
+    SELECT c.InvoiceIssuerName AS Vendor, SUM(c.BilledCost) AS Charged
+    FROM CostAndUsage c JOIN rc ON c.BillingPeriodStart >= rc.ReviewPeriodStart AND c.BillingPeriodStart < rc.ReviewPeriodEnd
+    GROUP BY c.InvoiceIssuerName
+  ),
+  fx AS (
+    SELECT b.Vendor, b.BaseActual, b.BaseActual * 12 / mo.n AS Annualized, COALESCE(v.EscalatorPct, 0) AS EscalatorPct,
+           v.RenewalDate,
+           CASE WHEN v.RenewalDate >= rc.ForecastYearStart AND v.RenewalDate < rc.ForecastYearEnd
+                THEN (12 - ((EXTRACT(YEAR FROM v.RenewalDate) - EXTRACT(YEAR FROM rc.ForecastYearStart)) * 12
+                            + EXTRACT(MONTH FROM v.RenewalDate) - EXTRACT(MONTH FROM rc.ForecastYearStart))) / 12.0
+                WHEN v.RenewalDate < rc.ForecastYearStart THEN 1.0 ELSE 0.0 END AS EscalatedShare,
+           i.Invoiced, c.Charged
+    FROM base b CROSS JOIN mo CROSS JOIN rc
+    LEFT JOIN ref_vendor v ON v.Vendor = b.Vendor
+    LEFT JOIN inv i ON i.Vendor = b.Vendor
+    LEFT JOIN chg c ON c.Vendor = b.Vendor
+  )
+  SELECT
+    Vendor,
+    ROUND(BaseActual, 2) AS ReviewPeriodActual,
+    ROUND(Annualized, 2) AS ReviewAnnualized,
+    EscalatorPct,
+    CAST(RenewalDate AS DATE) AS RenewalDate,
+    ROUND(Annualized * (1 + EscalatorPct / 100 * EscalatedShare), 2) AS ForecastYear,
+    ROUND(Annualized * EscalatorPct / 100 * EscalatedShare, 2) AS ContractEscalation,
+    CASE WHEN EscalatedShare > 0 AND EscalatorPct > 0 THEN 'Contract escalator at renewal'
+         ELSE 'Review period annualized' END AS Reason,
+    CASE WHEN Invoiced IS NULL THEN 'Billed via another issuer'
+         WHEN ABS(Invoiced - COALESCE(Charged, 0)) <= 1 THEN 'Tied to invoices'
+         ELSE 'Invoice exception' END AS InvoiceTieOut,
+    ROUND(COALESCE(Invoiced, 0) - COALESCE(Charged, 0), 2) AS InvoiceDifference
+  FROM fx
+  ORDER BY ReviewAnnualized DESC
+params:
+- name: filing
+  type: string
+  default: 'US-1120-FY2026'
+  label: 'Tax filing'
+notes: 'Invoice tie-out compares the vendor''s invoices with all of its charges in the review period (every entity), so one exception can affect several filings.'
+compliance:
+  area: 'Tax & accounting'
+  reference: 'Filing substantiation · invoice tie-out'
+  unit: 'vendors'
+  flag: 'InvoiceTieOut = ''Invoice exception'''
+  amount: ReviewPeriodActual

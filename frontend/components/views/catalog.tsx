@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AutoChart } from "@/components/charts";
+import { useMe } from "@/components/shell";
 import { UseCaseRunner } from "@/components/usecases";
 import { DataTable, Formula, Head, Loading } from "@/components/ui";
 import { post, useApi, type Result } from "@/lib/api";
@@ -15,7 +16,7 @@ export function CatalogView() {
   const [cat, setCat] = useState("");
   return (
     <div className="stack">
-      <Head title="Use Case Catalog" sub="Every figure in CostIQ is one of these executable, tested queries: FinOps Foundation FOCUS, AI, utilities, prudence and optimization" />
+      <Head title="Use Case Catalog" />
       <Loading state={state}>
         {(list) => {
           const cats = [...new Set(list.map((u) => u.category))].sort();
@@ -32,10 +33,10 @@ export function CatalogView() {
               </div>
               <div className="card flush uc-list">
                 {shown.map((u) => (
-                  <Link key={u.id} href={`/catalog/${u.id}`} className="uc" style={{ textDecoration: "none", color: "inherit", opacity: u.allowed ? 1 : 0.55 }}>
+                  <Link key={u.id} href={`/catalog/${u.id}`} className="uc">
                     <div className="row" style={{ flexWrap: "nowrap" }}>
                       <span className="uc-id">{u.id}</span>
-                      <div><div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.title}</div><div className="muted small">{u.business_question}</div></div>
+                      <div>{u.title}</div>
                     </div>
                     <span className="small muted" style={{ whiteSpace: "nowrap" }}>{u.allowed ? u.category : "not in your role"}</span>
                   </Link>
@@ -62,45 +63,46 @@ type Answer = { status: string; message?: string; suggestions?: { id: string; ti
   confidence?: string; interpreted?: string[]; headline?: string; result?: Result; formula?: string; sources?: string[]; alternatives?: { id: string; title: string }[] };
 
 const EXAMPLES = [
-  "Which vendors are missing CIP-013 clauses?", "How much spend is at risk of disallowance?", "What could cloud fees earn as a regulatory asset?",
-  "Are regulated OpCos subsidizing renewables?", "Which GPU endpoints are idle?", "Cost per accepted outcome by LLM app",
-  "Storm cost recovery", "Unused Copilot seats", "Which non-production servers run 24x7?", "Rate case test year bridge by vendor",
+  "Which GxP vendors are missing quality-agreement clauses?", "How much deduction is at risk?", "What R&D credit could cloud fees unlock?",
+  "Are GxP entities carrying Consumer Health work?", "Which GPU endpoints are idle?", "Cost per accepted outcome by LLM app",
+  "Database lock cost by study event", "Unused Copilot seats", "Which non-production servers run 24x7?", "Forecast bridge by vendor",
 ];
 
 export function AskView() {
+  const { period } = useMe();
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [a, setA] = useState<Answer | null>(null);
   const [err, setErr] = useState<string | null>(null);
   async function ask(text: string) {
     setQ(text); setBusy(true); setErr(null);
-    try { setA(await post<Answer>("/ask", { question: text })); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+    try { setA(await post<Answer>("/ask", { question: text, range: period })); } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   }
   const res = useMemo(() => a?.result, [a]);
   return (
     <div className="stack">
-      <Head title="Ask CostIQ" sub="Plain-English questions answered by the catalog's tested queries. Deterministic: no LLM, and the question never reaches SQL." />
+      <Head title="Ask CostIQ" />
       <div className="card stack">
-        <form className="ask-box" onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(q); }}>
-          <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={500} placeholder="e.g. Which vendors are missing CIP-013 clauses?" />
+        <form className="row" onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(q); }}>
+          <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={500} placeholder="Question" style={{ flex: 1 }} />
           <button className="btn primary" disabled={busy || !q.trim()}>{busy ? "Thinking…" : "Ask"}</button>
         </form>
-        <div className="row">{EXAMPLES.map((x) => <button key={x} className="chip" onClick={() => ask(x)}>{x}</button>)}</div>
+        <div className="small">Examples: {EXAMPLES.map((x, i) => <span key={x}>{i > 0 && " · "}<a href="#" onClick={(e) => { e.preventDefault(); ask(x); }}>{x}</a></span>)}</div>
       </div>
       {err && <div className="error">{err}</div>}
       {a && a.status !== "answered" && (
         <div className="card"><p>{a.message}</p>
-          <div className="row">{a.suggestions?.map((s) => <Link key={s.id} className="chip" href={`/catalog/${s.id}`}>{s.id} · {s.title}</Link>)}</div></div>
+          <ul>{a.suggestions?.map((s) => <li key={s.id}><Link href={`/catalog/${s.id}`}>{s.id} {s.title}</Link></li>)}</ul></div>
       )}
       {a && a.status === "answered" && res && (
         <div className="card stack">
           <div className="small muted">Answered with <Link href={`/catalog/${a.use_case?.id}`}>{a.use_case?.id} · {a.use_case?.title}</Link> · match confidence {a.confidence}
-            {a.interpreted?.length ? ` · ${a.interpreted.join(", ")}` : ""}</div>
-          <h2 style={{ margin: 0 }}>{a.headline}</h2>
+            {a.interpreted?.length ? ` · ${a.interpreted.join(", ")}` : " · the use case's own period"}</div>
+          <h2>{a.headline}</h2>
           <AutoChart columns={res.columns} rows={res.rows} />
           <DataTable columns={res.columns} rows={res.rows} max={100} />
           <Formula>{a.formula} Sources: {a.sources?.join(", ")}</Formula>
-          {a.alternatives?.length ? <div className="row small">Also relevant: {a.alternatives.map((x) => <Link key={x.id} href={`/catalog/${x.id}`} className="chip">{x.id} · {x.title}</Link>)}</div> : null}
+          {a.alternatives?.length ? <div className="small">Also: {a.alternatives.map((x, i) => <span key={x.id}>{i > 0 && " · "}<Link href={`/catalog/${x.id}`}>{x.id} {x.title}</Link></span>)}</div> : null}
         </div>
       )}
     </div>

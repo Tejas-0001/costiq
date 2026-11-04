@@ -2,15 +2,15 @@
 #
 # personas           CostIQ personas: the modules each can open and the actions each can take.
 #                    enterprise: true    sees every cost center and entity
-#                    entity_scoped: true sees only its legal entities' allocated cost (affiliate wall); never the shared,
+#                    entity_scoped: true sees only its legal entities' allocated cost (entity wall); never the shared,
 #                                        pre-allocation charges
 # roleMap            Entra ID app role value -> persona (create these app roles on the API app registration).
 # scopeGroups        Entra ID security group object id or name -> cost centers the member may see.
 # entityScopeGroups  Entra ID security group -> legal entities, for entity-scoped personas.
-# demoScope / demoEntityScope   scopes used when COSTIQ_AUTH_MODE=demo (no identity provider).
+# demoScope          cost-center scopes used when COSTIQ_AUTH_MODE=demo (no identity provider).
 #
 # Separation of duties is enforced on the person, not the persona: whoever submits a finding, allocation policy,
-# optimization or data-request response cannot also approve (or verify) it.
+# optimization or examiner-request response cannot also approve (or verify) it.
 
 modules:
   command: Command Center
@@ -22,21 +22,22 @@ modules:
   rates: Rate & Commitments
   budgets: Budgets & Forecasting
   anomalies: Anomalies & Optimization
-  prudence: Prudence Radar
-  regulatory: Regulatory Accounting
-  utilities: Utility Compliance
+  risk: Tax Risk Radar
+  tax: Tax & Transfer Pricing
+  compliance: GxP & Patient Data
   reconciliation: Reconciliation & Close
   governance: Governance & Evidence
   catalog: Use Case Catalog
   ask: Ask CostIQ
+  board: Board Pack
 
 personas:
   cfo:
     label: Chief Financial Officer
     group: Finance Leadership & Planning
     enterprise: true
-    modules: [command, explorer, cloud, ai, optimization, allocation, rates, budgets, anomalies, prudence, regulatory,
-              utilities, reconciliation, governance, catalog, ask]
+    modules: [board, command, explorer, cloud, ai, optimization, allocation, rates, budgets, anomalies, risk, tax,
+              compliance, reconciliation, governance, catalog, ask]
     actions: [forecast.approve, recommendation.approve, budget.approve, exhibit.export, datarequest.approve]
   pl_exec:
     label: P&L Executive
@@ -60,44 +61,43 @@ personas:
     label: Internal Controller
     group: Finance Leadership & Planning
     enterprise: true
-    modules: [command, explorer, allocation, reconciliation, budgets, regulatory, governance, catalog, ask]
+    modules: [board, command, explorer, allocation, reconciliation, budgets, tax, governance, catalog, ask]
     actions: [rule.approve, close.approve, datarequest.approve]
-  regulatory_analyst:
-    label: Regulatory Accounting & Rates
-    group: Regulatory & Compliance
+  auditor:
+    label: Internal Audit
+    group: Finance Leadership & Planning
     enterprise: true
-    modules: [command, explorer, allocation, budgets, prudence, regulatory, utilities, reconciliation, catalog, ask]
-    actions: [exhibit.export, datarequest.prepare, datarequest.approve]
-  affiliate_accounting:
-    label: Service-Company Accounting
-    group: Regulatory & Compliance
-    enterprise: true
-    modules: [allocation, regulatory, reconciliation, governance, catalog, ask]
-    actions: [driver.submit, datarequest.prepare]
-  cip_compliance:
-    label: NERC CIP Compliance
-    group: Regulatory & Compliance
-    enterprise: true
-    modules: [utilities, prudence, ai, governance, catalog, ask]
+    modules: [board, command, allocation, risk, reconciliation, governance, catalog, ask]
     actions: []
-  opco_finance:
-    label: OpCo Finance Manager (Meridian Electric Ohio)
+  tax_analyst:
+    label: Tax & R&D Credits
     group: Regulatory & Compliance
-    enterprise: false
-    entity_scoped: true
-    modules: [regulatory, prudence, catalog, ask]
+    enterprise: true
+    modules: [command, explorer, allocation, budgets, risk, tax, compliance, reconciliation, catalog, ask]
+    actions: [exhibit.export, datarequest.prepare, datarequest.approve]
+  transfer_pricing:
+    label: Transfer Pricing
+    group: Regulatory & Compliance
+    enterprise: true
+    modules: [allocation, tax, reconciliation, governance, catalog, ask]
+    actions: [driver.submit, datarequest.prepare]
+  gxp_compliance:
+    label: GxP Quality & Data Privacy
+    group: Regulatory & Compliance
+    enterprise: true
+    modules: [compliance, risk, ai, governance, catalog, ask]
     actions: []
   tech_exec:
     label: Technology Executive (CTO/CIO)
     group: Technology & Operations
     enterprise: true
-    modules: [command, explorer, cloud, ai, optimization, rates, budgets, anomalies, governance, catalog, ask]
+    modules: [board, command, explorer, cloud, ai, optimization, rates, budgets, anomalies, governance, catalog, ask]
     actions: [recommendation.approve]
   finops_analyst:
     label: FinOps Analyst
     group: Technology & Operations
     enterprise: true
-    modules: [command, explorer, cloud, ai, optimization, allocation, rates, budgets, anomalies, prudence, catalog, ask]
+    modules: [command, explorer, cloud, ai, optimization, allocation, rates, budgets, anomalies, risk, catalog, ask]
     actions: [recommendation.submit, optimization.verify, datarequest.prepare]
   cloud_ops:
     label: Cloud Operations
@@ -111,11 +111,11 @@ personas:
     enterprise: true
     modules: [command, explorer, ai, optimization, anomalies, governance, catalog, ask]
     actions: [recommendation.submit, optimization.implement]
-  auditor:
-    label: Internal Audit
-    group: Governance
+  investor_relations:
+    label: Investor Relations
+    group: Board & Investor
     enterprise: true
-    modules: [command, allocation, prudence, reconciliation, governance, catalog, ask]
+    modules: [board, command, explorer, optimization, catalog, ask]
     actions: []
 
 roleMap:
@@ -124,35 +124,33 @@ roleMap:
   CostIQ.FPAPartner: fpa_partner
   CostIQ.FPAAnalyst: fpa_analyst
   CostIQ.FinanceController: finance_controller
-  CostIQ.RegulatoryAnalyst: regulatory_analyst
-  CostIQ.AffiliateAccounting: affiliate_accounting
-  CostIQ.CIPCompliance: cip_compliance
-  CostIQ.OpCoFinance: opco_finance
+  CostIQ.TaxAnalyst: tax_analyst
+  CostIQ.TransferPricing: transfer_pricing
+  CostIQ.GxpCompliance: gxp_compliance
   CostIQ.TechExecutive: tech_exec
   CostIQ.FinOpsAnalyst: finops_analyst
   CostIQ.CloudOperations: cloud_ops
   CostIQ.AIProgramOwner: ai_program_owner
+  CostIQ.InvestorRelations: investor_relations
   CostIQ.Auditor: auditor
 
 # Grant `pii.view` to roles allowed to see real user names in AI views (default: nobody).
 piiRoles: []
 
 scopeGroups:
-  SG-CostIQ-GridOperations: [Grid Operations]
+  SG-CostIQ-ClinicalOperations: [Clinical Operations]
+  SG-CostIQ-PatientData: [Patient Data]
+  SG-CostIQ-ResearchDiscovery: [Research & Discovery]
   SG-CostIQ-DataAnalytics: [Data & Analytics]
-  SG-CostIQ-TransmissionPlanning: [Transmission Planning]
-  SG-CostIQ-CustomerOperations: [Customer Operations]
   SG-CostIQ-Finance: [Finance]
 
 entityScopeGroups:
-  SG-CostIQ-OpCo-Ohio: [Meridian Electric Ohio]
-  SG-CostIQ-OpCo-Indiana: [Meridian Electric Indiana]
-  SG-CostIQ-OpCo-Texas: [Meridian Electric Texas]
+  SG-CostIQ-Entity-US: [US Operations]
+  SG-CostIQ-Entity-DE: [Germany GmbH]
+  SG-CostIQ-Entity-UK: [UK Operations]
 
 demoScope:
-  pl_exec: [Grid Operations]
-  fpa_partner: [Grid Operations, Data & Analytics]
-  cloud_ops: [Grid Operations, Data & Analytics]
+  pl_exec: [Clinical Operations]
+  fpa_partner: [Clinical Operations, Data & Analytics]
+  cloud_ops: [Clinical Operations, Data & Analytics]
 
-demoEntityScope:
-  opco_finance: [Meridian Electric Ohio]

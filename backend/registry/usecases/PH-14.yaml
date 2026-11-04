@@ -1,0 +1,49 @@
+id: PH-14
+source: MM CostIQ Pharma extension
+title: 'Evidence completeness by filing'
+category: 'Pharma · Tax risk'
+module: risk
+business_question: 'For each tax filing, how complete is the evidence behind its recharged technology spend?'
+personas:
+- tax_analyst
+- cfo
+- auditor
+catalog_persona: 'Tax, Internal Audit'
+datasets:
+- 'Filing evidence (computed)'
+- 'Pharma reference tables'
+description: 'Share of each filing''s review-period spend that is reconciled, allocated under approved policy, mapped to a GL account, shows a benefit (or is remediated) and is free of unactioned savings, with the cost-weighted evidence score and the deduction at risk.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'evidence'
+- 'completeness'
+- 'evidence score'
+- 'filing'
+- 'readiness'
+- 'audit readiness'
+products: Any provider
+sql: |-
+  SELECT
+    e.FilingId, r.LegalEntity, r.Jurisdiction, r.Status AS FilingStatus,
+    COUNT(*) AS Lines,
+    ROUND(SUM(e.AllocatedCost), 2) AS ReviewPeriodSpend,
+    ROUND(100 * SUM(CASE WHEN e.Reconciled THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS ReconciledPct,
+    ROUND(100 * SUM(CASE WHEN e.PolicyApproved THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS PolicyApprovedPct,
+    ROUND(100 * SUM(CASE WHEN e.GlMapped THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS GlMappedPct,
+    ROUND(100 * SUM(CASE WHEN e.BenefitShown OR e.Remediated THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS BenefitShownPct,
+    ROUND(100 * SUM(CASE WHEN e.SavingsActioned OR e.Remediated THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS SavingsActionedPct,
+    ROUND(100 * SUM(e.AllocatedCost * e.EvidenceScore) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS EvidenceScore,
+    ROUND(SUM(e.RiskAmount), 2) AS DeductionAtRisk,
+    CASE WHEN SUM(e.RiskAmount) > 0 THEN 'Evidence gaps' ELSE 'Complete' END AS Status
+  FROM filing_evidence e
+  JOIN ref_tax_filing r ON r.FilingId = e.FilingId
+  GROUP BY e.FilingId, r.LegalEntity, r.Jurisdiction, r.Status
+  ORDER BY DeductionAtRisk DESC
+params: []
+notes: 'Weights: reconciled 25%, approved policy 15%, GL account 15%, benefit shown 30%, savings actioned 15%.'
+compliance:
+  area: 'Tax risk'
+  reference: 'OECD TPG benefit test · filing substantiation'
+  unit: 'filings'
+  flag: 'Status = ''Evidence gaps'''
+  amount: DeductionAtRisk

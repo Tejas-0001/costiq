@@ -1,0 +1,56 @@
+id: PH-03
+source: MM CostIQ Pharma extension
+title: 'Cross-charging: GxP entities carrying Consumer Health work'
+category: 'Pharma · Transfer pricing'
+module: tax
+business_question: 'Are pharma entities paying for work that belongs to Consumer Health?'
+personas:
+- transfer_pricing
+- tax_analyst
+- auditor
+- cfo
+catalog_persona: 'Transfer Pricing, Internal Audit'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Finds allocated cost from cost centers owned by Consumer Health (ref_cost_center) that landed on a GxP entity. The usual cause is a broad shared-platform policy that runs before the affiliate''s own direct-assignment policy.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'cross charging'
+- 'consumer health'
+- 'affiliate'
+- 'benefit test'
+- 'entity wall'
+- 'arm''s length'
+products: Any provider
+sql: |-
+  SELECT
+    a.CostCenter,
+    c.OwningEntity,
+    a.LegalEntity AS ChargedToEntity,
+    a.OpcoPolicy,
+    a.ServiceName,
+    COUNT(DISTINCT a.ChargeKey) AS ChargeLines,
+    ROUND(SUM(a.AllocatedCost), 2) AS CrossCharge
+  FROM allocated_cost a
+  JOIN ref_cost_center c ON c.CostCenter = a.CostCenter
+  WHERE NOT c.Regulated AND a.Regulated
+    AND a.PeriodStart >= :period_start AND a.PeriodStart < :period_end
+  GROUP BY a.CostCenter, c.OwningEntity, a.LegalEntity, a.OpcoPolicy, a.ServiceName
+  ORDER BY CrossCharge DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'Fix by giving the affiliate''s direct-assignment policy a lower priority number than shared-platform policies.'
+compliance:
+  area: 'Transfer pricing'
+  reference: 'OECD TPG Chapter VII benefit test · arm''s-length principle'
+  unit: 'allocations'
+  flag: 'CrossCharge > 0'
+  amount: CrossCharge

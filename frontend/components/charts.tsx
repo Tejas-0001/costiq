@@ -8,30 +8,20 @@ import { Bar, Line } from "react-chartjs-2";
 import { isMoneyCol, money, PALETTE } from "@/lib/format";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, LineElement, PointElement, Tooltip, Legend, Filler);
-ChartJS.defaults.font.family = "'Inter Variable', -apple-system, 'Segoe UI', system-ui, sans-serif";
+ChartJS.defaults.font.family = "'Times New Roman', Times, serif";
 ChartJS.defaults.font.size = 12;
-ChartJS.defaults.color = "#8e8e93";
-ChartJS.defaults.borderColor = "rgba(142, 142, 147, 0.16)";
-ChartJS.defaults.animation = { duration: 900, easing: "easeOutQuart" };
-ChartJS.defaults.elements.bar.borderRadius = 6;
-ChartJS.defaults.elements.bar.borderSkipped = "start";
-ChartJS.defaults.datasets.bar.maxBarThickness = 64;
-ChartJS.defaults.plugins.legend.labels.usePointStyle = true;
-ChartJS.defaults.plugins.legend.labels.pointStyle = "circle";
-ChartJS.defaults.plugins.legend.labels.boxWidth = 8;
-ChartJS.defaults.plugins.legend.labels.boxHeight = 8;
-ChartJS.defaults.plugins.tooltip.backgroundColor = "rgba(29, 29, 31, 0.92)";
-ChartJS.defaults.plugins.tooltip.padding = 10;
-ChartJS.defaults.plugins.tooltip.cornerRadius = 10;
-ChartJS.defaults.plugins.tooltip.titleFont = { weight: 600 };
-ChartJS.defaults.plugins.tooltip.boxPadding = 4;
+ChartJS.defaults.color = "#5f6163";
+ChartJS.defaults.borderColor = "#e4e4e4";
+ChartJS.defaults.animation = false;
+ChartJS.defaults.datasets.bar.maxBarThickness = 48;
+ChartJS.defaults.plugins.legend.labels.boxWidth = 10;
 
 type Dataset = { label: string; data: (number | null)[]; backgroundColor?: string | string[]; borderColor?: string; type?: "line" | "bar";
   pointRadius?: number | number[]; pointBackgroundColor?: string | string[]; borderWidth?: number; fill?: boolean; stack?: string };
 
 const moneyTick = (v: number | string) => money(Number(v));
 /** Long category labels are cut to one short line; the tooltip still shows the full label. */
-const clip = (l: string | undefined) => (l && l.length > 30 ? `${l.slice(0, 29)}…` : l ?? "");
+const clip = (l: string | undefined) => (l && l.length > 22 ? `${l.slice(0, 21)}…` : l ?? "");
 
 /** Bar chart (vertical or horizontal, optionally stacked). Values are money unless `plain`. */
 export function BarChart({ labels, datasets, horizontal, stacked, plain, height = "", onClick }: {
@@ -62,7 +52,7 @@ export function LineChart({ labels, datasets, height = "", plain }: { labels: st
     plugins: { legend: { display: datasets.length > 1, position: "bottom" },
       tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${tick(c.parsed.y ?? 0)}` } } },
     scales: { y: { ticks: { callback: tick } }, x: { ticks: { maxTicksLimit: 12 } } },
-    elements: { line: { tension: 0.25 } },
+    elements: { line: { tension: 0 } },
   };
   const data = { labels, datasets: datasets.map((d, i) => ({ borderColor: PALETTE[i % PALETTE.length], backgroundColor: PALETTE[i % PALETTE.length], pointRadius: 0, borderWidth: 2, ...d })) };
   return <div className={`chart-box ${height}`}><Line data={data as never} options={opts} /></div>;
@@ -70,10 +60,10 @@ export function LineChart({ labels, datasets, height = "", plain }: { labels: st
 
 /** Floating-bar waterfall: stages as bars from 0 (or a running base). Used for the savings lifecycle. */
 export function Waterfall({ steps, height = "" }: { steps: { label: string; value: number; tone?: "good" | "bad" | "base" }[]; height?: "" | "tall" | "short" }) {
-  const color = (t?: string) => (t === "good" ? "#20b26b" : t === "bad" ? "#ff5f45" : "#2f6bff");
+  const color = (t?: string) => (t === "good" ? "#2e7d4f" : t === "bad" ? "#ca4528" : "#0f6ec8");
   const data = {
     labels: steps.map((s) => s.label),
-    datasets: [{ label: "Monthly savings", data: steps.map((s) => [0, s.value]), backgroundColor: steps.map((s) => color(s.tone)), borderRadius: 4 }],
+    datasets: [{ label: "Monthly savings", data: steps.map((s) => [0, s.value]), backgroundColor: steps.map((s) => color(s.tone)) }],
   };
   const opts: ChartOptions<"bar"> = {
     responsive: true, maintainAspectRatio: false,

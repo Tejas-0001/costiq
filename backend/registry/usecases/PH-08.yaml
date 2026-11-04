@@ -1,0 +1,52 @@
+id: PH-08
+source: MM CostIQ Pharma extension
+title: 'GxP vendors missing quality-agreement clauses'
+category: 'Pharma · GxP & patient data'
+module: compliance
+business_question: 'Which vendors supporting GxP systems lack required quality-agreement clauses?'
+personas:
+- gxp_compliance
+- auditor
+- tech_exec
+catalog_persona: 'GxP Quality, Vendor Management'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Checks each GxP-scoped vendor''s contract for a signed quality agreement, audit rights, change notification and data-integrity commitments (21 CFR Part 11, EU Annex 11).'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'gxp'
+- 'quality agreement'
+- 'part 11'
+- 'annex 11'
+- 'vendor qualification'
+- 'data integrity'
+- 'audit rights'
+products: Any provider
+sql: |-
+  WITH c AS (
+    SELECT Vendor, GxpScoped, AnnualContractValue,
+           CASE WHEN json_extract_string(QualityClauses, '$.quality_agreement') = 'true' THEN '' ELSE 'quality agreement; ' END AS m1,
+           CASE WHEN json_extract_string(QualityClauses, '$.audit_rights') = 'true' THEN '' ELSE 'audit rights; ' END AS m2,
+           CASE WHEN json_extract_string(QualityClauses, '$.change_notification') = 'true' THEN '' ELSE 'change notification; ' END AS m3,
+           CASE WHEN json_extract_string(QualityClauses, '$.data_integrity') = 'true' THEN '' ELSE 'data integrity; ' END AS m4
+    FROM ref_vendor
+  )
+  SELECT
+    Vendor,
+    GxpScoped,
+    CONCAT(m1, m2, m3, m4) AS MissingClauses,
+    ROUND(AnnualContractValue, 2) AS AnnualContractValue,
+    CASE WHEN GxpScoped AND CONCAT(m1, m2, m3, m4) <> '' THEN 'Missing quality clauses'
+         WHEN GxpScoped THEN 'Clauses in place'
+         ELSE 'Not GxP-scoped' END AS Status
+  FROM c
+  ORDER BY CASE WHEN GxpScoped AND CONCAT(m1, m2, m3, m4) <> '' THEN 0 ELSE 1 END, AnnualContractValue DESC
+params: []
+notes: 'Clause flags come from vendor management (ref_vendor.QualityClauses).'
+compliance:
+  area: 'GxP & patient data'
+  reference: '21 CFR Part 11 · EU GMP Annex 11 · ICH Q10'
+  unit: 'vendors'
+  flag: 'Status = ''Missing quality clauses'''
+  amount: AnnualContractValue

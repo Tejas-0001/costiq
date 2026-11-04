@@ -24,7 +24,7 @@ SEAT_TABLES = {"ai_seat_assignment"}
 ACTIVITY_TABLES = {"ai_user_activity"}
 BUDGET_TABLES = {"ai_budget", "cost_budget"}
 # Allocated (post-allocation) tables carry a cost center and a legal entity.
-ENTITY_TABLES = {"ut_allocated_cost", "prudence_evidence"}
+ENTITY_TABLES = {"allocated_cost", "filing_evidence"}
 PARAM_RE = re.compile(r"(?<![:\w]):([a-zA-Z_][a-zA-Z0-9_]*)")
 
 # Cost-center attribution used for row-level scope: split-cost allocation tags first, then resource tags.

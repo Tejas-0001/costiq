@@ -1,0 +1,57 @@
+id: PH-13
+source: MM CostIQ Pharma extension
+title: 'Credit unlock: R&D credit on cloud fees not yet claimed'
+category: 'Pharma · R&D credit'
+module: tax
+business_question: 'What R&D credit could recurring cloud and SaaS fees earn, by jurisdiction?'
+personas:
+- tax_analyst
+- cfo
+catalog_persona: 'Tax, CFO'
+datasets:
+- 'Pharma reference tables'
+- 'Allocated cost (computed)'
+description: 'Annualized review-period recurring fees x the jurisdiction''s credit rate. Claimed where the group already claims them; unlock where they qualify but are not yet claimed.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'credit unlock'
+- 'r&d credit'
+- 'qualifying expenditure'
+- 'research credit'
+- 'cloud computing'
+- 'cash tax'
+products: Any provider
+sql: |-
+  WITH bp AS (SELECT MIN(ReviewPeriodStart) AS b0, MAX(ReviewPeriodEnd) AS b1 FROM ref_tax_filing),
+  fees AS (
+    SELECT a.Jurisdiction, a.LegalEntity, a.ServiceProviderName AS Vendor,
+           COUNT(DISTINCT a.PeriodStart) AS Months, SUM(a.AllocatedCost) AS Fees
+    FROM allocated_cost a CROSS JOIN bp
+    WHERE a.ChargeCategory = 'Purchase' AND a.ChargeFrequency = 'Recurring' AND a.CostClass IN ('opex', 'qre')
+      AND a.PeriodStart >= bp.b0 AND a.PeriodStart < bp.b1
+    GROUP BY a.Jurisdiction, a.LegalEntity, a.ServiceProviderName
+  ),
+  avg_rate AS (SELECT AVG(CreditRate) AS r FROM ref_tax_filing),
+  x AS (
+    SELECT f.*, p.CreditStatus,
+           COALESCE(rj.CreditRate, re.CreditRate, (SELECT r FROM avg_rate)) AS CreditRate,
+           COALESCE(rj.FilingId, re.FilingId) AS FilingId
+    FROM fees f
+    JOIN ref_jurisdiction_policy p ON p.Jurisdiction = f.Jurisdiction
+    LEFT JOIN ref_tax_filing rj ON rj.Jurisdiction = f.Jurisdiction
+    LEFT JOIN ref_tax_filing re ON re.LegalEntity = f.LegalEntity AND rj.FilingId IS NULL
+    WHERE p.CreditStatus <> 'not_applicable'
+  )
+  SELECT
+    Jurisdiction, CreditStatus, FilingId,
+    ROUND(MAX(CreditRate), 2) AS CreditRate,
+    ROUND(SUM(Fees * 12 / Months), 2) AS AnnualQualifyingFees,
+    ROUND(SUM(Fees * 12 / Months) * MAX(CreditRate) / 100, 2) AS Credit,
+    CASE WHEN CreditStatus = 'claimed' THEN 'Claimed'
+         WHEN CreditStatus = 'eligible' THEN 'Unlock: claim it'
+         ELSE 'Not eligible' END AS Status
+  FROM x
+  GROUP BY Jurisdiction, CreditStatus, FilingId
+  ORDER BY Credit DESC
+params: []
+notes: 'Illustrative: depends on each jurisdiction''s qualifying rules and on substantiation; jurisdictions without a filing use their entity''s filing rate, else the average of filings.'

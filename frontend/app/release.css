@@ -10,7 +10,7 @@
 .dl ul.checks li::before { content: ""; position: absolute; left: 0; top: 2px; width: 16px; height: 16px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px #c7c7cc; }
 .dl ul.checks li::after { content: ""; position: absolute; left: 5px; top: 5px; width: 6px; height: 8px; border: solid var(--blue); border-width: 0 1.8px 1.8px 0; transform: rotate(40deg) scale(0); }
 .dl ul.checks.done li::after { transform: rotate(40deg) scale(1); border-color: var(--green); }
-.dl .dl-sub { margin: 34px 0 0; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
+.dl .dl-sub { margin: 34px 0 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
 .dl .dl-sub + * { margin-top: 14px; }
 .dl .dp-sec > .dl-pipe, .dl .dp-sec > .dl-lanes { margin-top: 18px; }
 .dl .dp-btn { height: 40px; font-size: 14px; border-radius: 12px; }
@@ -42,7 +42,7 @@
 .dl-gantt .axis { display: flex; justify-content: space-between; margin: 4px 8px 0 192px; font-size: 11.5px; color: var(--ink-3); }
 .dl-phase { padding: 4px 4px 0 24px; border-left: 1px solid var(--line); }
 .dl-phase .k { font-size: 12px; font-weight: 650; color: var(--blue); }
-.dl-phase h4 { margin: 6px 0 6px !important; font-size: 21px !important; letter-spacing: -0.03em !important; }
+.dl-phase h4 { margin: 6px 0 6px !important; font-size: 21px !important; letter-spacing: -0.015em !important; }
 .dl-phase > p { font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
 .dl-phase .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 16px; }
 .dl-phase ul { font-size: 13.5px !important; }
@@ -59,7 +59,7 @@
 /* ---------------------------------------------------------------- pipeline */
 .dl-pipe { padding: 24px; }
 .dl-pipe-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.dl-pipe-bar b { display: block; font-size: 17px; font-weight: 650; letter-spacing: -0.02em; }
+.dl-pipe-bar b { display: block; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
 .dl-pipe-bar span { font-size: 13.5px; color: var(--ink-2); }
 .dl-pipe-btns { display: flex; gap: 8px; flex: none; }
 .dl .dp-btn.risky { color: var(--red); background: var(--red-bg); }
@@ -92,7 +92,7 @@
 .dl-gates .g.run { box-shadow: inset 0 0 0 2px var(--blue); }
 .dl-gates tr.failed td { background: var(--red-bg); }
 .dl-gates .why { margin: 6px 0 0 26px; font-size: 12.5px; color: var(--red); line-height: 1.45; }
-.dl-gates .tool { white-space: nowrap; font-weight: 550; }
+.dl-gates .tool { white-space: nowrap; font-weight: 500; }
 .dl-gates .std, .dl-std em { display: inline-block; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 600; font-style: normal; color: var(--prov-ink); background: var(--prov-bg); white-space: nowrap; }
 .dl-verdict { display: flex; align-items: flex-start; gap: 12px; margin-top: 14px; padding: 14px 16px; border-radius: 14px; font-size: 14px; line-height: 1.5; }
 .dl-verdict .ic { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 50%; color: #fff; }
@@ -122,7 +122,7 @@
 .dl-lane .slot { min-height: 64px; margin: 14px 0; }
 .dl-artifact { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 14px; background: #0b0b0f; color: #f5f5f7; box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18); }
 .dl-artifact b { display: block; font-size: 13.5px; font-weight: 650; }
-.dl-artifact code { font: 500 11px/1.4 ui-monospace, "SF Mono", Consolas, monospace; color: #8fb6ff; }
+.dl-artifact code { font: 500 12px/1.4 "Times New Roman", Times, serif; color: #8fb6ff; }
 .dl-artifact .seal { display: grid; place-items: center; flex: none; width: 24px; height: 24px; border-radius: 8px; color: #fff; background: linear-gradient(135deg, #22c37a, #0f8a4c); }
 .dl-artifact.ghost { opacity: 0.4; box-shadow: none; }
 .dl-artifact.empty { justify-content: center; min-height: 58px; color: var(--ink-3); font-size: 12.5px; background: none; box-shadow: inset 0 0 0 1.5px #d6d6dc; }
@@ -234,7 +234,7 @@
 .dl-sim-steps .out.recover { background: var(--amber); }
 .dl-sim-steps p { margin-top: 3px; font-size: 13px; line-height: 1.5; color: var(--ink-2); }
 .dl-sim-verdict { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding: 12px 14px; border-radius: 14px; font-size: 14px; color: var(--yours-ink); background: var(--yours-bg); }
-.dl-sim-verdict button { margin-left: auto; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 650; color: var(--blue); cursor: pointer; }
+.dl-sim-verdict button { margin-left: auto; border: 0; background: none; font: inherit; font-family: "Times New Roman", Times, serif; font-size: 13px; font-weight: 650; color: var(--blue); cursor: pointer; }
 .dl-def2 { margin-top: 14px; }
 .dl-sev { display: inline-block; padding: 2px 9px; border-radius: 99px; font-size: 11.5px; font-weight: 700; }
 .dl-sev.critical { color: #fff; background: var(--red); }
@@ -281,4 +281,9 @@
 }
 @media print {
   .dl-pipe-btns, .dl-lane-foot button, .dl-split-foot button, .dl-sim-tabs { display: none !important; }
+}
+
+/* paragraph-style text: Times New Roman (see deploy.css) */
+.dl-std .what, .dl-std .how, .dl-layer .does, .dl-csf dd, .dl-lane dd, .dl-gates .why, .dl .dl-steps-h li {
+  font-family: "Times New Roman", Times, serif;
 }

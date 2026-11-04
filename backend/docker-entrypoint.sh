@@ -16,7 +16,7 @@ case "$cmd" in
       duckdb:///*)
         db="${COSTIQ_DB_URL#duckdb:///}"
         if [ ! -f "$db" ]; then
-          echo "First start: copying the Meridian Energy sample database to $db"
+          echo "First start: copying the sample database to $db"
           cp "$SAMPLE" "$db"
         fi ;;
     esac

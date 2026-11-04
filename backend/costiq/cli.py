@@ -3,8 +3,8 @@
   python -m costiq.cli migrate
   python -m costiq.cli load-sample ../sample/costiq_sample.duckdb
   python -m costiq.cli seed                                    demo only: resets rules, manifests and the ledger
-  python -m costiq.cli refresh                                 after loading data: allocation, optimization, alerts, prudence
-  python -m costiq.cli allocate [--period 2026-10]                 rebuild the utility allocation chain
+  python -m costiq.cli refresh                                 after loading data: allocation, optimization, alerts, filing evidence
+  python -m costiq.cli allocate [--period 2026-10]                 rebuild the entity allocation chain
   python -m costiq.cli conformance [--target postgres]     run all catalog use cases; exit 1 on any failure
   python -m costiq.cli translate F-41 --target tsql        show a use case in another dialect
 """
@@ -56,7 +56,7 @@ def main(argv=None):
     elif a.cmd == "seed":
         loader.seed(db); print("seeded allocation rules, manifests and ledger")
     elif a.cmd == "refresh":
-        loader.refresh(db); print("rebuilt allocation, optimization, alerts and prudence evidence")
+        loader.refresh(db); print("rebuilt allocation, optimization, alerts and filing evidence")
     elif a.cmd == "allocate":
         import datetime as dt
         from .allocation import Allocator

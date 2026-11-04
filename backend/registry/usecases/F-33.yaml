@@ -1,5 +1,5 @@
 id: F-33
-source: FinOps Foundation FOCUS 1.4
+source: FinOps Foundation FOCUS 1.0
 title: Reconcile Cost and Usage to Invoice Detail by Invoice ID
 category: Invoicing & Chargeback
 module: reconciliation

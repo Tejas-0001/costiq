@@ -1,5 +1,5 @@
 id: F-68
-source: FinOps Foundation FOCUS 1.4
+source: FinOps Foundation FOCUS 1.0
 title: Analyze cost per compute service for a subaccount
 category: Usage Optimization
 module: anomalies

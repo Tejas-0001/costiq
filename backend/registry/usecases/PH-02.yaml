@@ -1,0 +1,53 @@
+id: PH-02
+source: MM CostIQ Pharma extension
+title: 'Intercompany recharges by entity and allocation key'
+category: 'Pharma · Transfer pricing'
+module: tax
+business_question: 'What did Global Services recharge to each entity, and on which allocation key?'
+personas:
+- transfer_pricing
+- tax_analyst
+- finance_controller
+- auditor
+catalog_persona: 'Transfer Pricing, Tax'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'A transfer-pricing local-file view of technology costs: amounts recharged to each entity by allocation policy and key (enrolled patients, trial sites, active studies, headcount, workstations). Amounts with no approved policy are flagged.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'transfer pricing'
+- 'recharge'
+- 'intercompany'
+- 'local file'
+- 'allocation key'
+- 'intra-group services'
+products: Any provider
+sql: |-
+  SELECT
+    LegalEntity AS RecipientEntity,
+    COALESCE(OpcoPolicy, '(none)') AS Policy,
+    COALESCE(DriverName, 'Direct (100% to one entity)') AS AllocationKey,
+    COUNT(DISTINCT ChargeKey) AS ChargeLines,
+    ROUND(SUM(AllocatedCost), 2) AS AmountRecharged,
+    CASE WHEN OpcoPolicy IS NULL THEN 'No approved policy' ELSE 'Approved policy' END AS Status
+  FROM allocated_cost
+  WHERE PeriodStart >= :period_start AND PeriodStart < :period_end
+  GROUP BY LegalEntity, OpcoPolicy, DriverName
+  ORDER BY RecipientEntity, AmountRecharged DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'Covers technology costs allocated through CostIQ only.'
+compliance:
+  area: 'Transfer pricing'
+  reference: 'OECD Transfer Pricing Guidelines, Chapter VII (intra-group services)'
+  unit: 'recharge lines'
+  flag: 'Status = ''No approved policy'''
+  amount: AmountRecharged

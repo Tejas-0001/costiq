@@ -1,12 +1,11 @@
 "use client";
 import Link from "next/link";
-import { motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { api, download, post, useApi, type Result, type Row } from "@/lib/api";
-import { compact } from "@/lib/format";
+import { money } from "@/lib/format";
 import { AutoChart } from "./charts";
-import { useMe } from "./shell";
-import { DataTable, InfoTip, Loading } from "./ui";
+import { PERIODS, useMe } from "./shell";
+import { DataTable, Loading, StatusBadge } from "./ui";
 
 type Param = { name: string; type: string; default: string; label: string };
 type UseCase = Row & {
@@ -15,10 +14,14 @@ type UseCase = Row & {
   adaptation?: string; notes?: string; reference_url?: string; sql: string; translated_sql: string; published_sql?: string;
 };
 
+type Run = Result & { period_note?: string | null };
+
 export function UseCaseRunner({ id, compact }: { id: string; compact?: boolean }) {
+  const { period } = useMe();
   const [uc, setUc] = useState<UseCase | null>(null);
   const [params, setParams] = useState<Record<string, string>>({});
-  const [res, setRes] = useState<Result | null>(null);
+  const [res, setRes] = useState<Run | null>(null);
+  const [manual, setManual] = useState(false);
   const [err, setErr] = useState<Error | null>(null);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("result");
@@ -26,7 +29,8 @@ export function UseCaseRunner({ id, compact }: { id: string; compact?: boolean }
   function runWith(p: Record<string, string>) {
     setBusy(true);
     setErr(null);
-    post<Result>(`/usecases/${id}/run`, { params: p }).then(setRes).catch(setErr).finally(() => setBusy(false));
+    setManual(true);  // dates typed in by hand win over the period selector
+    post<Run>(`/usecases/${id}/run`, { params: p }).then(setRes).catch(setErr).finally(() => setBusy(false));
   }
   useEffect(() => {
     let live = true;
@@ -34,17 +38,22 @@ export function UseCaseRunner({ id, compact }: { id: string; compact?: boolean }
       if (!live) return;
       setUc(u);
       setRes(null);
+      // defaults, except the period: the API fills period_start / period_end from the period selected at the top of the page
       const p: Record<string, string> = {};
-      (u.params || []).forEach((x) => { p[x.name] = x.default; });
+      (u.params || []).forEach((x) => { if (x.name !== "period_start" && x.name !== "period_end") p[x.name] = x.default; });
       setParams(p);
+      setManual(false);
       if (u.allowed) {
         setBusy(true);
-        post<Result>(`/usecases/${id}/run`, { params: p }).then((r) => live && setRes(r)).catch((e) => live && setErr(e))
-          .finally(() => live && setBusy(false));
+        post<Run>(`/usecases/${id}/run`, { params: p, range: period }).then((r) => {
+          if (!live) return;
+          setRes(r);
+          setParams(Object.fromEntries(Object.entries(r.params ?? p).map(([k, v]) => [k, String(v ?? "")])));
+        }).catch((e) => live && setErr(e)).finally(() => live && setBusy(false));
       }
     }).catch((e) => live && setErr(e));
     return () => { live = false; };
-  }, [id]);
+  }, [id, period]);
 
   if (err && !uc) return <div className="error">{err.message}</div>;
   if (!uc) return <div className="muted small">Loading…</div>;
@@ -88,8 +97,10 @@ export function UseCaseRunner({ id, compact }: { id: string; compact?: boolean }
               <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t === "sql" ? "SQL" : t[0].toUpperCase() + t.slice(1)}</button>
             ))}
             <div style={{ flex: 1 }} />
-            {res && <span className="small muted" style={{ alignSelf: "center" }}>{res.rows.length} rows · {res.elapsed_ms} ms</span>}
-            <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => download(`/usecases/${id}/export.csv?${qs}`, `${id}.csv`)}>Export CSV</button>
+            {res && <span className="small muted" style={{ alignSelf: "center" }}>
+              {"period_start" in params && !manual ? `${PERIODS.find((x) => x.key === period)?.label} · ` : ""}
+              {res.period_note && !manual ? `${res.period_note} · ` : ""}{res.rows.length} rows · {res.elapsed_ms} ms</span>}
+            <button className="btn" style={{ marginLeft: 8 }} onClick={() => download(`/usecases/${id}/export.csv?${qs}`, `${id}.csv`)}>Export CSV</button>
           </div>
           {err && <div className="error">{err.message}</div>}
           {tab === "result" && res && (
@@ -138,9 +149,9 @@ export function ModuleUseCases({ module, title = "Use cases in this module", fil
         const items = list.filter((u) => u.module === module && (!filter || filter(u)));
         return (
           <div className="card flush">
-            <div style={{ padding: "14px 16px 6px" }} className="card-head">
-              <h2 style={{ margin: 0 }}>{title}</h2>
-              <span className="muted small">{items.length} use cases · select one to run it here</span>
+            <div className="card-head">
+              <h2>{title}</h2>
+              <span className="muted small">{items.length}</span>
             </div>
             <div className="uc-list">
               {items.map((u) => (
@@ -148,14 +159,14 @@ export function ModuleUseCases({ module, title = "Use cases in this module", fil
                   <div className="uc" style={{ cursor: "pointer" }} onClick={() => setOpen(open === u.id ? null : u.id)}>
                     <div className="row" style={{ flexWrap: "nowrap" }}>
                       <span className="uc-id">{u.id}</span>
-                      <div><div style={{ fontWeight: 600, fontSize: 13.5 }}>{u.title}</div><div className="muted small">{u.business_question}</div></div>
+                      <div>{u.title}</div>
                     </div>
                     <div className="row" style={{ flexWrap: "nowrap" }}>
                       <Link className="small" href={`/catalog/${u.id}`} onClick={(e) => e.stopPropagation()}>Open</Link>
                       <span className="muted">{open === u.id ? "▾" : "▸"}</span>
                     </div>
                   </div>
-                  {open === u.id && <div style={{ padding: "0 16px 16px" }}><UseCaseRunner id={u.id} compact /></div>}
+                  {open === u.id && <div style={{ padding: "0 8px 8px" }}><UseCaseRunner id={u.id} compact /></div>}
                 </div>
               ))}
             </div>
@@ -187,35 +198,33 @@ export function Findings({ items, onDecided }: { items: Finding[]; onDecided?: (
     }
   }
   if (!items.length) return <div className="muted small">No findings in your scope.</div>;
-  const max = Math.max(1, ...items.map((f) => f.exposure));
   return (
-    <div className="flist">
-      {msg && <div className="pill">{msg}</div>}
-      {items.map((f, n) => (
-        <motion.div key={f.id} className={`frow ${f.severity}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: Math.min(n, 8) * 0.04 }}>
-          <span className="sev" title={`${f.severity} severity`} />
-          <div className="frow-main">
-            <div className="frow-title"><span className="uc-id">{f.id}</span><b>{f.title}</b>
-              <InfoTip text={<><b>{f.detail}</b><br />{f.formula}<br /><span className="muted">Owner: {f.owner}</span></>} /></div>
-            <div className="frow-bar"><motion.i initial={{ width: 0 }} animate={{ width: `${Math.max(3, (f.exposure / max) * 100)}%` }}
-              transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.15 + Math.min(n, 8) * 0.04 }} /></div>
-          </div>
-          <div className="frow-amt">
-            <b>{compact(f.exposure)}</b>
-            <span className={`kind ${f.kind}`}>{f.kind === "estimate" ? "estimate" : f.kind === "compliance" ? "compliance" : f.kind}</span>
-          </div>
-          <div className="frow-acts">
-            <Link href={`/catalog/${f.id}`} className="btn sm ghost">Evidence</Link>
-            {can("recommendation.submit") && <button className="btn sm" disabled={!!busy} onClick={() => decide(f, "submit")}>Submit</button>}
-            {can("recommendation.endorse") && <button className="btn sm" disabled={!!busy} onClick={() => decide(f, "endorse")}>Endorse</button>}
-            {can("recommendation.approve") && <>
-              <button className="btn sm primary" disabled={!!busy} onClick={() => decide(f, "approve")}>Approve</button>
-              <button className="btn sm" disabled={!!busy} onClick={() => decide(f, "return")}>Return</button>
-            </>}
-          </div>
-        </motion.div>
-      ))}
+    <div className="stack">
+      {msg && <div className="notice">{msg}</div>}
+      <table>
+        <thead><tr><th>ID</th><th>Finding</th><th>Severity</th><th>Kind</th><th className="num">Amount</th><th>Actions</th></tr></thead>
+        <tbody>
+          {items.map((f) => (
+            <tr key={f.id}>
+              <td className="id"><Link href={`/catalog/${f.id}`}>{f.id}</Link></td>
+              <td title={`${f.detail}
+${f.formula}
+Owner: ${f.owner}`}>{f.title}</td>
+              <td><StatusBadge s={f.severity} /></td>
+              <td className="small">{f.kind}</td>
+              <td className="num">{money(f.exposure)}</td>
+              <td>
+                {can("recommendation.submit") && <button className="btn" disabled={!!busy} onClick={() => decide(f, "submit")}>Submit</button>}
+                {can("recommendation.endorse") && <button className="btn" disabled={!!busy} onClick={() => decide(f, "endorse")}>Endorse</button>}
+                {can("recommendation.approve") && <>
+                  <button className="btn primary" disabled={!!busy} onClick={() => decide(f, "approve")}>Approve</button>
+                  <button className="btn" disabled={!!busy} onClick={() => decide(f, "return")}>Return</button>
+                </>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -227,8 +236,8 @@ export function LineageDrawer({ chargeKey, onClose }: { chargeKey: string; onClo
       <div className="drawer-bg" onClick={onClose} />
       <div className="drawer">
         <div className="row" style={{ justifyContent: "space-between", marginBottom: 14 }}>
-          <h2 style={{ margin: 0 }}>Charge lineage</h2>
-          <button className="btn sm" onClick={onClose}>Close</button>
+          <h2>Charge lineage</h2>
+          <button className="btn" onClick={onClose}>Close</button>
         </div>
         <Loading state={state}>
           {(d) => (

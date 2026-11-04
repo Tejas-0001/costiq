@@ -6,6 +6,7 @@ can be traced to the query behind it.
 from __future__ import annotations
 import datetime as dt
 from .engines import Engines
+from .window import window
 
 
 def rows(res):
@@ -23,8 +24,9 @@ class Monitor:
         return self.eng._uc(uid, scope, params)
 
     # ------------------------------------------------------------------ cloud
-    def cloud(self, scope, provider=None, cost_center=None):
+    def cloud(self, scope, provider=None, cost_center=None, win=None):
         as_of = self.eng.as_of()
+        win = win or window('mtd', as_of)
         start, end, day, days = self.eng.open_month()
         cc, ccp = self.eng.cost_center_expr()
         filt, p = ["x_AIProduct IS NULL"], dict(ccp)
@@ -43,7 +45,7 @@ class Monitor:
             d["Anomaly"] = f"{s['SubAccountId']} ({s['ServiceProviderName']}) {s['DailyEffectiveCost']:,.0f} vs {s['Baseline']:,.0f}" if s else None
         month = self.q(f"""SELECT ROUND(SUM(EffectiveCost), 2) AS MTD,
                                   ROUND(SUM(CASE WHEN {cc} = 'Unallocated' THEN EffectiveCost ELSE 0 END), 2) AS Untagged
-                           FROM CostAndUsage WHERE {w} AND BillingPeriodStart = :m""", {**p, "m": dt.datetime.combine(start, dt.time())}, scope)[0]
+                           FROM CostAndUsage WHERE {w} AND {win.pred()}""", {**p, **win.params()}, scope)[0]
         wk = lambda a, b: dt.datetime.combine(as_of - dt.timedelta(days=a), dt.time())
         movers = self.q(f"""SELECT ServiceName AS Service, ServiceProviderName AS Provider,
                                    ROUND(SUM(CASE WHEN ChargePeriodStart > :w1 THEN EffectiveCost ELSE 0 END), 2) AS Last7Days,
@@ -54,8 +56,7 @@ class Monitor:
             m["Change"] = round((m["Last7Days"] or 0) - (m["Prior7Days"] or 0), 2)
         movers.sort(key=lambda m: -abs(m["Change"]))
         by = lambda col, alias: self.q(f"""SELECT {col} AS {alias}, ROUND(SUM(EffectiveCost), 2) AS Effective FROM CostAndUsage
-                                          WHERE {w} AND BillingPeriodStart >= :m0 GROUP BY 1 ORDER BY 2 DESC LIMIT 10""",
-                                       {**p, "m0": dt.datetime.combine(start - dt.timedelta(days=62), dt.time()).replace(day=1)}, scope)
+                                          WHERE {w} AND {win.pred()} GROUP BY 1 ORDER BY 2 DESC LIMIT 10""", {**p, **win.params()}, scope)
         cov = self._uc("F-41", scope)
         covered, eligible = sum(r["CoveredCost"] or 0 for r in cov), sum(r["EligibleCost"] or 0 for r in cov)
         unused = self._uc("F-47", scope)
@@ -68,8 +69,8 @@ class Monitor:
                       for r in recs), key=lambda r: -r["MonthlySavings"])
         kp = self.eng.kpis(scope)
         return {
-            "as_of": as_of.isoformat(), "open_month": start.isoformat()[:7],
-            "kpis": {"month_to_date": month["MTD"], "untagged": month["Untagged"],
+            "as_of": as_of.isoformat(), "open_month": start.isoformat()[:7], "period": win.as_dict(),
+            "kpis": {"period_spend": month["MTD"], "untagged": month["Untagged"],
                      "untagged_pct": round(100 * (month["Untagged"] or 0) / month["MTD"], 2) if month["MTD"] else None,
                      "forecast": kp["forecast"], "budget": kp["budget"], "variance": kp["variance"],
                      "commitment_coverage_pct": round(100 * covered / eligible, 1) if eligible else None,
@@ -86,8 +87,9 @@ class Monitor:
         }
 
     # ------------------------------------------------------------------ AI & LLM
-    def ai(self, scope):
+    def ai(self, scope, win=None):
         as_of = self.eng.as_of()
+        win = win or window('mtd', as_of)
         start, *_ = self.eng.open_month()
         ai_w = "(x_AIProduct IS NOT NULL OR json_extract_string(Tags, '$.ai_component') IS NOT NULL)"
         by_month = self.q(f"""SELECT strftime(BillingPeriodStart, '%Y-%m') AS Month, COALESCE(x_AIProduct, 'AI infrastructure') AS Product,
@@ -130,18 +132,22 @@ class Monitor:
             a["SuggestedLevers"] = levers
         acc = sum(a["AcceptedOutcomes"] or 0 for a in apps)
         app_cost = sum(a["Cost"] or 0 for a in apps)
-        mtd = self.q(f"SELECT ROUND(SUM(EffectiveCost), 2) AS v FROM CostAndUsage WHERE {ai_w} AND BillingPeriodStart = :m",
-                     {"m": dt.datetime.combine(start, dt.time())}, scope)[0]["v"]
-        rag = self.q("""SELECT json_extract_string(Tags, '$.application') AS Application, json_extract_string(Tags, '$.ai_component') AS Component,
-                               ROUND(SUM(EffectiveCost), 2) AS Effective
-                        FROM CostAndUsage WHERE json_extract_string(Tags, '$.ai_component') IS NOT NULL GROUP BY 1, 2 ORDER BY 1, 3 DESC""",
-                     {}, scope)
-        channel = self.q("""SELECT x_ModelVendor AS ModelVendor, ServiceProviderName AS Channel, ROUND(SUM(EffectiveCost), 2) AS Effective
-                            FROM CostAndUsage WHERE x_ModelVendor IS NOT NULL GROUP BY 1, 2 ORDER BY 3 DESC""", {}, scope)
+        mtd = self.q(f"SELECT ROUND(SUM(EffectiveCost), 2) AS v FROM CostAndUsage WHERE {ai_w} AND {win.pred()}",
+                     win.params(), scope)[0]["v"]
+        by_product = self.q(f"""SELECT COALESCE(x_AIProduct, 'AI infrastructure') AS Product, ServiceProviderName AS Provider,
+                                       ROUND(SUM(EffectiveCost), 2) AS Effective
+                                FROM CostAndUsage WHERE {ai_w} AND {win.pred()} GROUP BY 1, 2 ORDER BY 3 DESC""", win.params(), scope)
+        rag = self.q(f"""SELECT json_extract_string(Tags, '$.application') AS Application, json_extract_string(Tags, '$.ai_component') AS Component,
+                                ROUND(SUM(EffectiveCost), 2) AS Effective
+                         FROM CostAndUsage WHERE json_extract_string(Tags, '$.ai_component') IS NOT NULL AND {win.pred()}
+                         GROUP BY 1, 2 ORDER BY 1, 3 DESC""", win.params(), scope)
+        channel = self.q(f"""SELECT x_ModelVendor AS ModelVendor, ServiceProviderName AS Channel, ROUND(SUM(EffectiveCost), 2) AS Effective
+                             FROM CostAndUsage WHERE x_ModelVendor IS NOT NULL AND {win.pred()} GROUP BY 1, 2 ORDER BY 3 DESC""",
+                         win.params(), scope)
         tot_tok = tokens[-2] if len(tokens) > 1 else (tokens[-1] if tokens else {})
         return {
-            "as_of": as_of.isoformat(), "open_month": start.isoformat()[:7],
-            "kpis": {"month_to_date": mtd,
+            "as_of": as_of.isoformat(), "open_month": start.isoformat()[:7], "period": win.as_dict(), "by_product": by_product,
+            "kpis": {"period_spend": mtd,
                      "cost_per_1m_tokens": tot_tok.get("CostPer1M"), "cost_per_1m_month": tot_tok.get("Month"),
                      "cache_hit_pct": round(100 * hit / (unc + hit), 1) if unc + hit else None,
                      "batch_share_pct": round(100 * sum(t["BatchCost"] for t in tokens) / sum(t["TokenCost"] for t in tokens), 1)

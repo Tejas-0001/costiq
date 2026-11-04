@@ -8,31 +8,14 @@ from .auth import Principal, current_principal
 from .context import audit, db, eng, ledger
 from .monitoring import Monitor
 from .optimization import LEVERS, Optimizer
+from .window import RANGES, bounds, window
 
 router = APIRouter(prefix="/api")
 monitor, optimizer, alerts = Monitor(db, eng), Optimizer(db, eng), Alerts(db, eng)
 
 
-PERIODS = ("today", "yesterday", "wtd", "mtd", "ytd")
-
-
-def _period_bounds(rng: str, today):
-    """[start, end] of the period ending at the data's as-of day, and the comparable prior period (None when no data)."""
-    d = dt.timedelta(days=1)
-    if rng == "today":
-        return (today, today), (today - d, today - d)
-    if rng == "yesterday":
-        y = today - d
-        return (y, y), (y - d, y - d)
-    if rng == "wtd":
-        s = today - dt.timedelta(days=today.weekday())
-        return (s, today), (s - dt.timedelta(days=7), today - dt.timedelta(days=7))
-    if rng == "mtd":
-        s = today.replace(day=1)
-        ps = (s - d).replace(day=1)
-        return (s, today), (ps, min(ps.replace(day=today.day) if today.day <= 28 else (s - d), s - d))
-    s = today.replace(month=1, day=1)
-    return (s, today), None
+PERIODS = RANGES
+_period_bounds = bounds
 
 
 @router.get("/period")
@@ -77,17 +60,20 @@ def period(range: str = "mtd", p: Principal = Depends(current_principal)):
 
 
 @router.get("/cloud-monitor")
-def cloud_monitor(provider: str | None = None, cost_center: str | None = None, p: Principal = Depends(current_principal)):
+def cloud_monitor(provider: str | None = None, cost_center: str | None = None, range: str = "mtd",
+                  p: Principal = Depends(current_principal)):
     p.require("cloud")
-    audit(p, "view", module="cloud", provider=provider, cost_center=cost_center)
-    return monitor.cloud(p.scope, provider, cost_center)
+    w = window(range, eng.as_of())
+    audit(p, "view", module="cloud", provider=provider, cost_center=cost_center, period=w.range)
+    return monitor.cloud(p.scope, provider, cost_center, w)
 
 
 @router.get("/ai-monitor")
-def ai_monitor(p: Principal = Depends(current_principal)):
+def ai_monitor(range: str = "mtd", p: Principal = Depends(current_principal)):
     p.require("ai")
-    audit(p, "view", module="ai")
-    return monitor.ai(p.scope)
+    w = window(range, eng.as_of())
+    audit(p, "view", module="ai", period=w.range)
+    return monitor.ai(p.scope, w)
 
 
 @router.get("/optimization")
@@ -132,18 +118,24 @@ def decide(oid: str, body: Decision, p: Principal = Depends(current_principal)):
     p.require("optimization")
     a, entry = optimizer.decide(oid, body.action, p, ledger, body.note)
     from .prudence import PrudenceEngine
-    PrudenceEngine(db, eng).run()  # remediation and actioned savings change the disallowance risk
+    PrudenceEngine(db, eng).run()  # remediation and actioned savings change the deduction at risk
     audit(p, "optimization_decision", optimization=oid, decision=body.action)
     return {"action": a, "ledger": entry}
 
 
 @router.get("/alerts")
-def list_alerts(p: Principal = Depends(current_principal)):
+def list_alerts(range: str | None = None, p: Principal = Depends(current_principal)):
+    """Fired alerts; with `range`, only those fired in the window (`open_total` still counts every open alert)."""
     out = alerts.events()
     if p.scope is not None:  # scoped users see alerts about their own cost centers only
         allowed = set(p.scope)
         out["events"] = [e for e in out["events"] if e["Subject"] in allowed]
+    out["unacknowledged"] = out["open_total"] = sum(1 for e in out["events"] if not e["Acknowledged"])
+    if range:
+        w = window(range, eng.as_of())
+        out["events"] = [e for e in out["events"] if w.start.isoformat() <= str(e["FiredAt"])[:10] <= w.end.isoformat()]
         out["unacknowledged"] = sum(1 for e in out["events"] if not e["Acknowledged"])
+        out["period"] = w.as_dict()
     return out
 
 

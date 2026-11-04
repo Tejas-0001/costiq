@@ -1,5 +1,5 @@
 # MM CostIQ API: FastAPI + DuckDB.
-# The synthetic Meridian Energy sample is built into the image at /app/sample. On first start the entrypoint copies it
+# The sample database is built into the image at /app/sample. On first start the entrypoint copies it
 # to the /data volume, so demo changes (approvals, evidence packs, the ledger) survive restarts until the volume is removed.
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1

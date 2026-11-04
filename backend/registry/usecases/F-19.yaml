@@ -1,5 +1,5 @@
 id: F-19
-source: FinOps Foundation FOCUS 1.4
+source: FinOps Foundation FOCUS 1.0
 title: Identify unused capacity reservations
 category: Anomaly Management
 module: anomalies

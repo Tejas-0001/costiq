@@ -1,5 +1,5 @@
 id: CO-02
-source: MM CostIQ Utilities extension
+source: MM CostIQ Pharma extension
 title: 'Idle and unattached resources'
 category: 'Optimization · Cloud'
 module: optimization
@@ -12,7 +12,7 @@ catalog_persona: 'Cloud Operations'
 datasets:
 - 'Cost and Usage'
 - 'Monitoring tables'
-description: 'Resources whose CPU p95 stayed under 5% with no requests for 14 days (utilization exports), and unattached volumes. Under ratemaking, spend on assets that are not used and useful is exposed to disallowance, so idle resources are both waste and prudence risk.'
+description: 'Resources whose CPU p95 stayed under 5% with no requests for 14 days (utilization exports), and unattached volumes. Recharged spend on resources that serve no one fails the transfer-pricing benefit test, so idle resources are both waste and tax risk.'
 columns: 'FOCUS columns plus monitoring tables (recommendations, utilization, LLM telemetry, provisioned capacity)'
 keywords:
 - 'idle'
@@ -20,7 +20,7 @@ keywords:
 - 'unattached'
 - 'orphaned volume'
 - 'zombie'
-- 'not used and useful'
+- 'no benefit'
 - 'stop instance'
 products: Any provider
 sql: |-

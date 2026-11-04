@@ -1,0 +1,52 @@
+id: PH-11
+source: MM CostIQ Pharma extension
+title: 'AI used in GxP contexts without an approved validation review'
+category: 'Pharma · Clinical operations & AI'
+module: compliance
+business_question: 'Which AI applications used in GxP processes are running without an approved validation review?'
+personas:
+- gxp_compliance
+- ai_program_owner
+- tech_exec
+- auditor
+catalog_persona: 'AI Governance, GxP Quality'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Joins the AI use register (ref_ai_use) to AI spend. AI that supports GxP work (clinical, safety, quality) needs a risk-based validation review with human oversight; applications without one are flagged with the spend they already incur.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'ai governance'
+- 'gxp'
+- 'validation'
+- 'csv'
+- 'pharmacovigilance'
+- 'agent'
+- 'human oversight'
+products: Any provider
+sql: |-
+  WITH spend AS (
+    SELECT json_extract_string(Tags, '$.application') AS Application, SUM(EffectiveCost) AS AISpend
+    FROM CostAndUsage
+    WHERE x_AIProduct IS NOT NULL OR ServiceCategory = 'AI and Machine Learning'
+    GROUP BY json_extract_string(Tags, '$.application')
+  )
+  SELECT
+    u.Application,
+    u.UseCase,
+    u.ReviewStatus,
+    u.ApprovedOn,
+    ROUND(COALESCE(s.AISpend, 0), 2) AS AISpend,
+    CASE WHEN u.ReviewStatus <> 'Approved' THEN 'GxP AI without approved review' ELSE 'Approved' END AS Status
+  FROM ref_ai_use u
+  LEFT JOIN spend s ON s.Application = u.Application
+  WHERE u.GxpContext
+  ORDER BY CASE WHEN u.ReviewStatus <> 'Approved' THEN 0 ELSE 1 END, AISpend DESC
+params: []
+notes: 'The AI use register is maintained by the AI program office with GxP Quality.'
+compliance:
+  area: 'Clinical operations & AI'
+  reference: 'FDA draft guidance on AI for regulatory decision-making (2025) · EU GMP Annex 22 (draft)'
+  unit: 'AI applications'
+  flag: 'Status = ''GxP AI without approved review'''
+  amount: AISpend

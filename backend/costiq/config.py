@@ -22,7 +22,7 @@ class Settings:
     oidc_jwks_url: str = field(default_factory=lambda: _env("COSTIQ_OIDC_JWKS_URL", ""))  # defaults from issuer discovery
     spa_client_id: str = field(default_factory=lambda: _env("COSTIQ_SPA_CLIENT_ID", ""))
     pseudonym_key: str = field(default_factory=lambda: _env("COSTIQ_PSEUDONYM_KEY", "dev-only-change-me"))
-    tenant_name: str = field(default_factory=lambda: _env("COSTIQ_TENANT_NAME", "Meridian Energy"))
+    tenant_name: str = field(default_factory=lambda: _env("COSTIQ_TENANT_NAME", ""))
     data_as_of: str = field(default_factory=lambda: _env("COSTIQ_DATA_AS_OF", ""))
     https_proxy: str = field(default_factory=lambda: _env("HTTPS_PROXY", ""))
 

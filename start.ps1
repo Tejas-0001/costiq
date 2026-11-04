@@ -1,4 +1,4 @@
-# MM CostIQ Utilities MVP launcher (Windows).
+# MM CostIQ Pharma MVP launcher (Windows).
 #   .\start.ps1            API on http://localhost:8080 (new window) + web app on http://localhost:3000
 #   .\start.ps1 -Rebuild   regenerate the synthetic sample database and rebuild the web app first
 #   .\start.ps1 -Dev       run the web app with `next dev` (hot reload) instead of the production build

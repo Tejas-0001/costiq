@@ -1,0 +1,51 @@
+id: PH-06
+source: MM CostIQ Pharma extension
+title: 'Renewals and price escalators landing in the forecast year'
+category: 'Pharma · Tax & accounting'
+module: tax
+business_question: 'Which contract renewals and escalators fall inside the forecast year?'
+personas:
+- tax_analyst
+- finops_analyst
+- fpa_analyst
+- cfo
+catalog_persona: 'FP&A, Vendor Management'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Vendors whose renewal date falls inside the filing''s forecast year, with the escalator and its annual dollar effect. Missing these understates the forecast; renegotiating them before renewal is the lever.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'renewal'
+- 'escalator'
+- 'price increase'
+- 'forecast year'
+- 'contract'
+products: Any provider
+sql: |-
+  SELECT
+    rc.FilingId,
+    v.Vendor,
+    CAST(v.RenewalDate AS DATE) AS RenewalDate,
+    v.EscalatorPct,
+    ROUND(v.AnnualContractValue, 2) AS AnnualContractValue,
+    ROUND(v.AnnualContractValue * v.EscalatorPct / 100, 2) AS AnnualEscalation,
+    CASE WHEN v.RenewalDate >= rc.ForecastYearStart AND v.RenewalDate < rc.ForecastYearEnd THEN 'In forecast year'
+         WHEN v.RenewalDate < rc.ForecastYearStart THEN 'Before forecast year'
+         ELSE 'After forecast year' END AS Timing
+  FROM ref_vendor v
+  CROSS JOIN ref_tax_filing rc
+  WHERE rc.FilingId = :filing AND v.EscalatorPct > 0
+  ORDER BY v.RenewalDate
+params:
+- name: filing
+  type: string
+  default: 'US-1120-FY2026'
+  label: 'Tax filing'
+notes: 'Annual contract values come from ref_vendor (vendor management); escalators apply from the renewal date.'
+compliance:
+  area: 'Forecast'
+  reference: 'Budget forecast: contract escalators'
+  unit: 'contracts'
+  flag: 'Timing = ''In forecast year'''
+  amount: AnnualEscalation

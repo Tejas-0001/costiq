@@ -1,0 +1,57 @@
+id: PH-09
+source: MM CostIQ Pharma extension
+title: 'Incremental technology cost by study event'
+category: 'Pharma · Clinical operations & AI'
+module: compliance
+business_question: 'What extra cloud cost did each study event (database lock, interim analysis) cause?'
+personas:
+- tax_analyst
+- finops_analyst
+- cfo
+catalog_persona: 'Clinical Operations, FinOps'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Charges tagged with a study_event compared with the same application''s average daily cost in the 14 days before the event. Capturing the increment by event lets it be charged to the study budget.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'study event'
+- 'database lock'
+- 'clinical trial'
+- 'incremental cost'
+- 'study budget'
+- 'surge'
+products: Any provider
+sql: |-
+  WITH ev AS (SELECT * FROM ref_study_event),
+  evt AS (
+    SELECT json_extract_string(Tags, '$.study_event') AS StudyEventId, json_extract_string(Tags, '$.application') AS Application,
+           COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) AS Days, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage
+    WHERE json_extract_string(Tags, '$.study_event') IS NOT NULL
+    GROUP BY json_extract_string(Tags, '$.study_event'), json_extract_string(Tags, '$.application')
+  ),
+  pre AS (
+    SELECT ev.StudyEventId, json_extract_string(c.Tags, '$.application') AS Application, SUM(c.EffectiveCost) / 14 AS DailyBaseline
+    FROM CostAndUsage c CROSS JOIN ev
+    WHERE c.ChargePeriodStart >= CAST(ev.StartDate AS TIMESTAMP) - INTERVAL '14' DAY
+      AND c.ChargePeriodStart < CAST(ev.StartDate AS TIMESTAMP)
+    GROUP BY ev.StudyEventId, json_extract_string(c.Tags, '$.application')
+  )
+  SELECT
+    s.StudyEventId, ev.Name, ev.Jurisdictions, s.Application, s.Days,
+    ROUND(s.Cost, 2) AS EventPeriodCost,
+    ROUND(COALESCE(p.DailyBaseline, 0) * s.Days, 2) AS BaselineCost,
+    ROUND(s.Cost - COALESCE(p.DailyBaseline, 0) * s.Days, 2) AS IncrementalCost
+  FROM evt s
+  JOIN ev ON ev.StudyEventId = s.StudyEventId
+  LEFT JOIN pre p ON p.StudyEventId = s.StudyEventId AND p.Application = s.Application
+  ORDER BY IncrementalCost DESC
+params: []
+notes: 'Flagged rows are costs to charge to the study, not errors.'
+compliance:
+  area: 'Clinical operations & AI'
+  reference: 'Study budget tracking'
+  unit: 'applications'
+  flag: 'IncrementalCost > 0'
+  amount: IncrementalCost

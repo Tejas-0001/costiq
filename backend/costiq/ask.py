@@ -21,15 +21,17 @@ SYN = {
     "savings": "savings saving", "commitments": "commitment", "reservations": "reservation reserved",
     "anomalies": "anomaly spike", "spikes": "spike anomaly", "forecasted": "forecast", "projection": "forecast",
     "trend": "month over month trend", "increasing": "increase month over month", "growing": "increase month over month",
-    # utilities
-    "ferc": "ferc account", "usoa": "ferc account", "rates": "rate case", "ratecase": "rate case", "docket": "rate case docket",
-    "exhibit": "rate case exhibit bridge", "testyear": "test year", "opco": "operating company entity",
-    "opcos": "operating company entity", "affiliate": "affiliate service company", "affiliates": "affiliate service company",
-    "subsidy": "cross subsidy", "subsidization": "cross subsidy", "form60": "form 60 service company",
-    "bcsi": "bcsi cip", "cip": "cip nerc", "nerc": "nerc cip", "ceii": "ceii residency", "storm": "storm event",
-    "storms": "storm event", "hurricane": "storm event", "deferral": "deferral regulatory asset",
-    "deferred": "deferral regulatory asset", "regulatory": "regulatory", "escalator": "escalator renewal",
-    "escalators": "escalator renewal", "renewals": "renewal", "meter": "meter ami", "meters": "meter ami",
+    # pharma
+    "gl": "gl account", "filing": "tax filing", "filings": "tax filing", "idr": "examiner request filing",
+    "examiner": "examiner tax filing", "entity": "entity affiliate",
+    "entities": "entity affiliate", "affiliate": "affiliate entity recharge", "affiliates": "affiliate entity recharge",
+    "recharge": "recharge transfer pricing", "recharges": "recharge transfer pricing", "intercompany": "recharge transfer pricing",
+    "tp": "transfer pricing", "credit": "credit qualifying research", "credits": "credit qualifying research", "qre": "qualifying research credit",
+    "phi": "patient data", "hipaa": "patient data", "gdpr": "patient data", "gxp": "gxp validation",
+    "part11": "gxp quality agreement", "genomic": "genomic residency", "study": "study event", "lock": "database lock study event",
+    "trial": "trial clinical", "trials": "trial clinical", "patients": "patient", "sites": "site trial",
+    "tax": "tax", "escalator": "escalator renewal",
+    "escalators": "escalator renewal", "renewals": "renewal",
 }
 MONTHS = {m.lower(): i for i, m in enumerate(calendar.month_name) if m} | {m.lower(): i for i, m in enumerate(calendar.month_abbr) if m}
 PROVIDERS = {"aws": "AWS", "amazon": "AWS", "azure": "Microsoft", "microsoft": "Microsoft", "gcp": "Google Cloud",
@@ -103,7 +105,7 @@ class AskEngine:
                 break
         return params, notes
 
-    def ask(self, question: str, principal, run):
+    def ask(self, question: str, principal, run, win=None):
         q = tokens(question)
         if not q:
             return {"status": "no_match", "message": "Ask a question about cost, usage, budgets, commitments, AI or invoices."}
@@ -120,6 +122,11 @@ class AskEngine:
                                      "business_question": self.reg.get(u)["business_question"]} for s, u in scored[:4] if s > 0]}
         uc = self.reg.get(uid)
         params, notes = self.extract(question)
+        if win and "period_start" not in params:  # no period in the question: use the period selected at the top of the page
+            from .window import use_case_params
+            wp, monthly = use_case_params(uc, win)
+            params.update(wp or {"period_start": win.start, "period_end": win.end + dt.timedelta(days=1)})
+            notes.append(f"period {win.long} ({win.dates})" + (f", run as {monthly}" if monthly else ""))
         names = {p["name"] for p in uc.get("params", [])}
         given = {k: (dt.datetime.combine(v, dt.time()) if isinstance(v, dt.date) and not isinstance(v, dt.datetime) else v)
                  for k, v in params.items() if k in names}

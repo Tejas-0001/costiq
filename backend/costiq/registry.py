@@ -1,4 +1,4 @@
-"""Use-case registry: the catalog use cases (FinOps Foundation, AI and utilities) as executable, versioned YAML entries."""
+"""Use-case registry: the catalog use cases (FinOps Foundation, AI and pharma) as executable, versioned YAML entries."""
 from __future__ import annotations
 import datetime as dt, glob, os, re
 import yaml
@@ -8,7 +8,7 @@ MODULES = {
     "allocation": "Allocation & Chargeback", "rates": "Rate & Commitments", "budgets": "Budgets & Forecasting",
     "anomalies": "Anomalies & Optimization", "reconciliation": "Reconciliation & Close",
     "governance": "Governance & Evidence", "cloud": "Cloud Cost Monitor", "optimization": "Optimization Center",
-    "prudence": "Prudence Radar", "regulatory": "Regulatory Accounting", "utilities": "Utility Compliance",
+    "risk": "Tax Risk Radar", "tax": "Tax & Transfer Pricing", "compliance": "GxP & Patient Data",
     "catalog": "Use Case Catalog", "ask": "Ask CostIQ",
 }
 

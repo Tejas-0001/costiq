@@ -1,0 +1,56 @@
+id: PH-01
+source: MM CostIQ Pharma extension
+title: 'Technology spend by GL account and cost class'
+category: 'Pharma · Tax & accounting'
+module: tax
+business_question: 'Does every allocated technology dollar land in a GL account, and how much is capital, opex or qualified research?'
+personas:
+- tax_analyst
+- finance_controller
+- auditor
+- cfo
+catalog_persona: 'Tax, Controller'
+datasets:
+- 'Cost and Usage'
+- 'Pharma reference tables'
+description: 'Summarizes the allocation chain''s output by legal entity, GL account and cost class. Opex is mapped through ref_gl_account_map; capitalized implementation (ASC 350-40) and claimed qualifying research (qre) book by rule. Dollars with no account are flagged: they need a manual entry before close and filing.'
+columns: 'FOCUS columns plus ref_* reference tables and allocated_cost'
+keywords:
+- 'gl account'
+- 'chart of accounts'
+- 'cost class'
+- 'capital'
+- 'opex'
+- 'unmapped'
+- 'r&d'
+- 'sg&a'
+products: Any provider
+sql: |-
+  SELECT
+    LegalEntity,
+    COALESCE(GlAccount, '(unmapped)') AS GlAccount,
+    COALESCE(MAX(GlTitle), 'No GL account mapped') AS GlTitle,
+    CostClass,
+    COUNT(DISTINCT ChargeKey) AS ChargeLines,
+    ROUND(SUM(AllocatedCost), 2) AS AllocatedCost,
+    CASE WHEN GlAccount IS NULL THEN 'Unmapped' ELSE 'Mapped' END AS Status
+  FROM allocated_cost
+  WHERE PeriodStart >= :period_start AND PeriodStart < :period_end
+  GROUP BY LegalEntity, GlAccount, CostClass
+  ORDER BY CASE WHEN GlAccount IS NULL THEN 0 ELSE 1 END, AllocatedCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'The GL map is illustrative and owned by controllership. Capital books to 1750 and claimed qualifying research to 6150 by rule, before the map is consulted.'
+compliance:
+  area: 'Tax & accounting'
+  reference: 'ASC 350-40 · group chart of accounts'
+  unit: 'account lines'
+  flag: 'Status = ''Unmapped'''
+  amount: AllocatedCost

@@ -50,5 +50,5 @@ sql: |-
   WHERE c.ContractCommitmentUnit = 'Seats'
   ORDER BY ActiveVsCommittedPct
 params: []
-adaptation: ContractApplied path uses the FOCUS 1.4 Elements structure
+adaptation: ContractApplied path uses the FOCUS 1.0 Elements structure
 notes: ''

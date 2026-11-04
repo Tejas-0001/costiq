@@ -4,7 +4,7 @@ import "../../site.css";
 import "../../deploy.css";
 import "../../release.css";
 
-export const metadata: Metadata = { title: "Deployment planner · CostIQ" };
+export const metadata: Metadata = { title: "CostIQ" };
 
 export default function Page() {
   return <DeployPage />;

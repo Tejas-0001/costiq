@@ -1,11 +1,11 @@
 """Generate a synthetic FOCUS 1.4 + AI-extension sample dataset (all four FOCUS datasets plus the
-supporting AI tables) for a fictional company, "Meridian", covering 2026-07-01 .. 2026-10-22.
+supporting AI tables) covering 2026-07-01 .. 2026-10-22.
 
 All prices, seat costs and credit rates are ILLUSTRATIVE, not vendor list prices.
 Deliberate scenarios are seeded so every use case returns rows:
-  - Oct 14: runaway Claude API key (outage-assistant-loadtest) spike
+  - Oct 14: runaway Claude API key (support-assistant-loadtest) spike
   - Oct 18+: HR-Onboarding-Agent credit surge in Copilot Studio -> Copilot Credit overage
-  - ceii-grid-models workspace partly served from 'global' geo (residency policy requires 'us')
+  - genomics-data workspace partly served from 'global' geo (residency policy requires 'us')
   - analytics-sandbox writes prompt cache but rarely reads it
   - unused M365 Copilot / GitHub Copilot / Claude Enterprise seats
   - GitHub users on a non-approved model (gpt-5.4-pro)
@@ -41,22 +41,22 @@ TT_COL = {"input": "x_InputTokens", "output": "x_OutputTokens",
           "cache_read": "x_CacheReadTokens", "cache_write": "x_CacheWriteTokens"}
 def price(model, tt): return MODELS[model][TT_IDX[tt]]
 
-DEPTS = ["Grid Operations", "Customer Operations", "Renewables Development", "HR", "Finance", "Data & Analytics", "Transmission Planning", "Corporate IT"]
+DEPTS = ["Clinical Operations", "Patient Data", "Consumer Health", "HR", "Finance", "Data & Analytics", "Research & Discovery", "Corporate IT"]
 USERS = []
 for i in range(1, 121):
     dept = DEPTS[0] if i <= 40 else DEPTS[5] if i <= 50 else DEPTS[1 + (i % 7)]
-    USERS.append((f"user{i:03d}@meridianenergy.com", dept))
+    USERS.append((f"user{i:03d}@company.example", dept))
 DEPT_OF = dict(USERS)
-ENG = [u for u, d in USERS if d in ("Grid Operations", "Data & Analytics")]
+ENG = [u for u, d in USERS if d in ("Clinical Operations", "Data & Analytics")]
 
 ISSUERS = {  # issuer -> (billing account id, name, provider)
-    "Microsoft": ("ms-mca-1001", "Meridian MCA", "Microsoft"),
-    "AWS": ("aws-payer-2002", "Meridian AWS Payer", "AWS"),
-    "Google Cloud": ("gcp-billing-3003", "Meridian GCP Billing", "Google Cloud"),
-    "Anthropic": ("ant-org-4004", "Meridian Claude Platform", "Anthropic"),
-    "GitHub": ("gh-ent-5005", "Meridian GitHub Enterprise", "GitHub"),
+    "Microsoft": ("ms-mca-1001", "MCA", "Microsoft"),
+    "AWS": ("aws-payer-2002", "AWS Payer", "AWS"),
+    "Google Cloud": ("gcp-billing-3003", "GCP Billing", "Google Cloud"),
+    "Anthropic": ("ant-org-4004", "Claude Platform", "Anthropic"),
+    "GitHub": ("gh-ent-5005", "GitHub Enterprise", "GitHub"),
 }
-ANT_ENT_ACCT = ("ant-ent-4005", "Meridian Claude Enterprise")
+ANT_ENT_ACCT = ("ant-ent-4005", "Claude Enterprise")
 
 CC = {}  # contract commitments
 def add_cc(**k): CC[k["ContractCommitmentId"]] = k
@@ -186,20 +186,20 @@ def growth(d): return 1 + 0.004 * (d - START).days  # ~45% growth over the windo
 
 # ----------------------------------------------------------------------------- Claude API (Console org)
 WORKSPACES = [  # id, name, cost center, app, data_class, keys, model mix, tier, cache profile
-    ("wrkspc_support", "outage-assistant", "Customer Operations", "customer-outage-assistant", "internal",
-     ["outage-assistant-prod", "outage-assistant-loadtest"], {"claude-sonnet-5-5": 0.85, "claude-haiku-5-5": 0.15}, "standard", "good"),
-    ("wrkspc_sales", "siting-research", "Renewables Development", "site-research", "internal",
-     ["siting-research-batch"], {"claude-opus-5-5": 0.7, "claude-sonnet-5-5": 0.3}, "batch", "none"),
+    ("wrkspc_support", "support-assistant", "Patient Data", "patient-support-assistant", "internal",
+     ["support-assistant-prod", "support-assistant-loadtest"], {"claude-sonnet-5-5": 0.85, "claude-haiku-5-5": 0.15}, "standard", "good"),
+    ("wrkspc_sales", "consumer-research", "Consumer Health", "consumer-research", "internal",
+     ["consumer-research-batch"], {"claude-opus-5-5": 0.7, "claude-sonnet-5-5": 0.3}, "batch", "none"),
     ("wrkspc_fin", "doc-summarizer", "Finance", "invoice-summarizer", "confidential",
      ["doc-summarizer-prod"], {"claude-haiku-5-5": 1.0}, "batch", "none"),
-    ("wrkspc_ceii", "ceii-grid-models", "Customer Operations", "grid-model-assistant", "ceii",
-     ["ceii-grid-models-prod"], {"claude-sonnet-5-5": 1.0}, "standard", "good"),
+    ("wrkspc_genomic", "genomics-data", "Patient Data", "protocol-assistant", "genomic",
+     ["genomics-data-prod"], {"claude-sonnet-5-5": 1.0}, "standard", "good"),
     ("wrkspc_rnd", "analytics-sandbox", "Data & Analytics", "experiments", "internal",
      ["analytics-notebook", "analytics-agent-eval"], {"claude-opus-5-5": 0.9, "claude-sonnet-5-5": 0.1}, "standard", "write_only"),
     (None, "Default Workspace", None, None, None,
      [None], {"claude-sonnet-5-5": 1.0}, "standard", "none"),  # untagged + playground (null api key)
 ]
-WS_SCALE = {"outage-assistant": 40e6, "siting-research": 18e6, "doc-summarizer": 60e6, "ceii-grid-models": 10e6,
+WS_SCALE = {"support-assistant": 40e6, "consumer-research": 18e6, "doc-summarizer": 60e6, "genomics-data": 10e6,
             "analytics-sandbox": 9e6, "Default Workspace": 1.5e6}
 for d in DAYS:
     for wid, wname, cc, app, dclass, keys, mix, tier, cache in WORKSPACES:
@@ -207,7 +207,7 @@ for d in DAYS:
                 "data_class": dclass} if wid else None
         for key in keys:
             base = WS_SCALE[wname] * wk(d) * growth(d) / len(keys)
-            if key == "outage-assistant-loadtest":
+            if key == "support-assistant-loadtest":
                 base *= 0.05
                 if d == dt.date(2026, 10, 14): base *= 400   # runaway retry loop
             for model, share in mix.items():
@@ -216,7 +216,7 @@ for d in DAYS:
                 elif cache == "write_only": toks = {"input": inp * 0.5, "cache_write": inp * 0.48, "cache_read": inp * 0.02, "output": inp * 0.03}
                 else: toks = {"input": inp, "output": inp * (0.08 if tier == "batch" else 0.15)}
                 geos = ["us"]
-                if dclass == "ceii" and d >= dt.date(2026, 9, 1): geos = ["us", "global"]
+                if dclass == "genomic" and d >= dt.date(2026, 9, 1): geos = ["us", "global"]
                 for g in geos:
                     gtoks = {k: v / len(geos) for k, v in toks.items()}
                     token_rows(d, "Anthropic", "Claude API", "claude_api", model, gtoks, tier=tier, disc=0.10,
@@ -242,7 +242,7 @@ for d in DAYS:
     for i, u in enumerate(CC_USERS):
         if random.random() > (0.85 if d.weekday() < 5 else 0.15): continue
         heavy = 3.0 if i < 3 else 1.0
-        if u == "user007@meridianenergy.com" and d == dt.date(2026, 10, 9): heavy = 12.0  # runaway agentic session
+        if u == "user007@company.example" and d == dt.date(2026, 10, 9): heavy = 12.0  # runaway agentic session
         sessions = random.randint(1, 6)
         for model, share in (("claude-opus-5-5", 0.6), ("claude-sonnet-5-5", 0.4)):
             inp = jitter(2.2e6 * heavy * share * growth(d) * sessions / 3)
@@ -261,7 +261,7 @@ for d in DAYS:
                             EstimatedCost=round(est, 6), BillingCurrency="USD"))
     for model, toks in ws_tokens.items():
         token_rows(d, "Anthropic", "Claude API", "claude_code", model, toks, disc=0.10, cc_id="cc-ant-2026",
-                   tags={"application": "claude-code", "cost_center": "Grid Operations", "environment": "dev", "data_class": "internal"},
+                   tags={"application": "claude-code", "cost_center": "Clinical Operations", "environment": "dev", "data_class": "internal"},
                    sub="wrkspc_claude_code", sub_name="claude-code", x_InferenceGeo="us", x_Speed="standard",
                    x_ContextWindow="0-200k", x_ApiKeyId="apikey_claude-code-org", x_ApiKeyName="claude-code-org",
                    x_WorkspaceId="wrkspc_claude_code", x_WorkspaceName="claude-code", x_SourceSystem="anthropic_cost_report")
@@ -272,10 +272,10 @@ for d in DAYS:
         ("AWS", "Claude Sonnet 5.5 (Amazon Bedrock Edition)", "claude_bedrock", "111122223333", "bedrock-prod", "us-east-1",
          0.08, "cc-aws-edp", "contract-review", "Legal", 25e6, "claude-sonnet-5-5", "aws_focus_export"),
         ("AWS", "Claude Haiku 5.5 (Amazon Bedrock Edition)", "claude_bedrock", "111122223333", "bedrock-prod", "us-east-1",
-         0.08, "cc-aws-edp", "ticket-classifier", "Customer Operations", 30e6, "claude-haiku-5-5", "aws_focus_export"),
+         0.08, "cc-aws-edp", "ticket-classifier", "Patient Data", 30e6, "claude-haiku-5-5", "aws_focus_export"),
         ("Google Cloud", "Vertex AI", "claude_vertex", "vertex-ai-prod", "vertex-ai-prod", "us-east5",
-         0.0, None, "marketing-content", "Transmission Planning", 8e6, "claude-sonnet-5-5", "gcp_focus_export"),
-        ("Microsoft", "Claude in Microsoft Foundry", "claude_foundry", "sub-ai-prod", "Meridian-AI-Prod", "eastus2",
+         0.0, None, "marketing-content", "Research & Discovery", 8e6, "claude-sonnet-5-5", "gcp_focus_export"),
+        ("Microsoft", "Claude in Microsoft Foundry", "claude_foundry", "sub-ai-prod", "AI-Prod", "eastus2",
          0.05, "cc-ms-macc", "knowledge-agent", "Corporate IT", 12e6, "claude-sonnet-5-5", "azure_focus_export"),
     ]:
         inp = jitter(scale * wk(d) * growth(d))
@@ -293,12 +293,12 @@ for d in DAYS:
         token_rows(d, "Microsoft", "Azure OpenAI", "azure_openai", model,
                    {"input": inp * 0.6, "cache_read": inp * 0.4, "output": inp * 0.1}, disc=0.05, cc_id="cc-ms-macc",
                    tags={"application": app, "cost_center": cc, "environment": "prod", "data_class": "internal"},
-                   sub="sub-ai-prod", sub_name="Meridian-AI-Prod", region="eastus2", publisher="OpenAI",
+                   sub="sub-ai-prod", sub_name="AI-Prod", region="eastus2", publisher="OpenAI",
                    x_InferenceGeo="us", x_WorkspaceId=dep, x_WorkspaceName=dep, x_SourceSystem="azure_focus_export")
 
 # ----------------------------------------------------------------------------- Copilot Studio (Copilot Credits)
 AGENTS = [("agt-it-01", "IT-Helpdesk-Agent", "Corporate IT", 150), ("agt-hr-02", "HR-Onboarding-Agent", "HR", 45),
-          ("agt-sales-03", "Sales-Proposal-Agent", "Renewables Development", 65), ("agt-fin-04", "Finance-Expense-Agent", "Finance", 50)]
+          ("agt-sales-03", "Sales-Proposal-Agent", "Consumer Health", 65), ("agt-fin-04", "Finance-Expense-Agent", "Finance", 50)]
 ACTIONS = [("classic_answer", 1, 0.35), ("generative_answer", 2, 0.40), ("agent_action", 5, 0.15), ("graph_grounding", 10, 0.10)]
 PACK_PER_MONTH, PACK_RATE, PAYG_RATE = 25000, 2400 / 300000, 0.01
 used = {}
@@ -308,7 +308,7 @@ for d in DAYS:
         row(d, "Microsoft", "Microsoft Copilot Studio", "copilot_studio", charge_cat="Purchase", freq="Recurring",
             consumed=PACK_PER_MONTH, cunit="Copilot Credits", list_up=PAYG_RATE, contr_up=PACK_RATE,
             list_cost=PACK_PER_MONTH * PAYG_RATE, contr_cost=200, eff_cost=0, billed=200, pricing_cat="Committed",
-            cc_id="cc-ms-copilot-credits", sub="sub-ai-prod", sub_name="Meridian-AI-Prod", period_end=next_month(d),
+            cc_id="cc-ms-copilot-credits", sub="sub-ai-prod", sub_name="AI-Prod", period_end=next_month(d),
             sku="copilot-credit-pack-25k", desc="Copilot Credits capacity pack (25,000 credits)",
             x_CreditQuantity=PACK_PER_MONTH, x_CreditUnit="Copilot Credits", x_TokenType="n/a",
             x_SourceSystem="azure_focus_export")
@@ -330,18 +330,18 @@ for d in DAYS:
                     pricing_cat="Committed" if committed else "Standard",
                     cc_id="cc-ms-copilot-credits" if committed else "cc-ms-macc",
                     tags={"application": aname, "cost_center": cc, "environment": "prod", "data_class": "internal"},
-                    sub="sub-ai-prod", sub_name="Meridian-AI-Prod", sku=f"copilot-credit-{act}",
+                    sub="sub-ai-prod", sub_name="AI-Prod", sku=f"copilot-credit-{act}",
                     desc=f"Copilot Studio {act.replace('_',' ')} ({'capacity pack' if committed else 'pay-as-you-go'})",
                     x_AgentId=aid, x_AgentName=aname, x_ActionType=act, x_CreditQuantity=qty,
                     x_CreditUnit="Copilot Credits", x_RequestCount=n if committed or not from_pack else int(over / credits),
-                    x_TokenType="n/a", x_WorkspaceId="env-meridian-prod", x_WorkspaceName="Meridian (default) environment",
+                    x_TokenType="n/a", x_WorkspaceId="env-pharma-prod", x_WorkspaceName="Default environment",
                     x_SourceSystem="azure_focus_export")
 
 # ----------------------------------------------------------------------------- Seats: M365 Copilot, GitHub Copilot, Claude Enterprise
 SEATS = []
 m365_users = [u for u, _ in USERS[:100]]
 gh_users = ENG[:45]
-ce_users = [u for u, dpt in USERS if dpt not in ("Grid Operations",)][:40]
+ce_users = [u for u, dpt in USERS if dpt not in ("Clinical Operations",)][:40]
 SEAT_DEF = [("m365_copilot", "Microsoft", "Microsoft 365 Copilot", m365_users, 30.0, "cc-m365-copilot-seats", "Microsoft 365 Copilot"),
             ("github_copilot", "GitHub", "GitHub Copilot", gh_users, 19.0, "cc-gh-copilot-seats", "Copilot Business"),
             ("claude_enterprise", "Anthropic", "Claude Enterprise", ce_users, 60.0, "cc-claude-ent-seats", "Claude Enterprise Seat")]
@@ -349,8 +349,8 @@ INACTIVE = {"m365_copilot": set(m365_users[-22:]), "github_copilot": set(gh_user
 for prod, issuer, service, users, seat_cost, ccid, sku in SEAT_DEF:
     for m in MONTHS:
         acct = ANT_ENT_ACCT if prod == "claude_enterprise" else None
-        sub, subn = {"m365_copilot": ("m365-tenant", "meridianenergy.onmicrosoft.com"), "github_copilot": ("meridian-eng", "meridian-eng"),
-                     "claude_enterprise": ("ant-ent-4005", "Meridian Claude Enterprise")}[prod]
+        sub, subn = {"m365_copilot": ("m365-tenant", "tenant.onmicrosoft.com"), "github_copilot": ("pharma-eng", "pharma-eng"),
+                     "claude_enterprise": ("ant-ent-4005", "Claude Enterprise")}[prod]
         row(m, issuer, service, prod, charge_cat="Purchase", freq="Recurring", acct=acct, sub=sub, sub_name=subn,
             consumed=len(users), cunit="Seats", punit="Seats", list_up=seat_cost, contr_up=seat_cost,
             list_cost=len(users) * seat_cost, contr_cost=len(users) * seat_cost, eff_cost=len(users) * seat_cost,
@@ -390,7 +390,7 @@ for d in DAYS:
             allow = max(0, GH_INCLUDED - gh_used.get((m, u), 0))
             covered = min(allow, credits); gh_used[(m, u)] = gh_used.get((m, u), 0) + credits
             disc = covered * GH_CREDIT; net = gross - disc
-            row(d, "GitHub", "GitHub Copilot", "github_copilot", sub="meridian-eng", sub_name="meridian-eng",
+            row(d, "GitHub", "GitHub Copilot", "github_copilot", sub="pharma-eng", sub_name="pharma-eng",
                 consumed=round(credits, 4), cunit="GitHub AI Credits", list_up=GH_CREDIT, contr_up=GH_CREDIT,
                 list_cost=gross, contr_cost=gross, eff_cost=net, billed=net,
                 pricing_cat="Committed" if net == 0 else "Standard", cc_id="cc-gh-copilot-seats" if disc else None,
@@ -418,7 +418,7 @@ for d in DAYS:
             inp = jitter(1.5e6)
             token_rows(d, "Anthropic", "Claude Enterprise", "claude_enterprise", "claude-sonnet-5-5",
                        {"input": inp * 0.4, "cache_read": inp * 0.55, "cache_write": inp * 0.05, "output": inp * 0.06},
-                       acct=ANT_ENT_ACCT, sub="ant-ent-4005", sub_name="Meridian Claude Enterprise",
+                       acct=ANT_ENT_ACCT, sub="ant-ent-4005", sub_name="Claude Enterprise",
                        tags={"cost_center": DEPT_OF[u], "application": "claude-enterprise"},
                        x_UserPrincipal=u, x_InferenceGeo="us", x_SourceSystem="anthropic_enterprise_analytics")
 
@@ -429,10 +429,10 @@ cloud_rows.generate(dict(ROWS=ROWS, add_cc=add_cc, DAYS=DAYS, ts=ts, month_start
 
 # ----------------------------------------------------------------------------- corrections, tax
 row(dt.date(2026, 8, 20), "Anthropic", "Claude API", "claude_api", charge_cat="Credit", freq="One-Time",
-    list_cost=0, contr_cost=0, eff_cost=-150, billed=-150, sub="wrkspc_support", sub_name="outage-assistant",
+    list_cost=0, contr_cost=0, eff_cost=-150, billed=-150, sub="wrkspc_support", sub_name="support-assistant",
     desc="Service credit: July 22 elevated error rates", ChargeClass="Correction", x_SourceSystem="anthropic_cost_report",
     BillingPeriodStart=ts(dt.date(2026, 8, 1)), BillingPeriodEnd=ts(dt.date(2026, 9, 1)),
-    tags={"application": "customer-outage-assistant", "cost_center": "Customer Operations"})
+    tags={"application": "patient-support-assistant", "cost_center": "Patient Data"})
 
 # ----------------------------------------------------------------------------- write CostAndUsage, then derive invoices
 con = duckdb.connect(DB)
@@ -530,8 +530,8 @@ for name, data in (("ai_seat_assignment", SEATS), ("ai_user_activity", ACT), ("a
     con.register("t", t); con.execute(f"INSERT INTO {name} SELECT * FROM t"); con.unregister("t")
 for mname, (vendor, tier, ok, i_, o_, cr, cw) in MODELS.items():
     con.execute("INSERT INTO ai_model_catalog VALUES (?,?,?,?,?,?,?,?, 'USD')", [mname, vendor, tier, ok, i_, o_, cr, cw])
-BUDGET = {"Grid Operations": 9000, "Customer Operations": 9000, "Renewables Development": 3000, "Finance": 3500, "Data & Analytics": 3500,
-          "Transmission Planning": 1500, "Corporate IT": 9000, "HR": 600, "Legal": 3000}
+BUDGET = {"Clinical Operations": 9000, "Patient Data": 9000, "Consumer Health": 3000, "Finance": 3500, "Data & Analytics": 3500,
+          "Research & Discovery": 1500, "Corporate IT": 9000, "HR": 600, "Legal": 3000}
 for m in MONTHS:
     for cc, b in BUDGET.items():
         con.execute("INSERT INTO ai_budget VALUES (?,?,?, 'USD')", [ts(m), cc, b])
@@ -549,7 +549,7 @@ WITH base AS (
   FROM CostAndUsage WHERE BillingPeriodStart = TIMESTAMP '2026-09-01' GROUP BY 1
 )
 SELECT m.BudgetPeriodStart, b.CostCenter,
-       ROUND(b.Sep * CASE b.CostCenter WHEN 'Data & Analytics' THEN 0.97 WHEN 'Customer Operations' THEN 1.0 ELSE 1.12 END, -2),
+       ROUND(b.Sep * CASE b.CostCenter WHEN 'Data & Analytics' THEN 0.97 WHEN 'Patient Data' THEN 1.0 ELSE 1.12 END, -2),
        'USD'
 FROM base b CROSS JOIN (SELECT DISTINCT BillingPeriodStart AS BudgetPeriodStart FROM CostAndUsage
                         WHERE BillingPeriodStart >= TIMESTAMP '2026-07-01') m

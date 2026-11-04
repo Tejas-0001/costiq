@@ -119,7 +119,7 @@ def current_principal(request: Request, authorization: str | None = Header(defau
     acc = access()
     if persona not in acc["personas"]:
         raise HTTPException(400, f"Unknown persona {persona}")
-    p = build_principal(f"demo.{persona}@meridian.example", f"Demo {acc['personas'][persona]['label']}", [persona])
+    p = build_principal(f"demo.{persona}@company.example", acc['personas'][persona]['label'], [persona])
     if isinstance(p.scope, EntityScope):
         p.scope = EntityScope(acc.get("demoEntityScope", {}).get(persona, []))
     elif p.scope is not None:

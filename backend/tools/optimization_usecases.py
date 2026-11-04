@@ -6,7 +6,7 @@ from __future__ import annotations
 import os, sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from utility_usecases import OUT, render  # noqa: E402
+from pharma_usecases import OUT, render  # noqa: E402
 
 PERIOD = [("period_start", "date", "2026-07-01", "Start of the period (inclusive)"),
           ("period_end", "date", "2026-10-23", "End of the period (exclusive)")]
@@ -57,9 +57,9 @@ ORDER BY EstimatedMonthlySavings DESC""", AS_OF,
        "Which resources are running and billing but doing no work?",
        ["finops_analyst", "cloud_ops", "tech_exec"], "Cloud Operations",
        "Resources whose CPU p95 stayed under 5% with no requests for 14 days (utilization exports), and unattached volumes. "
-       "Under ratemaking, spend on assets that are not used and useful is exposed to disallowance, so idle resources are "
-       "both waste and prudence risk.",
-       ["idle", "unused", "unattached", "orphaned volume", "zombie", "not used and useful", "stop instance"],
+       "Recharged spend on resources that serve no one fails the transfer-pricing benefit test, so idle resources are "
+       "both waste and tax risk.",
+       ["idle", "unused", "unattached", "orphaned volume", "zombie", "no benefit", "stop instance"],
        f"""
 WITH u AS (
   SELECT ResourceName, MAX(CpuP95) AS MaxCpuP95, SUM(Requests) AS Requests
@@ -150,7 +150,7 @@ LEFT JOIN optimization_recommendation r ON r.ResourceName = s.ResourceName AND r
 WHERE s.LastMonthCost > 500
 ORDER BY EstimatedMonthlySavings DESC, LastMonthCost DESC""",
        [("first_month", "date", "2026-07-01", "First month"), ("last_month", "date", "2026-09-01", "Last full month")],
-       "Grid data (SCADA, AMI) often has retention rules from regulators; check them before moving tiers."),
+       "Clinical trial data has GxP retention rules (often 25 years after the trial); check them before moving tiers."),
     uc("CO-06", "optimization", "Optimization · Cloud", "Data transfer and egress hotspots",
        "Where is data-transfer and egress cost concentrated, by account, region and cost center?",
        ["finops_analyst", "cloud_ops"], "Cloud Operations",
@@ -253,7 +253,7 @@ ORDER BY MonthlySavingsIfPayg DESC""", PERIOD, "Pay-as-you-go equivalents use li
     uc("UO-11", "optimization", "Optimization · AI", "Failed and retried LLM requests (tokens paid for nothing)",
        "How much LLM spend goes on requests that failed or were retried?",
        ["ai_program_owner", "finops_analyst"], "AI Program Owner, Engineering",
-       "Joins gateway telemetry (failed and retried requests) to each application's AI cost. Retry storms usually come "
+       "Joins gateway telemetry (failed and retried requests) to each application's AI cost. Retry spikes usually come "
        "from timeouts set below the model's p95 latency or from missing backoff.",
        ["retry", "retries", "failed requests", "errors", "timeout", "waste", "gateway"],
        """
@@ -318,7 +318,7 @@ ORDER BY InputGrowthPct DESC""",
        "What does each LLM application cost per request and per outcome a user actually accepted?",
        ["ai_program_owner", "finops_analyst", "cfo", "tech_exec"], "AI Program Owner, CFO",
        "All AI cost of an application (inference, embeddings, vector store) divided by its requests and by the outcomes "
-       "users or workflows accepted. Cost per accepted outcome is the unit to manage and to defend in a rate case; cost per "
+       "users or workflows accepted. Cost per accepted outcome is the unit to manage and to defend to the board; cost per "
        "prompt rewards answers nobody uses.",
        ["unit cost", "cost per answer", "cost per outcome", "accepted", "value", "roi", "rag"],
        """

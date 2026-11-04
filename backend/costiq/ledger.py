@@ -40,4 +40,4 @@ class Ledger:
 
     def reset(self, actor="system"):
         self.db.query("DELETE FROM decision_ledger", limit=None)
-        self.append(actor, "system", "seed", "tenant:meridian", "Ledger initialised")
+        self.append(actor, "system", "seed", "tenant:default", "Ledger initialised")

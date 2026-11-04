@@ -34,13 +34,13 @@ export function OptimizationView() {
     try {
       const r = await post<{ action: Action; ledger: { Seq: number } }>(`/optimization/${a.OptimizationId}/decision`, { action });
       const v = r.action.VerifiedMonthlySavings;
-      setMsg(`${a.OptimizationId}: ${action} recorded (ledger entry ${r.ledger.Seq})${action === "verify" && v != null ? ` · verified ${money(v)}/month (${r.action.VerificationBasis})` : ""}. Prudence evidence re-tested.`);
+      setMsg(`${a.OptimizationId}: ${action} recorded (ledger entry ${r.ledger.Seq})${action === "verify" && v != null ? ` · verified ${money(v)}/month (${r.action.VerificationBasis})` : ""}. Tax evidence re-tested.`);
       refresh();
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(null); }
   }
   return (
     <Gate module="optimization">
-      <Head title="Optimization Center" sub="Every cloud and AI saving from identified to verified, with the evidence a commission accepts">
+      <Head title="Optimization Center">
         {(["", "cloud", "ai"] as const).map((d) => <button key={d} className={`chip ${domain === d ? "on" : ""}`} onClick={() => setDomain(d)}>{d === "" ? "All" : d === "ai" ? "AI & LLM" : "Cloud"}</button>)}
       </Head>
       <Loading state={state}>
@@ -59,21 +59,20 @@ export function OptimizationView() {
                   <Waterfall steps={o.stages.map((s) => ({ label: s.Stage, value: s.MonthlySavings, tone: s.Stage === "Verified" ? "good" : undefined }))} /></div>
                 <div className="card"><h2>Savings by lever</h2>
                   <BarChart horizontal stacked labels={levers.map((l) => `${l.LeverLabel}${l.Domain === "ai" ? " (AI)" : ""}`)}
-                    datasets={[{ label: "Verified", data: levers.map((l) => l.Verified), backgroundColor: "#20b26b" },
-                      { label: "Identified, not yet verified", data: levers.map((l) => Math.max(0, l.Identified - l.Verified)), backgroundColor: "#2f6bff" }]} /></div>
+                    datasets={[{ label: "Verified", data: levers.map((l) => l.Verified), backgroundColor: "#2e7d4f" },
+                      { label: "Identified, not yet verified", data: levers.map((l) => Math.max(0, l.Identified - l.Verified)), backgroundColor: "#0f6ec8" }]} /></div>
               </div>
               {msg && <div className="notice">{msg}</div>}
               <div className="card flush">
-                <div style={{ padding: "14px 16px 6px" }} className="card-head"><h2 style={{ margin: 0 }}>Backlog</h2>
-                  <span className="small muted">approve: CFO / tech exec · implement: cloud ops / AI program owner · verify: FinOps analyst (not the implementer)</span></div>
-                <div className="table-wrap" style={{ maxHeight: 640 }}>
+                <h2>Backlog</h2>
+                <div className="table-wrap">
                   <table>
                     <thead><tr><th>Action</th><th>Lever</th><th>Scope</th><th className="num">Baseline /mo</th><th className="num">Estimated /mo</th><th className="num">Verified /mo</th><th>Status</th><th>Next step</th></tr></thead>
                     <tbody>
                       {acts.map((a) => (
-                        <tr key={a.OptimizationId} style={a.OptimizationId === focus ? { outline: "2px solid var(--brand)", outlineOffset: -2 } : undefined}>
+                        <tr key={a.OptimizationId} className={a.OptimizationId === focus ? "focus" : ""}>
                           <td><span className="uc-id">{a.OptimizationId}</span> <b>{a.Title}</b>
-                            <div className="small muted">{a.Origin.startsWith("UO") || a.Origin.startsWith("CO") || a.Origin.startsWith("UT")
+                            <div className="small muted">{a.Origin.startsWith("UO") || a.Origin.startsWith("CO") || a.Origin.startsWith("PH")
                               ? <Link href={`/catalog/${a.Origin}`}>{a.Origin}</Link> : a.Origin} · {a.Confidence === "provider_recommended" ? "provider recommended" : "CostIQ estimate"}</div></td>
                           <td>{a.LeverLabel}<div className="small muted">{a.Domain === "ai" ? "AI & LLM" : "Cloud"}</div></td>
                           <td className="small">{a.ScopeKey}<div className="muted">{a.CostCenter}</div></td>
@@ -82,7 +81,7 @@ export function OptimizationView() {
                           <td className="num">{a.VerifiedMonthlySavings != null ? <><b>{money(a.VerifiedMonthlySavings)}</b><div className="small muted">{a.VerificationBasis}</div></> : "—"}</td>
                           <td><StatusBadge s={a.Status} />{a.ImplementedBy && <div className="small muted">by {a.ImplementedBy.split("@")[0].replace("demo.", "")}</div>}</td>
                           <td><div className="row">{(NEXT[a.Status] ?? []).filter(([, , perm]) => me.actions.includes(perm)).map(([act, lab]) => (
-                            <button key={act} className={`btn sm ${act === "reject" ? "" : "primary"}`} disabled={!!busy} onClick={() => decide(a, act)}>{lab}</button>))}</div></td>
+                            <button key={act} className={`btn ${act === "reject" ? "" : "primary"}`} disabled={!!busy} onClick={() => decide(a, act)}>{lab}</button>))}</div></td>
                         </tr>
                       ))}
                     </tbody>
@@ -91,7 +90,7 @@ export function OptimizationView() {
               </div>
               {o.realized_by_month.length > 0 && <div className="card"><h2>Realized savings by verification month</h2>
                 <BarChart height="short" labels={o.realized_by_month.map((r) => r.Month)}
-                  datasets={[{ label: "Verified monthly savings", data: o.realized_by_month.map((r) => r.VerifiedMonthlySavings), backgroundColor: "#20b26b" }]} /></div>}
+                  datasets={[{ label: "Verified monthly savings", data: o.realized_by_month.map((r) => r.VerifiedMonthlySavings), backgroundColor: "#2e7d4f" }]} /></div>}
               <Formula>{o.formula}</Formula>
             </div>
           );

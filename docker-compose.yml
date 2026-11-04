@@ -1,4 +1,4 @@
-# MM CostIQ Utilities MVP: FastAPI backend + Next.js web app on synthetic Meridian Energy data.
+# MM CostIQ Pharma MVP: FastAPI backend + Next.js web app with a sample dataset.
 #   docker compose up -d --build     build and start, then open http://localhost:3000
 #   docker compose down              stop (demo changes are kept in the costiq-data volume)
 #   docker compose down -v           stop and reset the demo to the built-in sample
@@ -13,6 +13,9 @@ services:
       COSTIQ_AUTH_MODE: demo
       COSTIQ_PSEUDONYM_KEY: ${COSTIQ_PSEUDONYM_KEY:-dev-only-change-me}
       COSTIQ_ALERT_WEBHOOK_URL: ${COSTIQ_ALERT_WEBHOOK_URL:-}
+      # AI summary writer: costiq (default, nothing leaves the environment) or claude (needs ANTHROPIC_API_KEY)
+      COSTIQ_SUMMARY_WRITER: ${COSTIQ_SUMMARY_WRITER:-costiq}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
     volumes:
       - costiq-data:/data
     ports:

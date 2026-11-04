@@ -51,6 +51,6 @@ sql: |-
   GROUP BY u.BillingPeriodStart, cc.ContractCommitmentId, cc.ContractCommitmentQuantity, cc.TermMonths
   ORDER BY BillingMonth
 params: []
-adaptation: ContractApplied path uses the FOCUS 1.4 Elements structure
+adaptation: ContractApplied path uses the FOCUS 1.0 Elements structure
 notes: The current month is partial, so UnusedCredits will be high until month end. Use BF-03 to project whether the pack
   will run out.

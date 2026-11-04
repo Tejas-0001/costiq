@@ -9,9 +9,18 @@ import { EASE } from "@/components/motion";
 import { Diagram, gb, Num, ReuseBar } from "./canvas";
 import { FRAMEWORKS, QUESTIONS, type Answers, type Plan } from "./model";
 import {
-  CUSTODY, CUTOVERS, DB_STEPS, DEFENSE_SOURCES, DIGEST, FAIL_AT, RELEASE_SOURCES, ROUTES, STAGES, STANDARDS, TESTDATA, THREATS,
+  CUSTODY, CUTOVERS, DB_STEPS, DEFENSE_SOURCES, RELEASE_SOURCES, ROUTES, STAGES, STANDARDS, TESTDATA, THREATS,
 } from "./release";
 import { DefenseSim, DevPlan, Lanes, Pipeline, RouteFlow, TrafficSplit } from "./release-viz";
+
+/** "Try a risky change" plants a critical CVE; the scan stage's first gate stops it. */
+const FAIL_AT = {
+  stage: "scan", gate: 0,
+  message: "A newly added library carries a critical vulnerability (CVSS 9.8) and a fixed version exists. Policy allows none, so the merge is blocked and a fix ticket is opened.",
+};
+
+/** The one signed build promoted through the environments, identified by digest. */
+const DIGEST = "sha256:7f3c…e91a";
 
 export const SECTIONS = [
   ["summary", "Summary"], ["hardware", "Hardware"], ["reuse", "Yours vs. provided"], ["software", "Software"], ["network", "Network, F5 and firewall"],
@@ -21,19 +30,17 @@ export const SECTIONS = [
 
 /** Primary sources the planner's rules and wording were checked against (Nov 2026). */
 export const BP_SOURCES: [string, string][] = [
-  ["NERC CIP-004-7 (BCSI access, R6)", "https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-004-7.pdf"],
-  ["NERC CIP-011-3 (BCSI protection)", "https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-011-3.pdf"],
-  ["NERC CIP-013-2 (supply chain)", "https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-013-2.pdf"],
-  ["NERC CIP-007-6 (security event logging)", "https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-007-6.pdf"],
-  ["FERC Order No. 919, virtualization standards (Federal Register)", "https://www.federalregister.gov/documents/2026/03/24/2026-05716/order-no-919-virtualization-reliability-standards"],
-  ["ERO-endorsed guidance: cloud solutions for BCSI", "https://www.nerc.com/pa/comp/guidance/EROEndorsedImplementationGuidance/CIP-004-7%20R6%20and%20CIP-011-3%20R1%20-%20Cloud%20Solutions%20for%20BCSI%20(RSTC).pdf"],
+  ["21 CFR Part 11 (electronic records and signatures)", "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-11"],
+  ["EU GMP Annex 11 (computerised systems)", "https://health.ec.europa.eu/system/files/2016-11/annex11_01-2011_en_0.pdf"],
+  ["ISPE GAMP 5 Second Edition", "https://ispe.org/publications/guidance-documents/gamp-5-guide-2nd-edition"],
+  ["FDA: Computer Software Assurance for Production and Quality System Software", "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/computer-software-assurance-production-and-quality-system-software"],
+  ["HIPAA Security Rule (45 CFR Part 164, Subpart C)", "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C"],
+  ["GDPR (Regulation (EU) 2016/679)", "https://eur-lex.europa.eu/eli/reg/2016/679/oj"],
   ["NIST SP 800-53 Rev. 5 baselines (OSCAL)", "https://github.com/usnistgov/oscal-content/tree/main/nist.gov/SP800-53/rev5/json"],
   ["NIST Cybersecurity Framework 2.0", "https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf"],
   ["CISA Cross-Sector Cybersecurity Performance Goals 2.0", "https://www.cisa.gov/sites/default/files/2025-12/CPG_Report_2.0_508c.pdf"],
   ["CISA 2026 Minimum Elements for an SBOM", "https://www.cisa.gov/resources-tools/resources/2026-minimum-elements-software-bill-materials-sbom"],
   ["NIST Cryptographic Module Validation Program (FIPS 140-3)", "https://csrc.nist.gov/projects/cryptographic-module-validation-program"],
-  ["NATF supply chain criteria and questionnaire v7.0", "https://www.natf.net/industry-initiatives/supply-chain-industry-coordination"],
-  ["EEI model procurement contract language v4.0", "https://www.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Model-Procurement-Contract.pdf"],
   ["Kubernetes: ingress-nginx retirement", "https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/"],
   ["MinIO community repository (archived)", "https://github.com/minio/minio"],
   ["PostgreSQL versioning policy", "https://www.postgresql.org/support/versioning/"],
@@ -45,7 +52,8 @@ export const BP_SOURCES: [string, string][] = [
 
 /** Where each framework's control text comes from; linked from its card. */
 const FRAMEWORK_URL: Record<string, string> = {
-  "nerc-cip": "https://www.nerc.com/pa/Stand/Reliability%20Standards/CIP-011-3.pdf",
+  gxp: "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-11",
+  "hipaa-gdpr": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C",
   sox: "https://pcaobus.org/oversight/standards/auditing-standards/details/AS2201",
   "nist-csf": "https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf",
   "nist-800-53": "https://github.com/usnistgov/oscal-content/tree/main/nist.gov/SP800-53/rev5/json",
@@ -274,11 +282,11 @@ export function Blueprint({ plan, onEdit }: { plan: Plan; onEdit: () => void }) 
             <motion.div {...rise(1)} className="dp-card">
               <div className="dl-device-hd"><h4>NIST CSF 2.0, function by function</h4><Src href="https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf" /></div>
               <dl className="dl-csf">
-                <dt>Govern</dt><dd>Supplier risk through SBOMs, signed releases, the NATF questionnaire and contract terms.</dd>
+                <dt>Govern</dt><dd>Supplier risk through SBOMs, signed releases, your supplier quality questionnaire and the quality agreement.</dd>
                 <dt>Identify</dt><dd>This blueprint is the asset and data-flow inventory; the threat model stays current.</dd>
                 <dt>Protect</dt><dd>{plan.defense.layers.filter((l) => ["firewall", "waf", "identity", "access", "pam", "supply", "segment", "secrets"].includes(l.id)).length} protective layers above.</dd>
                 <dt>Detect</dt><dd>{plan.defense.detections.length} detection rules, watched by {plan.defense.soc}.</dd>
-                <dt>Respond</dt><dd>A joint incident playbook; we notify your security contact and coordinate the response, as CIP-013-2 R1.2.1 and R1.2.2 ask of vendors.</dd>
+                <dt>Respond</dt><dd>A joint incident playbook; we notify your security contact and coordinate the response, as the quality agreement&apos;s incident-notice terms require.</dd>
                 <dt>Recover</dt><dd>Immutable offsite backups with quarterly restore tests (CISA #StopRansomware guidance).</dd>
               </dl>
             </motion.div>
@@ -295,7 +303,7 @@ export function Blueprint({ plan, onEdit }: { plan: Plan; onEdit: () => void }) 
                   <ul>{c.items.map((x) => <li key={x}>{x}</li>)}</ul></motion.div>
               );
             })}</div>
-          ) : <p className="muted">No frameworks selected. Common choices for utilities: {FRAMEWORKS.slice(0, 3).map((f) => f.label).join(", ")}.</p>}
+          ) : <p className="muted">No frameworks selected. Common choices: {FRAMEWORKS.slice(0, 3).map((f) => f.label).join(", ")}.</p>}
         </section>
 
         <section id="bp-quality" className="dp-sec">

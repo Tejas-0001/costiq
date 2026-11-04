@@ -1,4 +1,4 @@
-"""Prudence Engine API: disallowance risk, Earnings Unlock, the Rate-Case Evidence Pack and the Data Request Responder."""
+"""Tax-risk API: deduction at risk, credit unlock, the filing audit file and the Examiner Request Responder."""
 from __future__ import annotations
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
@@ -21,54 +21,54 @@ def _need_any(p: Principal, *modules):
         raise HTTPException(403, f"Your role cannot open {' or '.join(modules)}")
 
 
-@router.get("/prudence")
-def prudence_summary(docket: str | None = None, p: Principal = Depends(current_principal)):
-    p.require("prudence")
-    audit(p, "view", module="prudence", docket=docket)
-    out = prudence.summary(p.scope, docket)
+@router.get("/risk")
+def risk_summary(filing: str | None = None, p: Principal = Depends(current_principal)):
+    p.require("risk")
+    audit(p, "view", module="risk", filing=filing)
+    out = prudence.summary(p.scope, filing)
     out["headline"] = prudence.headline(p.scope, Optimizer(db, eng))
     return out
 
 
-@router.get("/prudence/lines")
-def prudence_lines(docket: str | None = None, reason: str | None = None, entity: str | None = None,
+@router.get("/risk/lines")
+def risk_lines(filing: str | None = None, reason: str | None = None, entity: str | None = None,
                    vendor: str | None = None, p: Principal = Depends(current_principal)):
-    p.require("prudence")
-    return prudence.lines(p.scope, docket, reason, entity, vendor)
+    p.require("risk")
+    return prudence.lines(p.scope, filing, reason, entity, vendor)
 
 
-@router.get("/regulatory/earnings-unlock")
-def earnings_unlock(docket: str | None = None, p: Principal = Depends(current_principal)):
-    _need_any(p, "regulatory", "prudence")
-    return prudence.earnings_unlock(p.scope, docket)
+@router.get("/tax/credit-unlock")
+def credit_unlock(filing: str | None = None, p: Principal = Depends(current_principal)):
+    _need_any(p, "tax", "risk")
+    return prudence.credit_unlock(p.scope, filing)
 
 
-@router.get("/regulatory/rate-case/{docket}/evidence-pack.zip")
-def evidence_pack(docket: str, p: Principal = Depends(current_principal)):
-    p.require("regulatory")
+@router.get("/tax/filing/{filing}/audit-file.zip")
+def audit_file(filing: str, p: Principal = Depends(current_principal)):
+    p.require("tax")
     p.require_action("exhibit.export")
     if p.scope is not None:
-        raise HTTPException(403, "Evidence packs need enterprise scope")
+        raise HTTPException(403, "Audit files need enterprise scope")
     try:
-        data, sha, cert, entry = packs.export(docket, p.user, p.persona)
+        data, sha, cert, entry = packs.export(filing, p.user, p.persona)
     except KeyError:
-        raise HTTPException(404, f"Unknown docket {docket}")
-    audit(p, "export", module="regulatory", evidence_pack=docket, sha256=sha)
+        raise HTTPException(404, f"Unknown filing {filing}")
+    audit(p, "export", module="tax", audit_file=filing, sha256=sha)
     return Response(content=data, media_type="application/zip",
-                    headers={"Content-Disposition": f'attachment; filename="{docket}-evidence-pack.zip"',
+                    headers={"Content-Disposition": f'attachment; filename="{filing}-audit-file.zip"',
                              "X-CostIQ-SHA256": sha, "X-CostIQ-Ledger-Seq": str(entry["Seq"]),
                              "Access-Control-Expose-Headers": "X-CostIQ-SHA256, X-CostIQ-Ledger-Seq"})
 
 
-@router.get("/regulatory/evidence-packs")
-def evidence_packs(p: Principal = Depends(current_principal)):
-    _need_any(p, "regulatory", "governance")
+@router.get("/tax/audit-files")
+def audit_files(p: Principal = Depends(current_principal)):
+    _need_any(p, "tax", "governance")
     return packs.packs()
 
 
-@router.post("/regulatory/evidence-pack/verify")
-async def verify_pack(file: UploadFile = File(...), p: Principal = Depends(current_principal)):
-    _need_any(p, "regulatory", "governance")
+@router.post("/tax/audit-file/verify")
+async def verify_audit_file(file: UploadFile = File(...), p: Principal = Depends(current_principal)):
+    _need_any(p, "tax", "governance")
     data = await file.read()
     if len(data) > 50 * 1024 * 1024:
         raise HTTPException(413, "File too large")
@@ -78,24 +78,24 @@ async def verify_pack(file: UploadFile = File(...), p: Principal = Depends(curre
 
 
 class NewRequest(BaseModel):
-    docket: str
-    requester: str = "Commission staff"
+    filing: str
+    requester: str = "Tax examiner"
     text: str
 
 
-@router.get("/regulatory/data-requests")
-def list_requests(docket: str | None = None, p: Principal = Depends(current_principal)):
-    p.require("regulatory")
-    return requests.list(docket)
+@router.get("/tax/examiner-requests")
+def list_requests(filing: str | None = None, p: Principal = Depends(current_principal)):
+    p.require("tax")
+    return requests.list(filing)
 
 
-@router.post("/regulatory/data-requests")
+@router.post("/tax/examiner-requests")
 def new_request(body: NewRequest, p: Principal = Depends(current_principal)):
-    p.require("regulatory")
+    p.require("tax")
     p.require_action("datarequest.prepare")
     if not body.text.strip() or len(body.text) > 2000:
         raise HTTPException(400, "Request text must be 1-2000 characters")
-    r = requests.draft(p, run_use_case, body.docket, body.requester, body.text)
+    r = requests.draft(p, run_use_case, body.filing, body.requester, body.text)
     audit(p, "data_request_draft", request=r["RequestId"], matched=r["MatchedUseCases"])
     return r
 
@@ -105,9 +105,9 @@ class RequestDecision(BaseModel):
     note: str = ""
 
 
-@router.post("/regulatory/data-requests/{rid}/decision")
+@router.post("/tax/examiner-requests/{rid}/decision")
 def decide_request(rid: str, body: RequestDecision, p: Principal = Depends(current_principal)):
-    p.require("regulatory")
+    p.require("tax")
     r, entry = requests.decide(rid, body.action, p, body.note)
     audit(p, "data_request_decision", request=rid, decision=body.action)
     return {"request": r, "ledger": entry}
