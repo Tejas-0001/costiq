@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useCopy } from "@/components/copy";
 import { EASE } from "@/components/motion";
 import { useMe } from "@/components/shell";
 import { Linked, SummaryBody, type Fact, type Summary } from "@/components/summary";
@@ -24,18 +25,20 @@ const PERIOD_WORDS: [RegExp, string, string][] = [
   [/today/, "today", "today"], [/yesterday/, "yesterday", "yesterday"], [/week|wtd/, "wtd", "week to date"],
   [/year|ytd/, "ytd", "year to date"], [/./, "mtd", "month to date"],
 ];
-const REASON: Record<string, string> = {
-  unactioned_savings: "savings left unactioned", no_benefit: "no benefit shown", unreconciled: "not reconciled to an invoice",
-  unmapped_gl: "no GL account", no_approved_policy: "no approved allocation policy",
-};
-const SUGGEST = ["Brief me on this month", "What could an examiner disallow?", "How much did we spend today?", "Where can we save the most?",
-  "What R&D credit could we unlock?", "Any alerts I should know about?"];
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** The tenant's words for the scripted flows (copy agent.*): the risk and unlock questions, step labels, answers and
+ *  reason labels. The flows and their API calls are the same for every tenant. */
+type Words = { t: (key: string, vars?: Record<string, string | number>) => string; get: <T>(key: string) => T | undefined };
+const suggestions = (w: Words) => ["Brief me on this month", w.t("agent.questions.risk"), "How much did we spend today?",
+  "Where can we save the most?", w.t("agent.questions.credit"), "Any alerts I should know about?"];
+const reason = (w: Words, code: string | undefined) => (code ? w.get<Record<string, string>>("agent.reasons")?.[code] : undefined);
 
 // ------------------------------------------------------------------------------------------------ the agent's tools
 type Run = {
   period: string;
+  w: Words;
   step: (label: string, tool?: string) => Promise<void>;
   call: <T>(label: string, tool: string, fn: () => Promise<T>) => Promise<T | null>;
   say: (text: string, facts?: Record<string, Fact>) => void;
@@ -64,21 +67,24 @@ async function spend(r: Run, q: string) {
 }
 
 async function risk(r: Run) {
-  await r.step("Reading the question: deduction at risk across open filings");
-  const d = await r.call("Testing review-period lines for evidence", "GET /api/risk", () => api<{
+  const w = r.w;
+  await r.step(w.t("agent.risk.step"));
+  const d = await r.call(w.t("agent.risk.call"), "GET /api/risk", () => api<{
     deduction_at_risk: number; evidence_score: number; lines_at_risk: number; lines: number;
     by_reason: { RiskReason: string; Risk: number }[]; top: { Item: string; Vendor: string; FilingId: string; Risk: number; RiskReason: string; Fix: { kind: string; target?: string; label: string } }[];
   }>("/risk"));
   if (!d) return;
   await r.step("Ranking the largest risks and their fixes");
   const top = d.top.slice(0, 3);
-  r.say(`An examiner could disallow **${compact(d.deduction_at_risk)}** of recharged technology spend; ${d.evidence_score}% is evidenced ` +
-    `(${d.lines_at_risk.toLocaleString("en-US")} of ${d.lines.toLocaleString("en-US")} lines at risk). The biggest driver is **${REASON[d.by_reason[0]?.RiskReason] ?? "evidence gaps"}**. ` +
-    `I'd fix these first: ${top.map((t) => `**${t.Item}** (${t.Vendor}, ${compact(t.Risk)} in ${t.FilingId})`).join(", ")}.`);
-  r.show({ kind: "bars", title: "Why it's at risk", rows: d.by_reason.map((x) => ({ label: cap(REASON[x.RiskReason] ?? x.RiskReason), value: x.Risk, tone: "risk" })) });
+  r.say(w.t("agent.risk.answer", {
+    amount: compact(d.deduction_at_risk), score: d.evidence_score, atRisk: d.lines_at_risk.toLocaleString("en-US"),
+    lines: d.lines.toLocaleString("en-US"), reason: reason(w, d.by_reason[0]?.RiskReason) ?? "evidence gaps",
+    top: top.map((t) => `**${t.Item}** (${t.Vendor}, ${compact(t.Risk)} in ${t.FilingId})`).join(", "),
+  }));
+  r.show({ kind: "bars", title: "Why it's at risk", rows: d.by_reason.map((x) => ({ label: cap(reason(w, x.RiskReason) ?? x.RiskReason), value: x.Risk, tone: "risk" })) });
   const fix = top.find((t) => t.Fix.kind === "optimization" && t.Fix.target);
-  r.act([{ label: "Open the Tax Risk Radar", href: "/risk?sec=Largest%20risks" }, ...(fix ? [{ label: `Open fix ${fix.Fix.target}`, href: `/optimization?focus=${fix.Fix.target}` }] : [])],
-    ["Where can we save the most?", "What R&D credit could we unlock?"]);
+  r.act([{ label: `Open the ${w.t("nav.items.risk")}`, href: "/risk?sec=Largest%20risks" }, ...(fix ? [{ label: `Open fix ${fix.Fix.target}`, href: `/optimization?focus=${fix.Fix.target}` }] : [])],
+    ["Where can we save the most?", w.t("agent.questions.credit")]);
 }
 
 async function savings(r: Run) {
@@ -94,21 +100,22 @@ async function savings(r: Run) {
   r.say(`There's **${compact(id.MonthlySavings)}/month** identified across ${id.Actions} actions, of which ${compact(ap.MonthlySavings)}/month is approved. ` +
     `Verified savings so far: **${compact(d.verified_annual)}/yr**. The biggest levers are ${lev.map((l) => `**${l.LeverLabel}** (${compact(l.Identified)}/mo)`).join(", ")}.`);
   r.show({ kind: "bars", title: "Savings a month, by lever", rows: lev.map((l) => ({ label: l.LeverLabel, value: l.Identified, tone: "save" })) });
-  r.act([{ label: "Open the Optimization Center", href: "/optimization?sec=Backlog" }], ["What could an examiner disallow?", "Any alerts I should know about?"]);
+  r.act([{ label: "Open the Optimization Center", href: "/optimization?sec=Backlog" }], [r.w.t("agent.questions.risk"), "Any alerts I should know about?"]);
 }
 
 async function credit(r: Run) {
-  await r.step("Reading the question: R&D credit on cloud fees");
-  const d = await r.call("Computing the credit by jurisdiction", "GET /api/tax/credit-unlock", () => api<{
+  const w = r.w;
+  await r.step(w.t("agent.credit.step"));
+  const d = await r.call(w.t("agent.credit.call"), "GET /api/tax/credit-unlock", () => api<{
     credit_unlock: number; credit_claimed: number; jurisdictions: { Jurisdiction: string; Credit: number; CreditStatus: string }[];
   }>("/tax/credit-unlock"));
   if (!d) return;
-  await r.step("Separating claimed credit from eligible, unclaimed credit");
+  await r.step(w.t("agent.credit.split"));
   const best = [...d.jurisdictions].filter((j) => j.CreditStatus === "eligible").sort((a, b) => b.Credit - a.Credit)[0];
-  r.say(`Claiming qualifying cloud fees where they are eligible but unclaimed would add **${compact(d.credit_unlock)}/yr** of R&D credit, ` +
-    `on top of **${compact(d.credit_claimed)}/yr** claimed today. ${best ? `The biggest opportunity is **${best.Jurisdiction}** at ${compact(best.Credit)}/yr.` : ""}`);
-  r.show({ kind: "cols", title: "Credit a year, by jurisdiction", rows: d.jurisdictions.map((j) => ({ label: j.Jurisdiction, value: j.Credit, tone: j.CreditStatus === "claimed" ? "earned" : "whatif" })) });
-  r.act([{ label: "Model it by jurisdiction", href: best ? `/tax?tab=credit&hl=${best.Jurisdiction}` : "/tax?tab=credit" }], ["What could an examiner disallow?"]);
+  r.say(w.t("agent.credit.answer", { unlock: compact(d.credit_unlock), claimed: compact(d.credit_claimed) }) +
+    (best ? w.t("agent.credit.best", { jurisdiction: best.Jurisdiction, amount: compact(best.Credit) }) : ""));
+  r.show({ kind: "cols", title: w.t("agent.credit.chart"), rows: d.jurisdictions.map((j) => ({ label: j.Jurisdiction, value: j.Credit, tone: j.CreditStatus === "claimed" ? "earned" : "whatif" })) });
+  r.act([{ label: "Model it by jurisdiction", href: best ? `/tax?tab=credit&hl=${best.Jurisdiction}` : "/tax?tab=credit" }], [w.t("agent.questions.risk")]);
 }
 
 async function alerts(r: Run) {
@@ -125,14 +132,14 @@ async function alerts(r: Run) {
 }
 
 async function brief(r: Run) {
-  await r.step("Planning: spend, tax risk, GxP, savings and operations for your role");
+  await r.step(r.w.t("agent.brief.step"));
   const d = await r.call("Reading the figures behind every page you can open", `GET /api/summary?range=${r.period}`, () => api<Summary>(`/summary?range=${r.period}`));
   if (!d) return;
   await r.step(`Linking ${Object.keys(d.facts).length} figures to ${d.sources.length} source pages`);
   await r.step("Writing the briefing");
   r.say(d.headline, d.facts);
   r.show({ kind: "summary", data: d });
-  r.act([{ label: "Open the AI Summary", href: "/summary" }], ["What could an examiner disallow?", "Where can we save the most?", "How much did we spend today?"]);
+  r.act([{ label: "Open the AI Summary", href: "/summary" }], [r.w.t("agent.questions.risk"), "Where can we save the most?", "How much did we spend today?"]);
 }
 
 async function ask(r: Run, q: string) {
@@ -143,23 +150,26 @@ async function ask(r: Run, q: string) {
   }>("/ask", { question: q, range: r.period }));
   if (!d) return;
   if (d.status !== "answered" || !d.result) {
-    r.say(`I couldn't match that to a tested query. ${d.message ?? ""} Try one of these, or ask about spend, risk, savings, credit or alerts.`);
-    r.act((d.suggestions ?? []).slice(0, 3).map((s) => ({ label: `${s.id} · ${s.title}`, href: `/catalog/${s.id}` })), SUGGEST.slice(0, 3));
+    r.say(`I couldn't match that to a tested query. ${d.message ?? ""} Try one of these, or ask about ${r.w.t("agent.topics")}.`);
+    r.act((d.suggestions ?? []).slice(0, 3).map((s) => ({ label: `${s.id} · ${s.title}`, href: `/catalog/${s.id}` })), suggestions(r.w).slice(0, 3));
     return;
   }
   await r.step(`Reading ${d.result.rows.length} rows from ${d.use_case?.id}`);
   r.say(`Using **${d.use_case?.id} · ${d.use_case?.title}**: ${d.headline}`);
   const cols = d.result.columns.slice(0, 3);
   r.show({ kind: "table", title: d.use_case?.title ?? "Result", columns: cols, rows: d.result.rows.slice(0, 5).map((row) => row.slice(0, 3)) });
-  r.act([{ label: "Open the full query and evidence", href: `/catalog/${d.use_case?.id}` }], SUGGEST.slice(0, 2));
+  r.act([{ label: "Open the full query and evidence", href: `/catalog/${d.use_case?.id}` }], suggestions(r.w).slice(0, 2));
 }
 
-function route(q: string): (r: Run, q: string) => Promise<void> {
+/** The tenant's words that send a question to the risk or unlock flow (copy agent.route.*); never matches when unset. */
+const routeWords = (w: Words, key: string) => { const p = w.t(`agent.route.${key}`); return p ? new RegExp(p) : /$^/; };
+
+function route(q: string, w: Words): (r: Run, q: string) => Promise<void> {
   const s = q.toLowerCase();
   if (/brief|summar|overview|what should i|catch me up/.test(s)) return brief;
   if (/alert|anomal|spike|warning/.test(s)) return alerts;
-  if (/credit|unlock|r&d|qre/.test(s)) return credit;
-  if (/risk|disallow|deduct|examiner|audit|challenge|evidence/.test(s)) return risk;
+  if (routeWords(w, "credit").test(s)) return credit;
+  if (routeWords(w, "risk").test(s)) return risk;
   if (/sav|optimi|cut|reduce|waste|lever/.test(s)) return savings;
   if (/spen|cost|bill|how much/.test(s)) return spend;
   return ask;
@@ -261,6 +271,7 @@ function TurnView({ t, onAsk }: { t: Turn; onAsk: (q: string) => void }) {
 
 export function Agent() {
   const { me, period } = useMe();
+  const words: Words = useCopy();
   const [open, setOpen] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [q, setQ] = useState("");
@@ -290,6 +301,7 @@ export function Agent() {
     let answer = "";
     const r: Run = {
       period,
+      w: words,
       step: async (label, tool) => { addStep({ label, tool, state: "run" }); await pause(420); finishLast("done"); },
       call: async (label, tool, fn) => {
         addStep({ label, tool, state: "run" });
@@ -313,13 +325,13 @@ export function Agent() {
       show: (v) => patch((t) => ({ ...t, viz: [...(t.viz ?? []), v] })),
       act: (actions, follow) => patch((t) => ({ ...t, actions, follow })),
     };
-    try { await route(question)(r, question); } catch (e) { answer = `Something went wrong: ${(e as Error).message}`; }
+    try { await route(question, words)(r, question); } catch (e) { answer = `Something went wrong: ${(e as Error).message}`; }
     patch((t) => ({ ...t, answer }));
     const n = answer.split(" ").length;
     for (let i = 1; i <= n; i += 2) { await pause(22); patch((t) => ({ ...t, shown: i })); }
     patch((t) => ({ ...t, shown: n, done: true }));
     setBusy(false);
-  }, [busy, me.personas, period]);
+  }, [busy, me.personas, period, words]);
 
   return (
     <>
@@ -349,7 +361,7 @@ export function Agent() {
                   <motion.h3 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }}>What should we look into?</motion.h3>
                   <p>Signed in as {me.personas[0]?.label}. I plan the steps, run CostIQ&apos;s queries as your role, and show my working.</p>
                   <div className="ag-sugs">
-                    {SUGGEST.map((s, i) => (
+                    {suggestions(words).map((s, i) => (
                       <motion.button key={s} type="button" onClick={() => run(s)} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.4, ease: EASE, delay: 0.1 + i * 0.05 }}>{s}</motion.button>
                     ))}

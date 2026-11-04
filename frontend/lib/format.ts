@@ -1,8 +1,23 @@
 // Number formatting shared by tables, KPIs and charts (ported from the CostIQ web app).
+// Column patterns that depend on the tenant's own columns come from its copy (format.*), read after rememberCopy().
+import { copyText, copyValue } from "@/components/copy";
+
 export const PALETTE = ["#0f6ec8", "#454d53", "#97b5c3", "#ca4528", "#2e7d6b", "#b8c1cb", "#0a4a87", "#d6d6d6"];
 
 const MONEY =
-  /cost|spend|billed|amount|savings|variance|exposure|budget|forecast|overage|shortfall|effective|invoiced|charge(total)?$|actual|todate|risk|return|fees|annualized|measurable|escalation|value|baseline|o?andm$|perpatient|persite|perrequest|peroutcome|perstudy|equivalent|billing|credit$|qre|balance|crosscharge|burn$/i;
+  "cost|spend|billed|amount|savings|variance|exposure|budget|forecast|overage|shortfall|effective|invoiced|charge(total)?$|actual|todate|risk|return|fees|annualized|measurable|escalation|value|baseline|o?andm$|perrequest|peroutcome|equivalent|billing|credit$|balance|burn$";
+const NOT_MONEY = "pct|rate|ratio|percent|tokens|quantity|count|credits$|days$|units$|months$|lines$";
+
+let patterns: { key: string; money: RegExp; notMoney: RegExp } | null = null;
+
+/** The money / not-money column patterns: the shared ones plus the tenant's (format.moneyColumns, format.notMoneyColumns). */
+function columnPatterns() {
+  const m = copyText("format.moneyColumns"), n = copyText("format.notMoneyColumns"), key = `${m}\n${n}`;
+  if (!patterns || patterns.key !== key) {
+    patterns = { key, money: new RegExp(m ? `${MONEY}|${m}` : MONEY, "i"), notMoney: new RegExp(n ? `${NOT_MONEY}|${n}` : NOT_MONEY, "i") };
+  }
+  return patterns;
+}
 
 export function money(v: unknown, d = 0): string {
   const n = typeof v === "number" ? v : v == null ? NaN : Number(v);
@@ -31,9 +46,16 @@ export function pct(v: unknown, signed = true): string {
 }
 
 export function isMoneyCol(c: string): boolean {
-  return MONEY.test(c) && !/pct|rate|ratio|percent|tokens|quantity|count|credits$|days$|units$|months$|lines$|sites$|patients$|studies$/i.test(c);
+  const p = columnPatterns();
+  return p.money.test(c) && !p.notMoney.test(c);
 }
 
 export function label(s: string): string {
   return s.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+/** A table column's header: the tenant's own name for a shared column (format.columnLabels), else label(). */
+export function columnLabel(c: string): string {
+  const own = (copyValue<[string, string][]>("format.columnLabels") ?? []).find(([k]) => k === c);
+  return own ? own[1] : label(c);
 }

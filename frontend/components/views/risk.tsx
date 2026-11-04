@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useCopy } from "@/components/copy";
 import { Gate, useMe } from "@/components/shell";
 import { LineageDrawer } from "@/components/usecases";
 import { Formula, Head, Kpi, Loading, RecordTable, StatusBadge } from "@/components/ui";
@@ -56,19 +57,20 @@ function Heatmap({ cells, onPick }: { cells: Summary["heatmap"]; onPick: (entity
 
 function FixButton({ t, onDone }: { t: Top; onDone: (msg: string) => void }) {
   const { me, refresh } = useMe();
+  const copy = useCopy();
   const [busy, setBusy] = useState(false);
   const f = t.Fix;
   if (f.kind === "optimization") return <Link href={`/optimization?focus=${f.target}`}>{f.label}</Link>;
   if (f.kind === "reconciliation") return <Link href="/reconciliation">{f.label}</Link>;
   if (f.kind === "policy") return <Link href="/tax?tab=chain">{f.label}</Link>;
-  if (f.kind !== "optimization_new") return <Link href="/catalog/PH-01">{f.label}</Link>;  // GL account mapping
+  if (f.kind !== "optimization_new") return <Link href={`/catalog/${copy.t("risk.useCases.glMap")}`}>{f.label}</Link>;  // GL account mapping
   if (!me.actions.includes("recommendation.submit")) return <span className="small muted">FinOps analyst to track</span>;
   return (
     <button className="btn" disabled={busy} onClick={async () => {
       setBusy(true);
       try {
         const a = await post<{ OptimizationId: string }>("/optimization", {
-          origin: "PH-12", lever: LEVER_FOR[t.RiskReason] ?? "idle", title: `Remove deduction risk on ${t.Item}`,
+          origin: copy.t("risk.useCases.risk"), lever: LEVER_FOR[t.RiskReason] ?? "idle", title: copy.t("risk.fixTitle", { item: t.Item }),
           scope_type: "resource", scope_key: t.Item, cost_center: t.CostCenter, estimated_monthly_savings: 0 });
         onDone(`${a.OptimizationId} added to the Optimization Center.`);
         refresh();
@@ -88,11 +90,12 @@ export function RiskView() {
   const lq = new URLSearchParams({ ...(filing ? { filing } : {}), ...(pick.reason ? { reason: pick.reason } : {}),
     ...(pick.entity ? { entity: pick.entity } : {}), ...(pick.vendor ? { vendor: pick.vendor } : {}) }).toString();
   const lines = useApi<Record<string, unknown>[]>(`/risk/lines?${lq}`, version);
+  const { t } = useCopy();
   return (
     <Gate module="risk">
-      <Head title="Tax Risk Radar">
+      <Head title={t("nav.items.risk")}>
         <select value={filing} onChange={(e) => { setFiling(e.target.value); setPick({}); }}>
-          <option value="">All open filings</option>
+          <option value="">{t("risk.all")}</option>
           {state.data?.filings.map((d) => <option key={d.FilingId} value={d.FilingId}>{d.FilingId} · {d.LegalEntity}</option>)}
         </select>
       </Head>
@@ -103,10 +106,10 @@ export function RiskView() {
             <div className="stack">
               {msg && <div className="notice">{msg}</div>}
               <div className="grid g4">
-                <Kpi label="Deduction at risk" value={money(s.deduction_at_risk)} tone="bad"
+                <Kpi label={t("risk.amount")} value={money(s.deduction_at_risk)} tone="bad"
                   sub={`${s.lines_at_risk.toLocaleString("en-US")} of ${s.lines.toLocaleString("en-US")} lines`} />
                 <Kpi label="Evidence score" value={`${s.evidence_score}%`} />
-                <Kpi label="Review-period spend" value={money(s.review_period_spend)} />
+                <Kpi label={t("risk.spend")} value={money(s.review_period_spend)} />
                 <Kpi label="Risk after open fixes" value={money(Math.max(0, s.deduction_at_risk - fixable))} tone="good" />
               </div>
               <div className="grid g2">
@@ -121,7 +124,7 @@ export function RiskView() {
                   </table>
                 </div>
                 <div className="card flush">
-                  <h2>By filing</h2>
+                  <h2>{t("risk.byFiling")}</h2>
                   <RecordTable rows={s.by_filing} columns={["FilingId", "LegalEntity", "Status", "Spend", "Risk", "Score"]}
                     onRow={(r) => { setFiling(String(r.FilingId)); setPick({}); }} />
                 </div>
@@ -134,7 +137,7 @@ export function RiskView() {
                 <h2>Largest risks</h2>
                 <div className="table-wrap">
                   <table>
-                    <thead><tr><th>Reason</th><th>Item</th><th>Vendor</th><th>Entity</th><th>Filing</th><th>Days</th><th className="num">Risk</th><th>Fix</th></tr></thead>
+                    <thead><tr><th>Reason</th><th>Item</th><th>Vendor</th><th>Entity</th><th>{t("risk.filing")}</th><th>Days</th><th className="num">Risk</th><th>Fix</th></tr></thead>
                     <tbody>
                       {s.top.map((t, i) => (
                         <tr key={i}>

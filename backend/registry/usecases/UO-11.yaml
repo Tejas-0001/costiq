@@ -1,5 +1,5 @@
 id: UO-11
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'Failed and retried LLM requests (tokens paid for nothing)'
 category: 'Optimization · AI'
 module: optimization

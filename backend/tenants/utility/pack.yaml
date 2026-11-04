@@ -1,0 +1,167 @@
+# Tenant pack: electric utility holding company with generic names (see backend/tenants/__init__.py for every key).
+# Paths are relative to backend/.
+name: utility
+
+# Sample build: shared base generator (names.py), then these add-ons in order against the source DuckDB file.
+addons:
+  - tenants/utility/sample.py
+  - data/optimization.py
+
+# Tenant schema files loaded after the shared core (focus, app, regulatory) and before the optimization schema.
+schema:
+  - tenants/utility/schema.sql
+
+# Tenant register tables copied from the generated sample into the served database (tables in tenants/utility/schema.sql).
+register_tables: [ref_ferc_account, ref_ferc_rule, ref_exception_code, ref_rule_change, ref_work_order, ref_allocation_factor,
+                  ref_required_tag, ref_tag_denylist, ref_tag_value_map, ref_cloud_account, ref_invoice_reconciling_item,
+                  ref_prepayment, ref_rate_case, ref_vendor, ref_cip_review, ref_storm_event, ref_volume, ref_ai_use]
+
+# Allocation rules seeded by `costiq seed`: [rule id, name, priority, match column, match value, cost center]
+default_rules:
+  - [R-TAX, Untagged tax lines to finance and regulatory services, 10, ChargeCategory, Tax, Finance & Regulatory Services]
+  - [R-DEFAULT-WS, Claude Default Workspace to end-user computing until owners are assigned, 20, x_WorkspaceName, Default Workspace, End-User Computing]
+  - [R-M365-NOCC, Copilot seats with no cost center to end-user computing (workstations), 25, ServiceName, Microsoft 365 Copilot, End-User Computing]
+  - [R-AWS-DEV, grid-dev account to Transmission Operations, 30, SubAccountId, "333333333333", Transmission Operations]
+  - [R-SNOW, Snowflake account to the data platform, 30, SubAccountId, GRID_PROD, Data & Analytics Platform]
+
+# The FERC ledger (costiq/allocation.py, engine: ferc). Every charge, in the order of the rule register (ref_ferc_rule):
+#   entity       direct charge first: an opco tag naming one company (after ref_tag_value_map) books 100% there under the
+#                approved `direct_policy` (457.1); else the first approved ref_allocation_policy (fixed entity 457.1, a
+#                factor 457.2, or 457.1 for a factor whose ref_allocation_factor.BillingClass says so, e.g. a work order's
+#                benefiting companies); else held at the service company in suspense (`exceptions.no_opco`).
+#   function     tag ferc_function (normalized, valid) -> ref_cost_center.FercFunction -> ref_cloud_account.FercFunction ->
+#                the multi-function default (`multi_function`, flagged) when the cost center is multi-function.
+#   rule         R12 tax and R13 credits/corrections take the account of the line's map row; R9 commitment purchases stay at
+#                the service company in 165 (their dollars reach companies through the consuming usage); a requested class
+#                (`classes`: `when`) books its account only when `valid` holds, else the line stays in O&M through the map
+#                with the class's `held` exception; then the account map (ref_gl_account_map: first row by Priority matched
+#                on ChargeCategory, ServiceCategory, ServiceName or CostCenter, the entity type and FunctionCode), whose
+#                RuleId places the line (R4 support and R8 networking by function, R5-R7 by cost center, R16 service company
+#                by nature and the non-utility affiliate); AI seats and tokens take `rules.ai` over R5-R7.
+#   guard        an account flagged LaborOnly in ref_ferc_account (920) books nothing (`exceptions.labor_account`).
+# Citation and PolicyFlag come from ref_ferc_rule. One exception per line, first match wins (see `exception_order`).
+allocation:
+  engine: ferc
+  classes:
+    - class: cwip
+      when: "j.Capex = 'true' OR j.Impl = 'true'"          # capital requested (capex or implementation tag)
+      valid: "j.WoStatus = 'valid'"                         # work order on file, threshold date on or before the charge, not yet in service
+      held: "CASE j.WoStatus WHEN 'missing' THEN 'no_work_order' WHEN 'no_threshold' THEN 'capitalizable_without_threshold_date' END"
+      rule: R1
+      function: Construction work in progress
+      account: "107"
+      title: Construction work in progress, Electric (work order)
+    - class: regulatory_asset
+      when: "j.Impl = 'deferral_requested'"                 # deferral requested
+      valid: "jp.CreditClaimed"                             # a commission order on file for the jurisdiction
+      held: "'regulatory_asset_without_order'"
+      rule: R11
+      function: Regulatory asset (commission order)
+      account: "182.3"
+      title: Other regulatory assets
+  default_class: om
+  unmapped_exception: unmapped_ferc_account
+  expense_classes: [om]
+  # allocated_cost columns this tenant adds (tenants/utility/schema.sql); costiq.allocation.extra_columns()
+  ledger_columns: [SubAccountId, InvoiceId, InvoiceDetailId, ChargeDescription, FunctionCode, RuleId, Citation, PolicyFlag,
+                   WorkOrderId, BillingClass]
+  ferc:
+    direct_policy: AP-DIRECT          # approved policy stamped on direct lines (factor F-DIR)
+    shared_tag_value: SHARED          # opco value meaning "not one company"
+    multi_function: GENERAL
+    nonutility: {function: NONUTIL, entity_types: [affiliate]}
+    commitment: {class: prepayment, rule: R9, account: "165", title: Prepayments, function: Prepayment (amortized through the consuming usage)}
+    rules:
+      tax: R12
+      credit: R13
+      service_company: R16
+      ai: R17
+      ai_replaces: [R5, R6, R7]
+      by_function: {T: R5, D: R6, CUST: R7, AG: R7, GENERAL: R7, NONUTIL: R16}   # when no map row matched
+    exceptions:
+      no_opco: no_opco
+      labor_account: labor_account_on_non_labor
+      no_function: no_ferc_function
+      multi_function: multi_function_default_397.2
+      cip_review: cip_review_pending
+    exception_order: [no_opco, labor_account_on_non_labor, unmapped_ferc_account, no_work_order, capitalizable_without_threshold_date,
+                      regulatory_asset_without_order, no_ferc_function, multi_function_default_397.2, cip_review_pending]
+    tables: {rule: ref_ferc_rule, account: ref_ferc_account, work_order: ref_work_order, value_map: ref_tag_value_map,
+             cloud_account: ref_cloud_account, factor: ref_allocation_factor, cip_review: ref_cip_review}
+
+# Use cases the shared routes call by role (tenants/utility/usecases/).
+usecases:
+  bridge: UT-05            # rate-case test-year bridge (/api/tax/filing/{filing}/bridge, audit file)
+  recharge: UT-02          # service-company billing by receiving company (/api/tax/recharge-schedule)
+  filing_exhibits: [UT-05, UT-06]
+  capital_path: UT-16      # work orders: 107 -> in service -> 403 (/api/tax/capital-path)
+  exception_queue: UT-17
+  tag_compliance: UT-15
+  invoice_tieout: UT-18
+  seat_reharvest: UT-20
+  token_check: UT-21
+  rule_register: UT-22     # /api/tax/rule-register
+  account_listing: UT-25   # transactions by FERC account (/api/tax/ledger/listing)
+
+# Invoice reconciliation: labeled reconciling items, matched to invoice lines on InvoiceDetailId.
+reconciliation:
+  items_table: ref_invoice_reconciling_item
+
+# Tag enforcement (required tags, value normalization, account defaults and the suspense queue).
+tags:
+  required_table: ref_required_tag
+  value_map_table: ref_tag_value_map
+  account_table: ref_cloud_account              # owner, owning entity, default cost center per account
+  suspense_exception: no_opco
+  suspense_owner: Corporate IT Finance / Cloud CoE
+
+controls:
+  cross_subsidy_accounts: ref_cloud_account     # C-09 also flags regulated lines from accounts a non-regulated entity owns
+
+# {{name}} placeholders in registry YAML (shared use cases).
+usecase_vars:
+  residency_data_class: ceii
+  residency_data_label: CEII data
+  extension_source: MM CostIQ Utility extension
+  idle_risk_note: Spend on resources that serve no one fails the used-and-useful test, so idle resources are both waste and disallowance risk.   # CO-02
+  default_application: outage-map   # F-60 default application (an application tag in the sample)
+  storage_tier_note: Check record-retention schedules for operational and customer data before moving tiers.
+
+data_requests:
+  id_prefix: DR
+  ledger_target: data_request
+
+ask_synonyms:
+  ferc: ferc account
+  docket: docket filing
+  dockets: docket filing
+  rate: rate case
+  cwip: construction work in progress
+  opco: operating company entity
+  opcos: operating company entity
+  affiliate: affiliate entity service company
+  affiliates: affiliate entity service company
+  servco: service company billing
+  cip: cip review
+  bcsi: cip review
+  ceii: ceii residency
+  storm: storm event
+  workorder: work order
+  entity: entity operating company
+  entities: entity operating company
+  gl: ferc account
+  suspense: untagged tag compliance
+  untagged: untagged tag compliance
+  tags: tag compliance
+  tagging: tag compliance
+  unbundle: service company billing
+  invoice: invoice reconciliation
+  prepayment: prepayment amortization
+  "457": service company billing direct indirect
+  listing: transaction listing ferc account
+  transactions: transaction listing ferc account
+  readiness: data readiness discovery
+  capital: capital work order cwip
+  plant: plant in service capital
+  depreciation: depreciation 403 capital
+  workorders: work order capital

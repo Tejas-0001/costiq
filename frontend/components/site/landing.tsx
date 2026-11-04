@@ -1,10 +1,12 @@
 "use client";
 // Landing / sign-in page: what MM CostIQ is, live headline figures, and sign-in by role.
+// The tenant's words (persona cards, groups, value tiles, band line and art) come from /api/config copy (landing.*).
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { choosePersona } from "@/app/actions";
+import { choosePersona, chooseTenant } from "@/app/actions";
 import { MMLockup } from "@/components/brand";
+import { lookup, type Copy } from "@/components/copy";
 import { api } from "@/lib/api";
 
 type Persona = { key: string; label: string; group: string };
@@ -12,50 +14,24 @@ type Highlights = {
   run_rate: number; spend_series: number[]; forecast_variance_pct: number; variance_series: number[];
   optimization_potential: number; optimization_series: number[]; as_of: string;
 };
-type Config = { auth_mode: string; personas: Persona[]; highlights: Highlights | null };
+type Config = { auth_mode: string; personas: Persona[]; highlights: Highlights | null; tenant?: string; copy?: Copy };
 
-const DESCRIPTIONS: Record<string, string> = {
-  cfo: "Enterprise financial exposure, deduction at risk, R&D credit and verified savings.",
-  pl_exec: "Business-unit leader accountable for allocated cloud and AI expense against budget.",
-  fpa_partner: "Prepares budget and forecast revisions, writes variance commentary and submits for review.",
-  fpa_analyst: "Detailed cost exploration, reconciliation support, trend analysis and evidence-backed reports.",
-  finance_controller: "Invoice reconciliation, exception investigation, allocation rules and close readiness.",
-  auditor: "Control coverage, invoice-to-charge evidence, approved rules and lineage.",
-  tax_analyst: "Tax filings, deduction-at-risk evidence, R&D credit claims and examiner requests.",
-  transfer_pricing: "Intercompany recharges, allocation keys and transfer-pricing documentation.",
-  gxp_compliance: "Patient data in the cloud, GxP vendor quality agreements and AI validation reviews.",
-  tech_exec: "Enterprise cloud and AI spending, budget variance, risk and savings at a glance.",
-  finops_analyst: "Multi-cloud spend analysis, normalized FOCUS records, allocation and optimization.",
-  cloud_ops: "Cloud-invoiced consumption, resource anomalies, utilization and engineering review.",
-  ai_program_owner: "AI vendor spend, token and model economics, Copilot and Claude utilization and adoption.",
-  investor_relations: "Board Pack, spend run-rate, verified savings and R&D credit for investor reporting.",
-};
-
-const GROUPS: Record<string, { tone: string; icon: string; sub: string }> = {
-  "Finance Leadership & Planning": { tone: "fin", icon: "bars", sub: "Budgets, forecasts and executive decisions" },
-  "Regulatory & Compliance": { tone: "ctl", icon: "shield", sub: "Tax, transfer pricing, GxP and patient data" },
-  "Technology & Operations": { tone: "tech", icon: "gear", sub: "Spend, consumption and optimization" },
-  "Board & Investor": { tone: "brd", icon: "chart", sub: "Board Pack and investor reporting" },
-};
-const ORDER = Object.keys(GROUPS);
-
-const VALUE = [
-  { icon: "cloud", t: "One view of all spend",
-    d: "AWS, Azure, Google Cloud, Snowflake, and AI services such as Claude, OpenAI and Microsoft Copilot: usage, seats and credits side by side." },
-  { icon: "search", t: "Answers you can audit",
-    d: "More than 115 ready-made analyses. Each figure shows the formula behind it, and every approval is recorded in a log that can’t be quietly edited." },
-  { icon: "target", t: "A view for every role",
-    d: "CFOs, technology leaders, FinOps analysts, internal controllers and auditors each see what their role needs. There are one-page summaries for the board and for regulators." },
-  { icon: "shield", t: "Made for regulated work",
-    d: "Industry packs, such as life sciences and energy & utilities, check cloud and AI spend against the rules you report under. Sign-in uses your existing company login, and each person sees only their own business units." },
-];
-
-const PERSONA_ICON: Record<string, string> = {
-  cfo: "crown", pl_exec: "bars", fpa_partner: "doc", fpa_analyst: "trend", finance_controller: "calc",
-  tax_analyst: "doc", transfer_pricing: "arrow", gxp_compliance: "shield",
-  tech_exec: "monitor", finops_analyst: "cloud", cloud_ops: "server", ai_program_owner: "spark",
-  investor_relations: "up", auditor: "search",
-};
+/** The tenant's landing copy: groups [name, tone, icon, sub], persona cards [key, icon, description], value tiles
+ *  [icon, title, text], the band's first line and the band art ("helix" or "grid"). */
+function landingCopy(copy: Copy | undefined) {
+  const c = copy ?? {};
+  const groups = lookup<[string, string, string, string][]>(c, "landing.groups") ?? [];
+  const personas = lookup<[string, string, string][]>(c, "landing.personas") ?? [];
+  return {
+    groups: Object.fromEntries(groups.map(([name, tone, icon, sub]) => [name, { tone, icon, sub }])),
+    order: groups.map(([name]) => name),
+    icon: Object.fromEntries(personas.map(([key, icon]) => [key, icon])) as Record<string, string>,
+    description: Object.fromEntries(personas.map(([key, , d]) => [key, d])) as Record<string, string>,
+    value: (lookup<[string, string, string][]>(c, "landing.value") ?? []).map(([icon, t, d]) => ({ icon, t, d })),
+    band: lookup<string>(c, "landing.band") ?? "",
+    art: lookup<string>(c, "landing.art") ?? "",
+  };
+}
 
 const PATHS: Record<string, string> = {
   bars: "M4 20V10M10 20V4M16 20v-7M22 20H2",
@@ -120,7 +96,7 @@ function MiniArea({ values = [], color }: { values?: number[]; color: string }) 
   );
 }
 
-/** Abstract science art: a double helix, hexagonal molecule rings and cell-like circles on a slate field. */
+/** Abstract art (copy landing.art "helix"): a double helix, hexagonal rings and cell-like circles on a slate field. */
 function HeroArt() {
   const W = 1280, H = 380, N = 64;
   const strand = (phase: number) => Array.from({ length: N + 1 }, (_, i) => {
@@ -160,8 +136,51 @@ function HeroArt() {
   );
 }
 
+/** Abstract art (copy landing.art "grid"): a three-phase waveform strung between poles, and a small mesh of network nodes,
+ *  on the same slate field and palette as HeroArt. */
+function GridArt() {
+  const W = 1280, H = 380, N = 120;
+  const wave = (phase: number) => Array.from({ length: N + 1 }, (_, i) => {
+    const x = 80 + (i / N) * 820, y = 210 + Math.sin((i / N) * Math.PI * 6 + phase) * 64;
+    return `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
+  const poles = Array.from({ length: 7 }, (_, i) => 110 + i * 130);
+  const span = (y: number, sag: number) => poles.slice(1).map((x, i) =>
+    `M${poles[i]},${y} Q${(poles[i] + x) / 2},${y + sag} ${x},${y}`).join(" ");
+  const nodes = [[1000, 112], [1092, 168], [1184, 108], [1060, 262], [1168, 300], [962, 214], [1236, 214]];
+  const links = [[0, 1], [1, 2], [1, 3], [3, 4], [0, 5], [5, 3], [2, 6], [6, 4]];
+  return (
+    <svg className="lp-art" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <radialGradient id="glow" cx="0.42" cy="0.5" r="0.6">
+          <stop offset="0" stopColor="#0f6ec8" stopOpacity="0.5" /><stop offset="1" stopColor="#22282c" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0.55" stopColor="#22282c" stopOpacity="0" /><stop offset="1" stopColor="#22282c" stopOpacity="0.85" />
+        </linearGradient>
+      </defs>
+      <rect width={W} height={H} fill="#22282c" />
+      <rect width={W} height={H} fill="url(#glow)" />
+      {poles.map((x) => (
+        <g key={x} stroke="#b8c1cb" strokeOpacity="0.3" strokeWidth="2">
+          <line x1={x} x2={x} y1={58} y2={350} /><line x1={x - 30} x2={x + 30} y1={74} y2={74} /><line x1={x - 20} x2={x + 20} y1={96} y2={96} />
+        </g>
+      ))}
+      <path d={span(74, 18)} fill="none" stroke="#b8c1cb" strokeOpacity="0.35" strokeWidth="1.5" />
+      <path d={span(96, 14)} fill="none" stroke="#b8c1cb" strokeOpacity="0.25" strokeWidth="1.5" />
+      <path d={wave(0)} fill="none" stroke="#6fb3e8" strokeWidth="3" strokeOpacity="0.9" />
+      <path d={wave((2 * Math.PI) / 3)} fill="none" stroke="#97b5c3" strokeWidth="3" strokeOpacity="0.7" />
+      <path d={wave((4 * Math.PI) / 3)} fill="none" stroke="#bfe0f7" strokeWidth="2.5" strokeOpacity="0.55" />
+      {links.map(([a, b], i) => <line key={i} x1={nodes[a][0]} y1={nodes[a][1]} x2={nodes[b][0]} y2={nodes[b][1]} stroke="#6fb3e8" strokeOpacity="0.45" strokeWidth="2" />)}
+      {nodes.map(([x, y], i) => <g key={i}><circle cx={x} cy={y} r="16" fill="#97b5c3" opacity="0.1" /><circle cx={x} cy={y} r="5" fill="#bfe0f7" /></g>)}
+      <rect width={W} height={H} fill="url(#fade)" />
+    </svg>
+  );
+}
+
 /** `signedIn` comes from the server (the session cookie is http-only). `roles` renders only the sign-in by role (the /sign-in page). */
-export function Landing({ signedIn = false, roles = false }: { signedIn?: boolean; roles?: boolean }) {
+export function Landing({ signedIn = false, roles = false, tenants = [], tenant = "" }:
+  { signedIn?: boolean; roles?: boolean; tenants?: { key: string; label: string }[]; tenant?: string }) {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -173,10 +192,16 @@ export function Landing({ signedIn = false, roles = false }: { signedIn?: boolea
   const target = next.startsWith("/deploy") ? "the Deployment planner" : next !== "/command" ? "that page" : null;
 
   const hl = cfg?.highlights;
+  const lc = landingCopy(cfg?.copy);
   const groups: Record<string, Persona[]> = {};
   (cfg?.personas ?? []).forEach((p) => { (groups[p.group] ??= []).push(p); });
-  const names = [...ORDER.filter((g) => groups[g]), ...Object.keys(groups).filter((g) => !ORDER.includes(g))];
+  const names = [...lc.order.filter((g) => groups[g]), ...Object.keys(groups).filter((g) => !lc.order.includes(g))];
   const go = (key: string) => { setPicked(key); start(() => choosePersona(key, next)); };
+  // switching tenant signs out of the current tenant's role, then reloads so roles and wording come from the other API
+  const switchTo = (key: string) => { if (key !== tenant) start(async () => { await chooseTenant(key); window.location.reload(); }); };
+  const at = tenants.findIndex((t) => t.key === tenant);
+  const current = at >= 0 ? tenants[at] : undefined;
+  const other = tenants.length > 1 && current ? tenants[(at + 1) % tenants.length] : undefined;  // the footer button cycles
 
   return (
     <div className="lp">
@@ -197,12 +222,14 @@ export function Landing({ signedIn = false, roles = false }: { signedIn?: boolea
       </section>
 
       <section className="lp-band">
-        <HeroArt />
-        <div className="lp-band-text">
-          <div>From molecule to patient,</div>
-          <div className="hl">cloud and AI costs, governed</div>
-          <span className="bar" />
-        </div>
+        {lc.art === "grid" ? <GridArt /> : lc.art ? <HeroArt /> : null}
+        {lc.band && (
+          <div className="lp-band-text">
+            <div>{lc.band}</div>
+            <div className="hl">cloud and AI costs, governed</div>
+            <span className="bar" />
+          </div>
+        )}
       </section>
 
       {hl && (
@@ -217,7 +244,7 @@ export function Landing({ signedIn = false, roles = false }: { signedIn?: boolea
 
       <section className="lp-value">
         <div className="lp-wrap lp-value-grid">
-          {VALUE.map((v) => (
+          {lc.value.map((v) => (
             <div key={v.t}><span className="vi"><Icon name={v.icon} size={22} /></span><b>{v.t}</b><p>{v.d}</p></div>
           ))}
         </div>
@@ -235,15 +262,15 @@ export function Landing({ signedIn = false, roles = false }: { signedIn?: boolea
           {err && <div className="error" style={{ margin: "12px 0" }}>CostIQ can&apos;t reach its API: {err}</div>}
           <div className="lp-groups">
             {names.map((name) => {
-              const g = GROUPS[name] ?? { tone: "tech", icon: "gear", sub: "" };
+              const g = lc.groups[name] ?? { tone: "tech", icon: "gear", sub: "" };
               return (
                 <section key={name} className={`lp-group ${g.tone}`}>
                   <header><span className="gi"><Icon name={g.icon} size={22} /></span><div><h3>{name}</h3><p>{g.sub}</p></div></header>
                   <div className="lp-cards">
                     {groups[name].map((p) => (
                       <button key={p.key} type="button" className="lp-card" disabled={pending} onClick={() => go(p.key)}>
-                        <span className="pi"><Icon name={PERSONA_ICON[p.key] ?? "target"} size={17} /></span>
-                        <span className="pt"><b>{p.label}</b><span>{pending && picked === p.key ? "Signing in…" : DESCRIPTIONS[p.key] ?? ""}</span></span>
+                        <span className="pi"><Icon name={lc.icon[p.key] ?? "target"} size={17} /></span>
+                        <span className="pt"><b>{p.label}</b><span>{pending && picked === p.key ? "Signing in…" : lc.description[p.key] ?? ""}</span></span>
                         <span className="chev"><Icon name="chev" size={16} /></span>
                       </button>
                     ))}
@@ -259,7 +286,9 @@ export function Landing({ signedIn = false, roles = false }: { signedIn?: boolea
         <div className="lp-wrap">
           <p className="lk"><Icon name="lock" size={14} /> Runs inside your environment. Sign-in uses your company login, and each person sees
             only their own business units{hl?.as_of ? `. Data as of ${hl.as_of}` : ""}.</p>
-          <p><Link href={signedIn ? "/deploy" : "/sign-in?next=%2Fdeploy"}>Deployment planner</Link> · <Link href="/glossary">Glossary</Link></p>
+          <p><Link href={signedIn ? "/deploy" : "/sign-in?next=%2Fdeploy"}>Deployment planner</Link> · <Link href="/glossary">Glossary</Link>
+            {other && <> · <span className="lp-industry">Industry: <b>{current?.label}</b>
+              <button type="button" disabled={pending} onClick={() => switchTo(other.key)}>Change to {other.label}</button></span></>}</p>
           <p className="by">MM CostIQ · Miracle Minds</p>
         </div>
       </footer>

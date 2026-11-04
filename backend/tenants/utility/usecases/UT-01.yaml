@@ -1,0 +1,60 @@
+id: UT-01
+source: MM CostIQ Utility extension
+title: 'Technology spend by FERC account and cost class'
+category: 'Utility · FERC accounting'
+module: tax
+business_question: 'Does every allocated technology dollar land in a FERC account, and how much is construction work in progress, O&M or a regulatory asset?'
+personas:
+- finance_controller
+- regulatory_analyst
+- auditor
+- cfo
+catalog_persona: 'Controller, Regulatory Accounting'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'The allocated ledger by receiving company, FERC account and cost class. Build work under an open work order books to 107; recurring cloud and SaaS fees go to functional O&M through the account map (R4-R8, R17); tax and credits follow the line they belong to (R12, R13). Dollars with no account are flagged.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'ferc account'
+- 'uniform system of accounts'
+- 'order 898'
+- 'cost class'
+- 'cwip'
+- '107'
+- 'o&m'
+- 'unmapped'
+products: Any provider
+sql: |-
+  SELECT
+    LegalEntity,
+    COALESCE(GlAccount, '(unmapped)') AS FercAccount,
+    COALESCE(MAX(GlTitle), 'No FERC account mapped') AS FercTitle,
+    MAX(PnlFunction) AS Function,
+    FunctionCode,
+    CostClass,
+    RuleId,
+    MAX(PolicyFlag) AS PolicyFlag,
+    COUNT(DISTINCT ChargeKey) AS ChargeLines,
+    ROUND(SUM(AllocatedCost), 2) AS AllocatedCost,
+    CASE WHEN GlAccount IS NULL THEN 'Unmapped' ELSE 'Mapped' END AS Status
+  FROM allocated_cost
+  WHERE PeriodStart >= :period_start AND PeriodStart < :period_end
+  GROUP BY LegalEntity, GlAccount, FunctionCode, CostClass, RuleId
+  ORDER BY CASE WHEN GlAccount IS NULL THEN 0 ELSE 1 END, AllocatedCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'The account map is owned by regulatory accounting; [POLICY] rows await the controller''s sign-off (UT-22). Account 920 is A&G salaries and never receives a cloud or software line (UT-23).'
+compliance:
+  area: 'FERC accounting'
+  reference: '18 CFR Part 101 and Part 367 · Order No. 898'
+  unit: 'account lines'
+  flag: 'Status = ''Unmapped'''
+  amount: AllocatedCost

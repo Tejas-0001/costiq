@@ -1,0 +1,58 @@
+id: UT-04
+source: MM CostIQ Utility extension
+title: 'Regulatory-asset deferral by jurisdiction'
+category: 'Utility · Regulatory accounting'
+module: tax
+business_question: 'Where do commission orders allow cloud costs to be deferred, and where has no deferral been requested?'
+personas:
+- regulatory_analyst
+- cfo
+- finance_controller
+catalog_persona: 'Rates & Regulatory, CFO'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Recurring cloud and SaaS fees and non-capitalizable implementation costs by jurisdiction, against each jurisdiction''s deferral status: deferred to 182.3 under an order, not yet requested, or denied.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'regulatory asset'
+- '182.3'
+- 'deferral'
+- 'commission order'
+- 'cloud computing arrangement'
+products: Any provider
+sql: |-
+  SELECT
+    a.Jurisdiction,
+    p.CreditStatus AS DeferralStatus,
+    p.Reference AS OrderReference,
+    ROUND(SUM(a.AllocatedCost), 2) AS EligibleCost,
+    ROUND(SUM(CASE WHEN a.CostClass = 'regulatory_asset' THEN a.AllocatedCost ELSE 0 END), 2) AS Deferred182_3,
+    ROUND(SUM(CASE WHEN a.CostClass = 'om' THEN a.AllocatedCost ELSE 0 END), 2) AS ExpensedNoReturn,
+    CASE WHEN p.CreditStatus = 'claimed' THEN 'Deferred under order'
+         WHEN p.CreditStatus = 'eligible' THEN 'No order on file: request deferral'
+         WHEN p.CreditStatus = 'ineligible' THEN 'Denied: re-file with a customer-savings case'
+         ELSE 'Not applicable' END AS Opportunity
+  FROM allocated_cost a
+  JOIN ref_jurisdiction_policy p ON p.Jurisdiction = a.Jurisdiction
+  WHERE a.CostClass IN ('om', 'regulatory_asset')
+    AND ((a.ChargeCategory = 'Purchase' AND a.ChargeFrequency = 'Recurring') OR a.CostClass = 'regulatory_asset')
+    AND a.PeriodStart >= :period_start AND a.PeriodStart < :period_end
+  GROUP BY a.Jurisdiction, p.CreditStatus, p.Reference
+  ORDER BY ExpensedNoReturn DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: '182.3 needs an order on file; a requested deferral without one stays in O&M (exception regulatory_asset_without_order).'
+compliance:
+  area: 'Rates'
+  reference: 'Acct 182.3 · ASC 350-40 · Idaho PUC Order No. 34707 (precedent)'
+  unit: 'jurisdictions'
+  flag: 'Opportunity = ''No order on file: request deferral'''
+  amount: ExpensedNoReturn

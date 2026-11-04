@@ -1,0 +1,34 @@
+/* Bill unbundling and tag enforcement (components/views/ledger.tsx): the invoice-to-ledger drawer, the tag-compliance
+   panel and pooling-rule proposals. Uses the app tokens from globals.css; fonts inherit (Times New Roman). */
+
+/* the invoice-to-ledger drawer is wider than the lineage drawer; lineage opens on top of it */
+.drawer.ledger-drawer { width: min(1040px, 100vw); }
+.drawer.ledger-drawer ~ .drawer-bg { z-index: 22; }
+.drawer.ledger-drawer ~ .drawer { z-index: 23; }
+.ledger-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+.ledger-head h2 { margin: 0 0 4px; }
+.ledger-sub { font-size: 13px; color: var(--ink-2); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.ledger-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 10px 0 14px; }
+.ledger-kpis .kpi { padding: 10px 12px; }
+.ledger-kpis .kpi .value { font-size: 19px; }
+.ledger-section { margin-top: 16px; }
+.ledger-section > h3 { margin: 0 0 6px; font-size: 15px; }
+.ledger-section .table-wrap { max-height: 340px; border: 1px solid var(--line); border-radius: 8px; }
+.ledger-cite { font-size: 11.5px; color: var(--ink-2); max-width: 260px; }
+.ledger-click tbody tr { cursor: pointer; }
+.ledger-click tbody tr:hover td { background: var(--panel-2); }
+
+/* tag-compliance panel on the Allocation page */
+.tag-panel .card-head select { min-width: 220px; }
+.tag-panel .kpi .sub { line-height: 1.4; }
+.tag-panel td .btn { white-space: nowrap; }
+.rule-form { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) auto; gap: 8px; align-items: end; padding: 0 16px 12px; }
+.rule-form label { font-size: 12px; color: var(--ink-2); display: flex; flex-direction: column; gap: 3px; }
+.rule-form input, .rule-form select { width: 100%; }
+.rule-note { font-size: 12.5px; color: var(--ink-2); padding: 0 16px 10px; line-height: 1.45; }
+.card.flush > .notice { margin: 0 16px 12px; }
+
+@media (max-width: 1100px) {
+  .ledger-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rule-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

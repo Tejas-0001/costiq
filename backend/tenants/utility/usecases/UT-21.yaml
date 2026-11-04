@@ -1,0 +1,53 @@
+id: UT-21
+source: MM CostIQ Utility extension
+title: 'AI token cost check: cache tokens counted'
+category: 'Utility · Copilot and AI'
+module: ai
+business_question: 'Would AI cost be understated if only input and output tokens were added up?'
+personas:
+- ai_program_owner
+- finops_analyst
+- finance_controller
+catalog_persona: 'AI & Copilot Program Owner, Cloud CoE'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Token cost by application and model, by token type. The check fails where cache-read or cache-write tokens carry cost that an input-plus-output sum would miss.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'tokens'
+- 'cache tokens'
+- 'token reconciliation'
+- 'bedrock'
+- 'azure openai'
+- 'ai cost check'
+products: Any provider
+sql: |-
+  SELECT
+    json_extract_string(Tags, '$.application') AS Application,
+    x_ModelName AS Model,
+    ServiceName,
+    ROUND(SUM(EffectiveCost), 2) AS TotalCost,
+    ROUND(SUM(CASE WHEN x_TokenType = 'input' THEN EffectiveCost ELSE 0 END), 2) AS InputCost,
+    ROUND(SUM(CASE WHEN x_TokenType = 'output' THEN EffectiveCost ELSE 0 END), 2) AS OutputCost,
+    ROUND(SUM(CASE WHEN x_TokenType = 'cache_read' THEN EffectiveCost ELSE 0 END), 2) AS CacheReadCost,
+    ROUND(SUM(CASE WHEN x_TokenType = 'cache_write' THEN EffectiveCost ELSE 0 END), 2) AS CacheWriteCost,
+    ROUND(SUM(CASE WHEN x_TokenType IN ('input', 'output') THEN EffectiveCost ELSE 0 END), 2) AS InputPlusOutputOnly,
+    ROUND(SUM(CASE WHEN x_TokenType IN ('cache_read', 'cache_write') THEN EffectiveCost ELSE 0 END), 2) AS MissedIfCacheIgnored,
+    CASE WHEN SUM(CASE WHEN x_TokenType IN ('cache_read', 'cache_write') THEN EffectiveCost ELSE 0 END) > 0
+         THEN 'Fails if only input and output are added' ELSE 'Passes' END AS CheckResult
+  FROM CostAndUsage
+  WHERE x_TokenType IN ('input', 'output', 'cache_read', 'cache_write')
+    AND ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+  GROUP BY json_extract_string(Tags, '$.application'), x_ModelName, ServiceName
+  ORDER BY MissedIfCacheIgnored DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'FOCUS 1.4 carries the token counts in extension columns; the ledger keeps all four token types.'

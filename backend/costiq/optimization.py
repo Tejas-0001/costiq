@@ -131,7 +131,7 @@ class Optimizer:
         recs = rows(self.db.query("""
             SELECT r.*, (SELECT MAX(json_extract_string(c.Tags, '$.cost_center')) FROM CostAndUsage c
                          WHERE c.ResourceName = r.ResourceName) AS CostCenter
-            FROM optimization_recommendation r""", {}, None, limit=None))
+            FROM optimization_recommendation r ORDER BY r.RecommendationId""", {}, None, limit=None))
         for r in recs:
             lever = "ptu" if r["ActionType"] == "rightsize" and r["ServiceProviderName"] == "Microsoft" else ACTION_LEVER[r["ActionType"]]
             scope_type = "account" if str(r["ResourceName"]).startswith("account:") else "resource"

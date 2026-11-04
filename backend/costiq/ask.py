@@ -21,18 +21,19 @@ SYN = {
     "savings": "savings saving", "commitments": "commitment", "reservations": "reservation reserved",
     "anomalies": "anomaly spike", "spikes": "spike anomaly", "forecasted": "forecast", "projection": "forecast",
     "trend": "month over month trend", "increasing": "increase month over month", "growing": "increase month over month",
-    # pharma
-    "gl": "gl account", "filing": "tax filing", "filings": "tax filing", "idr": "examiner request filing",
-    "examiner": "examiner tax filing", "entity": "entity affiliate",
-    "entities": "entity affiliate", "affiliate": "affiliate entity recharge", "affiliates": "affiliate entity recharge",
-    "recharge": "recharge transfer pricing", "recharges": "recharge transfer pricing", "intercompany": "recharge transfer pricing",
-    "tp": "transfer pricing", "credit": "credit qualifying research", "credits": "credit qualifying research", "qre": "qualifying research credit",
-    "phi": "patient data", "hipaa": "patient data", "gdpr": "patient data", "gxp": "gxp validation",
-    "part11": "gxp quality agreement", "genomic": "genomic residency", "study": "study event", "lock": "database lock study event",
-    "trial": "trial clinical", "trials": "trial clinical", "patients": "patient", "sites": "site trial",
-    "tax": "tax", "escalator": "escalator renewal",
-    "escalators": "escalator renewal", "renewals": "renewal",
 }
+
+
+def _tenant_synonyms() -> dict:
+    """The tenant's own terms (tenants/<t>/pack.yaml ask_synonyms), added after the shared list."""
+    try:
+        from .tenant import pack
+        return {str(k): str(v) for k, v in (pack().get("ask_synonyms") or {}).items()}
+    except Exception:  # noqa: BLE001 - Ask still works with the shared list
+        return {}
+
+
+SYN.update(_tenant_synonyms())
 MONTHS = {m.lower(): i for i, m in enumerate(calendar.month_name) if m} | {m.lower(): i for i, m in enumerate(calendar.month_abbr) if m}
 PROVIDERS = {"aws": "AWS", "amazon": "AWS", "azure": "Microsoft", "microsoft": "Microsoft", "gcp": "Google Cloud",
              "google": "Google Cloud", "anthropic": "Anthropic", "github": "GitHub", "snowflake": "Snowflake"}

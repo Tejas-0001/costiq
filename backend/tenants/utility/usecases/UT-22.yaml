@@ -1,0 +1,59 @@
+id: UT-22
+source: MM CostIQ Utility extension
+title: 'FERC rule register: dollars by rule and sign-off status'
+category: 'Utility · FERC accounting'
+module: tax
+business_question: 'Which mapping rule placed each dollar, on what citation, and which [POLICY] rules await the controller''s sign-off?'
+personas:
+- finance_controller
+- regulatory_analyst
+- auditor
+- cfo
+catalog_persona: 'Controller, Regulatory Accounting'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Rules R1-R17 in order of evaluation with their accounts by function, condition, citation and basis (Regulation or [POLICY]), and the allocated dollars each placed in the period.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'rule register'
+- 'ferc rules'
+- 'policy'
+- 'sign-off'
+- 'citation'
+- 'r1'
+- 'r5'
+- 'r7'
+- 'mapping rules'
+products: Any provider
+sql: |-
+  WITH r AS (
+    SELECT RuleId, AllocatedCost FROM allocated_cost
+    WHERE PeriodStart >= :period_start AND PeriodStart < :period_end
+  )
+  SELECT
+    f.RuleId, f.EvaluationStep, f.ChargePattern, f.TransmissionAccount, f.DistributionAccount, f.GeneralAccount,
+    f.Condition, f.Citation, f.Basis, f.PolicyElement, f.Status,
+    COUNT(r.RuleId) AS AllocatedLines,
+    ROUND(COALESCE(SUM(r.AllocatedCost), 0), 2) AS AllocatedCost
+  FROM ref_ferc_rule f
+  LEFT JOIN r ON r.RuleId = f.RuleId
+  GROUP BY f.RuleId, f.EvaluationStep, f.ChargePattern, f.TransmissionAccount, f.DistributionAccount, f.GeneralAccount,
+           f.Condition, f.Citation, f.Basis, f.PolicyElement, f.Status
+  ORDER BY f.EvaluationStep, f.RuleId
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'Dollars come from the rule stamped on each ledger line, so the rules add up to the ledger total. Tax and credit lines (R12, R13) take the account of the line they belong to. We make the company''s policy executable and auditable; the controller signs off every [POLICY] row.'
+compliance:
+  area: 'FERC accounting'
+  reference: 'Rule register R1-R17 · controller sign-off'
+  unit: 'rules'
+  flag: 'Status = ''awaiting sign-off'''
+  amount: AllocatedCost

@@ -1,7 +1,7 @@
 """Filing audit file: one deterministic ZIP per tax filing, sealed in the hash-chained ledger.
 
 Contents
-  forecast_bridge.csv       PH-05 review period to forecast year bridge
+  forecast_bridge.csv       the tenant's bridge use case (pharma PH-05): review period to forecast year
   workpapers/<vendor>.csv   every review-period line: allocation step by step, invoice line and tie-out, GL account,
                             evidence flags and risk
   approvals.csv             ledger entries for the policies, optimizations and exhibits behind the numbers
@@ -9,6 +9,11 @@ Contents
   risk_summary.csv          deduction at risk by reason and vendor
   ledger_certificate.json   chain verification result and the hash of the last decision entry
   methodology.md            how every figure is computed
+  listing_by_account.csv    tenants whose ledger carries rule ids: every line for the filing's entity, jurisdiction
+                            and review period, by account, with vendor, description, amount and invoice (pack.yaml
+                            `usecases.account_listing`)
+  rule_register.csv         the same tenants: each mapping rule, its citation and sign-off, and the dollars it placed
+                            for the filing's entity, jurisdiction and review period
 
 The ZIP is byte-identical for the same data (fixed timestamps, sorted entries, no wall-clock values inside), so its
 SHA-256 identifies the evidence. Exporting appends `audit_file:<filing>` to the ledger with that hash; anyone can later
@@ -16,9 +21,21 @@ prove a submitted file was not altered by checking the hash against the ledger.
 """
 from __future__ import annotations
 import csv, hashlib, io, json, zipfile
+from . import tenant
+from .data_requests import ledger_target
 from .engines import CHARGE_KEY
 
 FIXED = (2026, 1, 1, 0, 0, 0)
+# ledger columns copied into the workpapers when the tenant's ledger carries them (tenants/<t>/pack.yaml allocation.ledger_columns)
+WORKPAPER_COLUMNS = ("FunctionCode", "RuleId", "Citation", "PolicyFlag", "BillingClass", "WorkOrderId")
+
+
+def say(key, **values):
+    """Backend copy, or "" when the tenant's copy has no such key."""
+    try:
+        return tenant.text(key, **values)
+    except KeyError:
+        return ""
 
 
 def rows(res):
@@ -54,7 +71,9 @@ class EvidencePack:
         if not rc:
             raise KeyError(filing)
         rc = rc[0]
-        uc = self.reg.get("PH-05")
+        cols = self.ledger_columns()
+        extra = "".join(f", a.{c}" for c in WORKPAPER_COLUMNS if c in cols)
+        uc = self.reg.get(tenant.usecase("bridge"))
         bridge = rows(self.db.query(uc["sql"], self.reg.resolve_params(uc, {"filing": filing}), None, limit=None))
         lines = self.q(f"""
             WITH c AS (
@@ -64,7 +83,7 @@ class EvidencePack:
             SELECT e.ServiceProviderName AS Vendor, CAST(e.ChargeDay AS VARCHAR) AS ChargeDay, e.ServiceName, c.Resource,
                    e.Application, e.CostCenter, a.PoolMethod, a.OpcoPolicy, a.OpcoPolicyVersion, a.DriverName,
                    ROUND(a.OpcoShare, 6) AS OpcoShare, e.LegalEntity, e.Jurisdiction, ROUND(a.JurisdictionFactor, 4) AS JurisdictionFactor,
-                   e.GlAccount, e.CostClass, ROUND(a.SourceCost, 4) AS SourceCost, ROUND(e.AllocatedCost, 4) AS AllocatedCost,
+                   e.GlAccount, e.CostClass{extra}, ROUND(a.SourceCost, 4) AS SourceCost, ROUND(e.AllocatedCost, 4) AS AllocatedCost,
                    c.InvoiceId, c.InvoiceDetailId, e.Reconciled, e.PolicyApproved, e.GlMapped, e.BenefitShown, e.Remediated,
                    e.SavingsActioned, e.RiskReason, ROUND(e.RiskAmount, 4) AS RiskAmount, e.ChargeKey
             FROM filing_evidence e
@@ -76,7 +95,7 @@ class EvidencePack:
         for l in lines:
             by_vendor.setdefault(l["Vendor"], []).append(l)
         decisions = [e for e in self.ledger.entries()
-                     if e["Target"].split(":")[0] in ("policy", "optimization", "finding", "examiner_request", "exhibit")]
+                     if e["Target"].split(":")[0] in ("policy", "optimization", "finding", ledger_target(), "exhibit", "listing")]
         approvals = [{k: e[k] for k in ("Seq", "EntryAt", "Actor", "Persona", "Action", "Target", "Detail", "Hash")}
                      for e in decisions]
         actions = self.q("""SELECT OptimizationId, Lever, Title, ScopeType, ScopeKey, CostCenter, Status, EstimatedMonthlySavings,
@@ -107,6 +126,11 @@ class EvidencePack:
         }
         for vendor, vl in by_vendor.items():
             files[f"workpapers/{safe(vendor)}.csv"] = to_csv(vl)
+        if "RuleId" in cols:
+            files.update(self.ledger_files(rc))
+            note = say("tax.methodology_ledger", filing=filing)
+            if note:
+                files["methodology.md"] = files["methodology.md"].rstrip("\n") + "\n\n" + note + "\n"
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
             for name in sorted(files):
@@ -117,43 +141,52 @@ class EvidencePack:
         data = buf.getvalue()
         return data, hashlib.sha256(data).hexdigest(), certificate
 
+    def ledger_columns(self):
+        from .regulatory import Regulatory
+        return Regulatory(self.db, self.eng).ledger_columns()
+
+    def ledger_files(self, rc):
+        """listing_by_account.csv (the account-listing use case, run per account) and rule_register.csv for the filing's
+        entity, jurisdiction and review period. Rows are sorted on every key so the ZIP stays byte-identical."""
+        p = {"e": rc["LegalEntity"], "j": rc["Jurisdiction"], "b0": rc["ReviewPeriodStart"], "b1": rc["ReviewPeriodEnd"]}
+        scope = "LegalEntity = :e AND Jurisdiction = :j AND PeriodStart >= :b0 AND PeriodStart < :b1"
+        files = {}
+        uid = (tenant.pack().get("usecases") or {}).get("account_listing")
+        try:
+            uc = self.reg.get(uid) if uid else None
+        except KeyError:
+            uc = None
+        if uc:
+            names = {x["name"] for x in uc.get("params", [])}
+            accounts = [r["GlAccount"] for r in self.q(f"SELECT DISTINCT GlAccount FROM allocated_cost WHERE {scope} "
+                                                         "AND GlAccount IS NOT NULL ORDER BY 1", p)]
+            listing, columns = [], None
+            for a in accounts:
+                params = {"account": a, "period_start": str(rc["ReviewPeriodStart"])[:10], "period_end": str(rc["ReviewPeriodEnd"])[:10],
+                          "entity": rc["LegalEntity"]}
+                res = self.db.query(uc["sql"], self.reg.resolve_params(uc, {k: v for k, v in params.items() if k in names}),
+                                    None, limit=None)
+                columns = columns or res["columns"]
+                listing += [r for r in rows(res) if r.get("LegalEntity") == rc["LegalEntity"] and r.get("Jurisdiction") == rc["Jurisdiction"]]
+            first = [c for c in ("GlAccount", "ChargeDay", "ChargeKey", "InvoiceDetailId") if c in (columns or [])]
+            order = first + [c for c in (columns or []) if c not in first]
+            listing.sort(key=lambda r: [str(r.get(c)) for c in order])
+            files["listing_by_account.csv"] = to_csv(listing, columns) if listing else ""
+        placed = {r["RuleId"]: r for r in self.q(f"""SELECT RuleId, COUNT(*) AS Lines, ROUND(SUM(AllocatedCost), 2) AS AllocatedCost
+                                                     FROM allocated_cost WHERE {scope} GROUP BY 1""", p)}
+        register = []
+        for r in self.q("SELECT * FROM ref_ferc_rule ORDER BY EvaluationStep, RuleId"):
+            d = placed.get(r["RuleId"], {})
+            register.append({**r, "Lines": d.get("Lines", 0), "AllocatedCost": d.get("AllocatedCost", 0.0)})
+        files["rule_register.csv"] = to_csv(register)
+        return files
+
     def methodology(self, filing, rc):
-        return f"""# Technology cost evidence: {filing}
-
-{rc['LegalEntity']} ({rc['Jurisdiction']}), {rc['Authority']}. Review period {str(rc['ReviewPeriodStart'])[:10]} to
-{str(rc['ReviewPeriodEnd'])[:10]} (actuals); forecast year {str(rc['ForecastYearStart'])[:10]} to
-{str(rc['ForecastYearEnd'])[:10]}. Prepared with MM CostIQ.
-
-## Sources
-Provider billing exports in FOCUS format (cloud and AI), SaaS vendor invoices (file drop), invoice detail, and the
-group's reference registers (legal entities, allocation keys and policies, GL account map, jurisdiction factors).
-
-## Allocation (workpapers, one row per allocated charge)
-1. Pool: cost center from split-cost allocation tags, resource tags or approved rules.
-2. Entity: first approved policy by priority; shares from the policy's allocation key for the month, or 100% to a
-   fixed entity.
-3. Jurisdiction: the entity's jurisdiction factors.
-4. Cost class: capitalizable implementation (ASC 350-40), qre where the jurisdiction claims cloud fees as qualifying
-   research expenditure, else opex.
-5. GL account: the group's map.
-Allocated totals tie to source totals for every period (control C-10).
-
-## Forecast bridge (forecast_bridge.csv)
-Review-period cost by vendor, annualized; the forecast year adds contract escalators from each renewal date. Invoice
-tie-out compares each vendor's invoices with its charges.
-
-## Evidence tests (workpapers and risk_summary.csv)
-Reconciled to the invoice line (within $1); allocated under an approved, effective-dated policy; mapped to a GL
-account; benefit shown (no idle day, unused commitment or unused seat share) unless remediated by an implemented
-optimization; no known savings left unactioned for 60+ days.
-
-## Integrity
-approvals.csv lists the ledger entries for every policy, optimization and exhibit decision with their hashes.
-ledger_certificate.json records that the hash chain verified and the last decision entry. The SHA-256 of this ZIP is
-written to the ledger on export as `audit_file:{filing}`.
-
-Decision support for the tax team; not a legal opinion or a prediction of any tax authority's ruling.
-"""
+        """methodology.md, from the tenant's copy (backend.evidence.methodology)."""
+        return tenant.text("evidence.methodology", filing=filing, entity=rc["LegalEntity"], jurisdiction=rc["Jurisdiction"],
+                           authority=rc["Authority"], review_start=str(rc["ReviewPeriodStart"])[:10],
+                           review_end=str(rc["ReviewPeriodEnd"])[:10], forecast_start=str(rc["ForecastYearStart"])[:10],
+                           forecast_end=str(rc["ForecastYearEnd"])[:10])
 
     def export(self, filing, user, persona):
         data, sha, cert = self.build(filing)

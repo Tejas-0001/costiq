@@ -1,0 +1,73 @@
+{
+  "frontend": {
+    "allocation": {
+      "chainLink": "Entity, jurisdiction and GL steps",
+      "tags": {
+        "title": "Tag compliance",
+        "suspense": "In suspense",
+        "suspenseSub": "{share}% of cloud usage · owner {owner} · oldest {days} days",
+        "invalid": "Invalid tag values",
+        "cannot": "Cannot be tagged",
+        "cannotSub": "Tax, credits, fees and Marketplace, reported apart",
+        "covered": "Fully tagged",
+        "coveredSub": "Every required tag present and valid",
+        "byKey": "Coverage by required tag",
+        "byEntity": "By entity (after allocation)",
+        "byUnit": "By business unit",
+        "cannotTitle": "Cannot be tagged, by kind",
+        "suspenseTitle": "Suspense: untagged spend held at the shared-services entity",
+        "violations": "Tag violations",
+        "propose": "Propose rule"
+      },
+      "proposals": {
+        "title": "Pooling rule proposals",
+        "note": "A tag fixed at the provider does not restate history; an approved rule with an effective date does. One person proposes, another approves, and both actions go to the decision ledger.",
+        "submit": "Submit for approval"
+      }
+    },
+    "reconciliation": {
+      "drawerTitle": "Invoice line to ledger",
+      "where": "Allocated by entity and GL account",
+      "byEntity": "By entity",
+      "items": "Reconciling items",
+      "noItems": "Ties to the cost rows: nothing to reconcile.",
+      "charges": "Largest charges (click for lineage)",
+      "columns": {
+        "entity": "Entity",
+        "function": "Function",
+        "account": "GL account",
+        "title": "Account title",
+        "rule": "Rule",
+        "citation": "Citation",
+        "billing": "Billing class"
+      }
+    }
+  },
+  "backend": {
+    "ledger": {
+      "reconciliation_note": "A difference that registered reconciling items account for (±$1) is labeled when they are explained, or awaiting when one is still open.",
+      "invoice_formula": "Invoice line − Σ billed cost of its cost rows = the difference, explained by reconciling items. Allocated = Σ effective cost of the line's cost rows, split by entity and GL account; it ties to effective cost (C-10 for this line). Effective cost spreads commitment fees into the usage they cover, so billed and effective cost differ on usage and fee lines.",
+      "unexplained": "Difference not explained",
+      "lineage": {
+        "account_step": "GL account and cost class",
+        "work_order_step": "Capital project"
+      },
+      "tags": {
+        "formula": "Coverage = spend whose required tags are all present and valid ÷ taggable spend, weighted by cost; by entity after allocation. Tax, credits, adjustments, fees, Marketplace purchases and usage with no resource id cannot be tagged and are reported apart, never as violations. Suspense = taggable spend with no cost center after tags and approved rules; it waits with an owner instead of being spread. Share = suspense ÷ cloud usage in the tagged accounts.",
+        "unassigned": "Unassigned",
+        "unresolved": "Not resolved",
+        "normalized": "Normalized to {value}",
+        "queued": "Exception queue",
+        "not_in_register": "Not in the register: fix at source",
+        "not_taggable": {
+          "tax": "Tax",
+          "credit": "Credits and refunds",
+          "adjustment": "Rounding and adjustments",
+          "marketplace": "Marketplace purchases",
+          "purchase": "Support, commitment and seat fees",
+          "no_resource": "Usage with no resource id"
+        }
+      }
+    }
+  }
+}

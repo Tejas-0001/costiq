@@ -4,8 +4,9 @@ import csv, datetime as dt, io, json, logging, re, time
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
-from .auth import Principal, access, current_principal
+from .auth import Principal, access, current_principal, pseudonym
 from .config import settings
+from . import tenant
 from .context import asker, audit, db, eng, ledger, protect, reg, run_use_case
 from . import dialect
 from .board import BoardPack, confidence as forecast_confidence
@@ -72,6 +73,7 @@ def landing_highlights() -> dict | None:
 def public_config():
     acc = access()
     return {"auth_mode": settings.auth_mode, "tenant_name": settings.tenant_name,
+            "tenant": settings.tenant, "copy": tenant.frontend_copy(),  # the tenant pack and its UI copy (copy.json "frontend")
             "highlights": landing_highlights(),
             "oidc": {"authority": settings.oidc_issuer.replace("/v2.0", ""), "client_id": settings.spa_client_id,
                      "scope": f"{settings.oidc_audience}/access_as_user" if settings.oidc_audience else ""},
@@ -86,7 +88,7 @@ def me(p: Principal = Depends(current_principal)):
     acc = access()
     return {"user": p.user, "name": p.name, "personas": [{"key": k, "label": acc["personas"][k]["label"]} for k in p.personas],
             "modules": p.modules, "actions": p.actions, "scope": p.scope or "enterprise", "pii": p.pii,
-            "as_of": eng.as_of().isoformat()}
+            "as_of": eng.as_of().isoformat(), "tenant": settings.tenant, "copy": tenant.frontend_copy()}
 
 
 # ---------------------------------------------------------------------------------------- use cases
@@ -307,6 +309,20 @@ from .routes_regulatory import router as regulatory_router  # noqa: E402
 app.include_router(regulatory_router)
 app.include_router(monitoring_router)
 app.include_router(prudence_router)
+from .routes_codebase import router as codebase_router  # noqa: E402  (Snowflake SQL + dbt project export)
+app.include_router(codebase_router)
+
+# Optional routers: served as soon as the module exists (invoice-to-ledger drill, tag compliance, pooling rules; readiness).
+import importlib as _importlib  # noqa: E402
+
+for _name in ("routes_ledger", "routes_readiness"):
+    try:
+        _mod = _importlib.import_module(f"costiq.{_name}")
+    except ModuleNotFoundError as _e:
+        if _e.name != f"costiq.{_name}":
+            raise
+        continue
+    app.include_router(_mod.router)
 
 
 # ---------------------------------------------------------------------------------------- AI summary

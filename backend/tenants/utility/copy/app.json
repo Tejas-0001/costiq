@@ -1,0 +1,478 @@
+{
+  "frontend": {
+    "landing": {
+      "band": "From the invoice to the FERC account,",
+      "art": "grid",
+      "groups": [
+        [
+          "Finance & Regulatory Accounting",
+          "fin",
+          "bars",
+          "FERC ledger, rates, close and executive decisions"
+        ],
+        [
+          "Business Unit Finance",
+          "brd",
+          "chart",
+          "Budgets and allocated cost by business unit and company"
+        ],
+        [
+          "Technology",
+          "tech",
+          "gear",
+          "Spend, consumption and optimization"
+        ],
+        [
+          "Governance & Compliance",
+          "ctl",
+          "shield",
+          "Audit, controls and the NERC CIP program"
+        ]
+      ],
+      "personas": [
+        [
+          "finance_controller",
+          "calc",
+          "Invoice tie-out, the FERC ledger, rule sign-off, exceptions and close readiness."
+        ],
+        [
+          "cfo",
+          "crown",
+          "Enterprise financial exposure, disallowance at risk, earnings unlock and verified savings."
+        ],
+        [
+          "regulatory_analyst",
+          "doc",
+          "Dockets, test-year bridges, data requests and audit files for rate cases."
+        ],
+        [
+          "affiliate_accounting",
+          "arrow",
+          "Service company billing: 457.1 direct, 457.2 by factor, and the allocation factors."
+        ],
+        [
+          "transmission_finance",
+          "bolt",
+          "Transmission cloud and AI spend against budget, by cost center."
+        ],
+        [
+          "distribution_finance",
+          "trend",
+          "Distribution cloud and AI spend against budget, by cost center."
+        ],
+        [
+          "opco_finance",
+          "chart",
+          "One operating company's allocated cost, dockets and service company bills."
+        ],
+        [
+          "pl_exec",
+          "bars",
+          "Business-unit leader accountable for allocated cloud and AI expense against budget."
+        ],
+        [
+          "finops_analyst",
+          "cloud",
+          "Multi-cloud spend analysis, FOCUS records, tag enforcement, allocation and optimization."
+        ],
+        [
+          "tech_exec",
+          "monitor",
+          "Enterprise cloud and AI spending, budget variance, risk and savings at a glance."
+        ],
+        [
+          "cloud_ops",
+          "server",
+          "Cloud-invoiced consumption, resource anomalies, utilization and engineering review."
+        ],
+        [
+          "ai_program_owner",
+          "spark",
+          "AI vendor spend, token and model economics, Copilot seats and adoption."
+        ],
+        [
+          "cip_compliance",
+          "shield",
+          "CIP-flagged workloads, masked names and data checks for the CIP program's review."
+        ],
+        [
+          "auditor",
+          "search",
+          "Control coverage, invoice-to-ledger evidence, approved rules and lineage."
+        ]
+      ],
+      "value": [
+        [
+          "cloud",
+          "One view of all spend",
+          "AWS, Azure, Google Cloud, Snowflake, and AI services such as Claude, OpenAI and Microsoft Copilot: usage, seats and credits side by side."
+        ],
+        [
+          "search",
+          "Answers you can audit",
+          "More than 150 ready-made analyses. Each figure shows the formula behind it, and every approval is recorded in a log that can’t be quietly edited."
+        ],
+        [
+          "target",
+          "A view for every role",
+          "Controllers, regulatory accountants, CFOs, FinOps analysts and auditors each see what their role needs. There are one-page summaries for the board and for regulators."
+        ],
+        [
+          "shield",
+          "Made for regulated work",
+          "Industry packs, such as energy & utilities, check cloud and AI spend against the rules you report under. Sign-in uses your existing company login, and each person sees only their own business units."
+        ]
+      ]
+    },
+    "glossary": {
+      "how": [
+        {
+          "t": "Month forecast",
+          "eq": "Forecast = non-usage charges booked this month + (usage cost month to date ÷ days elapsed) × days in month",
+          "d": "Fixed charges (subscriptions, commitments, support) are counted once; usage is projected at its average daily rate so far. Closed months use actual cost. Computed per cost center, then added up."
+        },
+        {
+          "t": "Budget status",
+          "eq": "Variance = forecast − budget",
+          "d": "Command Center: over budget above 0%, at risk within 3% of budget. Budgets & Forecasts: warning above +2%, critical above +5%."
+        },
+        {
+          "t": "Full-year run-rate",
+          "eq": "Run-rate = open-month forecast × 12",
+          "d": "A straight-line view of the current month, not a seasonal model. Board Pack program run-rates use spend to date ÷ days in the data window × 365."
+        },
+        {
+          "t": "Forecast confidence",
+          "eq": "Confidence = mean(share of month elapsed, share of spend from live adapters, allocation coverage, share of closed invoice lines that tie out)",
+          "d": "Rises as the month progresses and as more spend comes from live feeds that reconcile to invoices. Each input is shown next to the score."
+        },
+        {
+          "t": "FERC ledger placement",
+          "eq": "Build work on an open work order with a threshold date → 107 → in service: 351.2 Transmission, 363.2 Distribution, 397.2 General or multi-function → 403 depreciation (Cr 108)\nRecurring cloud and SaaS fees → functional O&M: Transmission 560, 561.1–561.3, 561.5–561.7, 566; Distribution 580–588; A&G 921, 923, 930.2; renewals and support 569.2, 592.3, 935.2",
+          "d": "Rules are applied in order: tax, credits and corrections (R12, R13), commitment purchases (R9), capital (R1–R3, only with a valid work order), maintenance (R4), functional O&M (R5–R8); anything unresolved goes to the exception queue. Every ledger line carries the rule that placed it, its citation and its basis: Regulation where FERC text decides, [POLICY] where the controller signs it off (awaiting sign-off until then). Tax follows its line; a credit reverses to the original account. 920 is A&G salaries only, and a test blocks any cloud or SaaS invoice line from it."
+        },
+        {
+          "t": "Service company billing",
+          "eq": "457.1 direct = lines resolved to one company by tag or a fixed-entity policy\n457.2 indirect = the rest × the receiving company's share of an approved factor\nDirect share = 457.1 ÷ (457.1 + 457.2)",
+          "d": "Direct charging comes first. Factors are employees, workstations, retail customers, transmission pole miles and GL transactions, by month. Each bill line carries the receiving company's own account by function."
+        },
+        {
+          "t": "Tag coverage and suspense",
+          "eq": "Coverage = taggable spend with a valid value ÷ taggable spend, per required tag\nSuspense share = untagged cost-center spend ÷ AWS and Azure usage in the period",
+          "d": "Weighted by cost, by company and business unit. Spend with no valid operating company or cost center waits in suspense at the service company with an owner and an age; it is not spread into Corporate IT. Tax, credits, support, rounding and Marketplace purchases cannot be tagged and are reported apart."
+        },
+        {
+          "t": "Capital path",
+          "eq": "107 balance = additions on a valid work order since the threshold date − transfers to plant\nMonthly 403 = plant balance × approved depreciation rate ÷ 12",
+          "d": "A capitalized line with no work order (no_work_order), or on a work order with no probable-to-complete date (capitalizable_without_threshold_date), is held out of 107 and expensed until fixed. Existing depreciation rates continue until the next depreciation case."
+        },
+        {
+          "t": "Test-year bridge (rate cases)",
+          "eq": "Rate year = test-period actuals, annualized, + renewal escalators landing in the rate year",
+          "d": "Built by vendor for the docket's operating company and jurisdiction (UT-05). Renewals and escalators come from the vendor register (UT-06). An invoice exception is flagged because it weakens the support."
+        },
+        {
+          "t": "How CostIQ predicts",
+          "d": "There is no machine-learning model and no language model in any figure. Every projection is a fixed formula over billed data, so the same data always gives the same answer, and each figure shows its formula."
+        },
+        {
+          "t": "Anomaly detection",
+          "eq": "Sub-account spike: daily cost > 3 × its average over the prior 14 days, and > $500\nAPI key spike: daily cost > 3σ above its trailing 14-day mean, and > $25\nCopilot Studio surge: daily credits ≥ 3 × trailing 7-day average",
+          "d": "Rules run over every day in the data. The excess above the baseline is reported as already spent."
+        },
+        {
+          "t": "Savings estimates",
+          "eq": "Commitment-eligible spend × 28% (assumed Savings Plan discount)\nStandard-tier AI cost × 50% (batch discount)\nIdle seats = seat price of seats with no activity in 28 days",
+          "d": "Estimates are opportunities, not savings. They stay labelled as estimates until verified."
+        },
+        {
+          "t": "Verified savings",
+          "eq": "Verified = 30-day run-rate before the change − run-rate after (14+ days of data)",
+          "d": "Measured on the scope that changed. With less than 14 days of data the estimate is shown as provisional."
+        },
+        {
+          "t": "Disallowance at risk",
+          "eq": "Test-period spend failing the reconciliation, approved-policy, FERC-account or used-and-useful tests\n+ unused share of seat purchases\n+ share of a line equal to a savings estimate left unactioned for 60+ days",
+          "d": "Evidence score = cost-weighted share of evidence present. Decision support for the regulatory team, not a prediction of any commission's order."
+        },
+        {
+          "t": "Earnings unlock",
+          "eq": "Earnings unlock = average regulatory-asset balance × the docket's pre-tax rate of return\nBalance = annualized test-period recurring cloud and SaaS fees ÷ 12 × (amortization months + 1) ÷ 2",
+          "d": "Over the contract term (62 months when none). Unlock covers jurisdictions where an order could allow deferral to 182.3 and none is on file; balances already deferred under an order earn their return today."
+        },
+        {
+          "t": "AI summary",
+          "d": "The AI Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, disallowance at risk, earnings unlock, open savings, NERC CIP and data findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages."
+        },
+        {
+          "t": "Ask CostIQ",
+          "d": "Your question is matched to one of the tested use cases by keyword ranking (BM25), parameters such as periods and providers are read from the text, and the use case runs in your scope. Nothing is generated; if nothing matches, CostIQ says so."
+        }
+      ],
+      "terms": [
+        [
+          "FOCUS 1.0",
+          "The FinOps Foundation's open billing standard. Every provider's bill is loaded into the same FOCUS columns, so AWS, Azure, Google Cloud, Snowflake and AI vendors compare line for line."
+        ],
+        [
+          "Billed cost",
+          "What the invoice charges for a line."
+        ],
+        [
+          "Effective cost",
+          "Cost after discounts and with commitment purchases spread over the usage they cover. Most CostIQ figures use it."
+        ],
+        [
+          "List cost / contracted cost",
+          "Price at public rates / at your negotiated rates. List − contracted = negotiated discount."
+        ],
+        [
+          "Commitment",
+          "Savings Plan, reservation, committed-use discount or provisioned AI throughput (PTU) paid for in advance. Unused commitment is cost with no usage behind it."
+        ],
+        [
+          "Run-rate",
+          "Spend projected to a year from a recent period."
+        ],
+        [
+          "Cost center / business unit",
+          "Where cost is reported, from tags, approved allocation rules or split-cost data. Each person sees only their own."
+        ],
+        [
+          "Allocation coverage",
+          "1 − unallocated cost ÷ total cost."
+        ],
+        [
+          "Allocation policy",
+          "An approved, effective-dated rule that splits shared cost by a factor (for example retail customers or transmission pole miles). One person submits, another approves."
+        ],
+        [
+          "Legal entity / jurisdiction",
+          "The company in the group that bears a cost (the service company, an operating company, a transmission company or the non-utility affiliate), and the state or FERC jurisdiction whose rates it reaches."
+        ],
+        [
+          "Service company billing",
+          "Technology cost the service company bills to each associate company at cost: 457.1 direct, 457.2 by an approved factor. Each bill line carries the receiving company's account."
+        ],
+        [
+          "Suspense",
+          "Spend with no valid operating company or cost center. It waits at the service company with an owner and an age until it is tagged or restated through an approved rule."
+        ],
+        [
+          "Cost class",
+          "cwip (construction work in progress, 107, on a valid work order), regulatory_asset (182.3, only with a commission order) or om (functional O&M)."
+        ],
+        [
+          "FERC account",
+          "The account a line is booked to under the Uniform System of Accounts (18 CFR Part 101; Part 367 at the service company). Every ledger line carries the rule ID, citation and policy flag that placed it."
+        ],
+        [
+          "Order No. 898 software accounts",
+          "Since 2025-01-01, software placed in service is plant in 351.2 (Transmission), 363.2 (Distribution) or 397.2 (General or multi-function), depreciated through 403 (Cr 108). 303 stays for older balances and service-company software."
+        ],
+        [
+          "Work order / 107",
+          "Implementation work on an open work order with a probable-to-complete (threshold) date is construction work in progress (107) until the module is ready for use, then moves to plant."
+        ],
+        [
+          "Functional O&M",
+          "Recurring cloud and SaaS fees go to the O&M accounts of the function they serve: Transmission 560, 561.1–561.3, 561.5–561.7, 566 (never 561.4 or 561.8); Distribution 580–588; A&G 921, 923, 930.2; renewals and support 569.2, 592.3, 935.2. 920 is A&G salaries only."
+        ],
+        [
+          "Regulation / [POLICY]",
+          "Regulation: FERC text decides the placement. [POLICY]: FERC leaves the choice to the company, so the rule shows awaiting sign-off until the controller signs it off."
+        ],
+        [
+          "Test period / rate year",
+          "The actual period a rate case rests on, and the year rates are set for."
+        ],
+        [
+          "Docket",
+          "A rate case or other proceeding before a commission, with its own test period and filing date."
+        ],
+        [
+          "Data request",
+          "A question from commission staff or an intervenor. CostIQ drafts the answer from a tested use case, such as every transaction in an account with vendor, description and amount; someone else approves it."
+        ],
+        [
+          "Audit file",
+          "A ZIP of the docket's evidence. Its SHA-256 fingerprint is sealed in the decision ledger, so anyone can check it later."
+        ],
+        [
+          "Disallowance at risk",
+          "Test-period spend a commission could challenge because evidence is missing. Decision support, not a prediction of any order."
+        ],
+        [
+          "Earnings unlock",
+          "The return on cloud and SaaS costs that could be deferred to a regulatory asset where a commission order allows it."
+        ],
+        [
+          "Incurred exposure / already spent",
+          "Money already spent on waste or error (spikes, idle capacity, invoice mismatches)."
+        ],
+        [
+          "Estimated saving",
+          "A saving that has not happened yet. Never added to verified savings."
+        ],
+        [
+          "Compliance exposure",
+          "Spend on a workload that fails a compliance check. Reported separately; never summed with savings."
+        ],
+        [
+          "Optimization lifecycle",
+          "Identified → approved → implemented → verified, with a different person signing each step."
+        ],
+        [
+          "NERC CIP",
+          "NERC's Critical Infrastructure Protection standards. They apply to the registered entity, not to tools or vendors. CostIQ flags and masks names on CIP-related accounts; the client's CIP program decides what is BES Cyber System Information (BCSI)."
+        ],
+        [
+          "CEII",
+          "Critical Energy/Electric Infrastructure Information, such as planning data. Flagged workloads are checked for where they are served."
+        ],
+        [
+          "Cross-subsidy",
+          "Non-utility affiliate work carried by a regulated company. Control C-09 flags it so it can be retagged and the months restated."
+        ],
+        [
+          "Customer-managed keys",
+          "Encryption keys the company controls, so the provider cannot read the data."
+        ],
+        [
+          "Cost per customer contact",
+          "AI summarization cost ÷ customer contacts handled in the month."
+        ],
+        [
+          "Native Snowflake Pipeline / Client-Owned Codebase",
+          "The rules and the ledger delivered as SQL and a dbt project in the client's own Git repository, designed to run inside the client's Snowflake. The CostIQ app is optional."
+        ],
+        [
+          "Separation of duties",
+          "Whoever submits a finding, policy, optimization or data-request response cannot approve or verify it."
+        ],
+        [
+          "Decision ledger",
+          "A hash-chained log of every approval. Changing an old entry breaks the chain, which the Governance page checks."
+        ],
+        [
+          "Use case",
+          "A tested, named analysis with its SQL and formula. CostIQ runs more than 150 of them."
+        ],
+        [
+          "Board Pack status",
+          "In CostIQ: computed from data CostIQ holds. Partial: part of the section needs a feed or an approval. Needs data: the missing input is named; nothing is estimated in its place."
+        ]
+      ]
+    },
+    "agent": {
+      "questions": {
+        "risk": "What could a commission disallow?",
+        "credit": "What earnings could we unlock?"
+      },
+      "route": {
+        "risk": "risk|disallow|prudence|commission|audit|challenge|evidence|recover",
+        "credit": "credit|unlock|earning|deferr|regulatory asset"
+      },
+      "reasons": {
+        "unactioned_savings": "savings left unactioned",
+        "no_benefit": "not shown used and useful",
+        "unreconciled": "not reconciled to an invoice",
+        "unmapped_gl": "no FERC account",
+        "no_approved_policy": "no approved allocation policy"
+      },
+      "risk": {
+        "step": "Reading the question: disallowance at risk across open dockets",
+        "call": "Testing test-period lines for evidence",
+        "answer": "A commission could disallow **{amount}** of technology spend in open dockets; {score}% is evidenced ({atRisk} of {lines} lines at risk). The biggest driver is **{reason}**. I'd fix these first: {top}."
+      },
+      "credit": {
+        "step": "Reading the question: earnings unlock on cloud and SaaS costs",
+        "call": "Computing the earnings unlock by jurisdiction",
+        "split": "Separating balances deferred under orders from eligible costs not yet deferred",
+        "answer": "Deferring eligible cloud and SaaS costs where an order allows it would add **{unlock}/yr** of earnings, on top of **{claimed}/yr** on balances deferred under orders today. ",
+        "best": "The biggest opportunity is **{jurisdiction}** at {amount}/yr.",
+        "chart": "Earnings unlock a year, by jurisdiction"
+      },
+      "brief": {
+        "step": "Planning: spend, prudence risk, NERC CIP, savings and operations for your role"
+      },
+      "topics": "spend, risk, savings, earnings or alerts"
+    },
+    "command": {
+      "risk": {
+        "label": "Disallowance at risk",
+        "sub": "{score}% evidenced · {filings} open dockets"
+      },
+      "unlock": {
+        "label": "Earnings unlock",
+        "sub": "{amount}/yr earned today under an order"
+      },
+      "status": {
+        "claimed": "under order",
+        "eligible": "eligible",
+        "ineligible": "deferral denied"
+      }
+    },
+    "risk": {
+      "all": "All open dockets",
+      "amount": "Disallowance at risk",
+      "spend": "Test-period spend",
+      "byFiling": "By docket",
+      "filing": "Docket",
+      "fixTitle": "Remove disallowance risk on {item}",
+      "useCases": {
+        "risk": "UT-12",
+        "glMap": "UT-01"
+      }
+    },
+    "catalog": {
+      "examples": [
+        "Which spend sits in suspense?",
+        "How much disallowance is at risk?",
+        "What earnings could deferral unlock?",
+        "Is non-utility affiliate spend landing on regulated companies?",
+        "Service company billing by receiving company",
+        "Capital path by work order",
+        "Exception queue by code",
+        "Which workloads await CIP review?",
+        "Unused Copilot seats",
+        "Do token costs include cache tokens?"
+      ]
+    },
+    "format": {
+      "moneyColumns": "percustomer|permeter|percontact|perworkorder|crosssubsidy|transferredtoplant|depreciation|heldoutof107|cwip107|difference|labeled|awaitingrerun|cannotbetagged|missedifcacheignored|^direct$|^indirect$|^total$",
+      "notMoneyColumns": "customers$|contacts$|meters$",
+      "idColumns": "filing|docket|workorder",
+      "columnLabels": [
+        [
+          "FilingId",
+          "Docket"
+        ],
+        [
+          "GlAccount",
+          "FERC Account"
+        ],
+        [
+          "GlTitle",
+          "FERC Account Title"
+        ],
+        [
+          "ReviewPeriodStart",
+          "Test Period Start"
+        ],
+        [
+          "ReviewPeriodEnd",
+          "Test Period End"
+        ],
+        [
+          "ForecastYearStart",
+          "Rate Year Start"
+        ],
+        [
+          "ForecastYearEnd",
+          "Rate Year End"
+        ]
+      ]
+    }
+  }
+}

@@ -30,6 +30,7 @@ modules:
   catalog: Use Case Catalog
   ask: Ask CostIQ
   board: Board Pack
+  readiness: Data Readiness
 
 personas:
   cfo:

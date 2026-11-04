@@ -11,11 +11,15 @@ Every scenario that a FinOps Foundation FOCUS use case needs is seeded deliberat
   - virtual currency: Snowflake credits purchased and consumed (PricingCurrency = credits)
   - EKS split-cost allocation (AllocatedMethodId / AllocatedResourceId / AllocatedTags)
   - availability zones, SkuPriceDetails core counts, data transfer in GB
-  - an EC2 spend spike in pharma-dev us-west-2 on 2026-10-09 (anomaly use cases)
+  - an EC2 spend spike in the aws-dev account, us-west-2, on 2026-10-09 (anomaly use cases)
   - a September AWS correction posted after invoicing, an Azure correction, AWS promotional credits
-All prices are illustrative, not vendor list prices.
+All prices are illustrative, not vendor list prices. Account, bucket, namespace and cost-center names come from the
+active tenant (tenants/<tenant>/names.py); the scenarios are shared.
 """
 import json, random, datetime as dt
+from sample_common import names
+
+N = names()
 
 ELIG_AWS = {"CommitmentPrograms": [
     {"ProgramType": "FlexibleSpendPlan", "ProgramName": "Compute Savings Plans"},
@@ -36,18 +40,10 @@ ACCTS = {
     "Google Cloud": ("gcp-billing-3003", "GCP Billing", "USD"),
     "Snowflake": ("snow-org-6006", "Snowflake", "USD"),
 }
-# sub account id, name, cost center, application, application id, issuer key, provider
-SUBS = {
-    "aws-prod": ("111111111111", "pharma-prod", "Clinical Operations", "web-store", "APP-1001", "AWS"),
-    "aws-data": ("222222222222", "pharma-data", "Data & Analytics", "analytics-lake", "APP-2002", "AWS"),
-    "aws-dev":  ("333333333333", "pharma-dev", "Clinical Operations", "dev-sandbox", "APP-1003", "AWS"),
-    "az-crm":   ("sub-0a1b-crm", "CRM-Prod", "Patient Data", "crm-portal", "APP-3001", "Microsoft"),
-    "az-erp":   ("sub-0c2d-erp", "ERP", "Finance", "erp-finance", "APP-3002", "Microsoft"),
-    "az-eu":    ("sub-0e3f-eu", "EU-Web", "Research & Discovery", "eu-web", "APP-3003", "MicrosoftEU"),
-    "gcp-mktg": ("pharma-rd-analytics", "Marketing Analytics", "Research & Discovery", "marketing-analytics", "APP-4001", "Google Cloud"),
-    "gcp-hr":   ("pharma-hr-apps", "HR Apps", "HR", "hr-portal", "APP-4002", "Google Cloud"),
-    "snow":     ("PHARMA_PROD", "Snowflake Prod", "Data & Analytics", "analytics-lake", "APP-2002", "Snowflake"),
-}
+# sub account id, name, cost center, application, application id, issuer key (keys are fixed; names are the tenant's)
+SUBS = N.SUBS
+GCP_MKTG, GCP_HR = SUBS["gcp-mktg"][0], SUBS["gcp-hr"][0]   # GCP project ids
+SNOW_ACCOUNT = SUBS["snow"][0]
 PROVIDER = {"AWS": "AWS", "Microsoft": "Microsoft", "MicrosoftEU": "Microsoft", "Google Cloud": "Google Cloud",
             "Snowflake": "Snowflake"}
 ISSUER = {"AWS": "AWS", "Microsoft": "Microsoft", "MicrosoftEU": "Microsoft", "Google Cloud": "Google Cloud",
@@ -77,16 +73,16 @@ AZ_VMS = [  # id, name, sub, region, zone, size, series, cores, list/hr, hours, 
     ("/subscriptions/sub-0e3f-eu/vm/eu-web-02", "eu-web-02", "az-eu", "westeurope", "3", "D4s_v5", "Dsv5", 4, 0.176, 24, False),
 ]
 GCE = [
-    ("projects/pharma-rd-analytics/instances/mktg-etl-01", "mktg-etl-01", "gcp-mktg", "us-central1", "us-central1-a", "n2-standard-8", "n2", 8, 0.3885, 24, True),
-    ("projects/pharma-rd-analytics/instances/mktg-etl-02", "mktg-etl-02", "gcp-mktg", "us-central1", "us-central1-b", "n2-standard-8", "n2", 8, 0.3885, 16, False),
-    ("projects/pharma-hr-apps/instances/hr-portal-01", "hr-portal-01", "gcp-hr", "us-east4", "us-east4-a", "e2-standard-4", "e2", 4, 0.1508, 24, False),
+    (f"projects/{GCP_MKTG}/instances/mktg-etl-01", "mktg-etl-01", "gcp-mktg", "us-central1", "us-central1-a", "n2-standard-8", "n2", 8, 0.3885, 24, True),
+    (f"projects/{GCP_MKTG}/instances/mktg-etl-02", "mktg-etl-02", "gcp-mktg", "us-central1", "us-central1-b", "n2-standard-8", "n2", 8, 0.3885, 16, False),
+    (f"projects/{GCP_HR}/instances/hr-portal-01", "hr-portal-01", "gcp-hr", "us-east4", "us-east4-a", "e2-standard-4", "e2", 4, 0.1508, 24, False),
 ]
 SP_ARN = "arn:aws:savingsplans::111111111111:savingsplan/sp-0compute2026"
 CR_USED = "arn:aws:ec2:us-east-1:111111111111:capacity-reservation/cr-0a1used"
 CR_IDLE = "arn:aws:ec2:us-east-1:111111111111:capacity-reservation/cr-0b2idle"
 RI_RDS = "arn:aws:rds:us-east-1:111111111111:ri:ri-rds-erp-2026"
 AZ_RES = "/providers/Microsoft.Capacity/reservationOrders/ro-crm-erp/reservations/res-dsv5-esv5"
-GCP_CUD = "projects/pharma-rd-analytics/regions/us-central1/commitments/cud-n2-2026"
+GCP_CUD = f"projects/{GCP_MKTG}/regions/us-central1/commitments/cud-n2-2026"
 
 
 def generate(ctx):
@@ -191,7 +187,7 @@ def generate(ctx):
              pqty=round(sp_daily_commit, 2), punit="USD", list_cost=sp_daily_commit, contr_cost=sp_daily_commit,
              eff_cost=0, billed=sp_daily_commit, pricing_cat="Committed", region=None, res_id=SP_ARN,
              res_name="Compute Savings Plan", res_type="Savings Plan", sku="SavingsPlanRecurringFee",
-             tags={"cost_center": "Corporate IT", "application": "shared-commitments", "Application": "shared-commitments"},
+             tags={"cost_center": N.IT_CC, "application": "shared-commitments", "Application": "shared-commitments"},
              provider="AWS", CommitmentDiscountId=SP_ARN, CommitmentDiscountName="Compute Savings Plan 1yr No Upfront",
              CommitmentDiscountType="Compute Savings Plan", CommitmentDiscountCategory="Spend",
              CommitmentDiscountQuantity=round(sp_daily_commit, 2), CommitmentDiscountUnit="USD")
@@ -201,7 +197,7 @@ def generate(ctx):
                  "Compute Savings Plan unused commitment", consumed=None, pqty=round(unused, 4), punit="USD",
                  list_cost=0, contr_cost=0, eff_cost=unused, billed=0, pricing_cat="Committed", res_id=SP_ARN,
                  res_name="Compute Savings Plan", res_type="Savings Plan", sku="SavingsPlanUnused",
-                 tags={"cost_center": "Corporate IT", "application": "shared-commitments", "Application": "shared-commitments"},
+                 tags={"cost_center": N.IT_CC, "application": "shared-commitments", "Application": "shared-commitments"},
                  provider="AWS", CommitmentDiscountId=SP_ARN, CommitmentDiscountName="Compute Savings Plan 1yr No Upfront",
                  CommitmentDiscountType="Compute Savings Plan", CommitmentDiscountCategory="Spend",
                  CommitmentDiscountStatus="Unused", CommitmentDiscountQuantity=round(unused, 4), CommitmentDiscountUnit="USD")
@@ -236,15 +232,14 @@ def generate(ctx):
              charge_cat="Purchase", freq="Recurring", pqty=24, punit="Hours", list_cost=24 * 0.48 * 0.6 * (1 - EDP_DISC),
              contr_cost=24 * 0.48 * 0.6 * (1 - EDP_DISC), eff_cost=0, billed=24 * 0.48 * 0.6 * (1 - EDP_DISC),
              pricing_cat="Committed", res_id=RI_RDS, res_name="RDS RI db.r6g.xlarge", res_type="Reserved Instance",
-             sku="RDS-RI-RecurringFee", provider="AWS", tags={"cost_center": "Corporate IT", "application": "shared-commitments",
+             sku="RDS-RI-RecurringFee", provider="AWS", tags={"cost_center": N.IT_CC, "application": "shared-commitments",
                                                               "Application": "shared-commitments"},
              CommitmentDiscountId=RI_RDS, CommitmentDiscountName="RDS RI db.r6g.xlarge 1yr Partial Upfront",
              CommitmentDiscountType="Reserved Instance", CommitmentDiscountCategory="Usage",
              CommitmentDiscountQuantity=24, CommitmentDiscountUnit="Hours")
 
         # -------------------------------------------------------------- S3 storage, requests and data transfer
-        for sub, bucket, gb in (("aws-prod", "pharma-web-assets", 18000), ("aws-data", "pharma-datalake-raw", 420000),
-                                ("aws-data", "pharma-datalake-curated", 160000), ("aws-dev", "pharma-dev-scratch", 9000)):
+        for sub, bucket, gb in N.S3_BUCKETS:
             gbd = gb * growth(d) / 30.0  # GB-month accrued per day
             lp = 0.023
             crow(d, sub, "Amazon S3", "Storage", "Object Storage", "S3 Standard storage", consumed=round(gbd, 3),
@@ -269,16 +264,14 @@ def generate(ctx):
         # -------------------------------------------------------------- EKS shared cluster with split cost allocation
         cluster = "arn:aws:eks:us-east-1:111111111111:cluster/shared-eks"
         node_cost = 6 * 24 * 0.4032 * (1 - EDP_DISC) * growth(d)
-        for ns, share, cc, app in (("checkout", 0.45, "Clinical Operations", "web-store"),
-                                   ("ml-serving", 0.35, "Data & Analytics", "ml-serving"),
-                                   ("personalization", 0.20, "Research & Discovery", "personalization")):
+        for ns, share, cc, app in N.EKS_NAMESPACES:
             amt = node_cost * share
             crow(d, "aws-prod", "Amazon Elastic Kubernetes Service", "Compute", "Containers",
                  f"EKS split cost: namespace {ns}", consumed=round(6 * 24 * share, 2), cunit="Hours",
                  list_up=0.4032, contr_up=0.4032 * (1 - EDP_DISC), list_cost=amt / (1 - EDP_DISC), contr_cost=amt,
                  eff_cost=amt, billed=amt, region="us-east-1", res_id=cluster, res_name="shared-eks",
                  res_type="Kubernetes Cluster", sku="EKS-SplitCost-m7i.2xlarge", contract=EDP, provider="AWS",
-                 tags={"cost_center": "Corporate IT", "application": "shared-eks", "Application": "shared-eks"},
+                 tags={"cost_center": N.IT_CC, "application": "shared-eks", "Application": "shared-eks"},
                  AllocatedMethodId="eks-split-cost-allocation", AllocatedResourceId=f"{cluster}/namespace/{ns}",
                  AllocatedResourceName=ns, AllocatedTags=json.dumps({"cost_center": cc, "application": app}),
                  AllocatedMethodDetails=json.dumps({"Elements": [{"AllocatedRatio": share, "UsageUnit": "vCPU-Hours"}]}))
@@ -319,7 +312,7 @@ def generate(ctx):
              charge_cat="Purchase", freq="Recurring", pqty=72, punit="Hours", list_cost=res_fee, contr_cost=res_fee,
              eff_cost=0, billed=res_fee, pricing_cat="Committed", res_id=AZ_RES, res_name="res-dsv5-esv5",
              res_type="Reservation", sku="Reservation-RecurringFee",
-             tags={"cost_center": "Corporate IT", "application": "shared-commitments", "Application": "shared-commitments"},
+             tags={"cost_center": N.IT_CC, "application": "shared-commitments", "Application": "shared-commitments"},
              CommitmentDiscountId=AZ_RES, CommitmentDiscountName="Dsv5/Esv5 1yr reservation",
              CommitmentDiscountType="Reservation", CommitmentDiscountCategory="Usage", CommitmentDiscountQuantity=72,
              CommitmentDiscountUnit="Hours")
@@ -358,7 +351,7 @@ def generate(ctx):
         tb = 14 * growth(d) * wkf(d, True) * rnd.uniform(0.7, 1.3)
         crow(d, "gcp-mktg", "BigQuery", "Analytics", "Data Warehouses", "BigQuery on-demand analysis", consumed=round(tb, 3),
              cunit="TiB", list_up=6.25, contr_up=6.25, list_cost=tb * 6.25, contr_cost=tb * 6.25, eff_cost=tb * 6.25,
-             billed=tb * 6.25, region="us", res_id="projects/pharma-rd-analytics/datasets/marketing",
+             billed=tb * 6.25, region="us", res_id=f"projects/{GCP_MKTG}/datasets/marketing",
              res_name="marketing", res_type="Dataset", sku="BQ-Analysis-OnDemand")
         for sub, gb in (("gcp-mktg", 64000), ("gcp-hr", 3500)):
             g = gb / 30 * growth(d)
@@ -374,12 +367,12 @@ def generate(ctx):
              consumed=round(cr_used / 8, 3), cunit="Warehouse-Hours", pqty=round(cr_used / 8, 3), punit="Warehouse-Hours",
              list_up=8 * 2.60, contr_up=8 * 2.20, list_cost=cr_used * 2.60, contr_cost=cr_used * 2.20,
              eff_cost=cr_used * 2.20, billed=0, pricing_cat="Committed", region="aws_us_east_1",
-             res_id="PHARMA_PROD.ANALYTICS_WH", res_name="ANALYTICS_WH", res_type="Warehouse",
+             res_id=f"{SNOW_ACCOUNT}.ANALYTICS_WH", res_name="ANALYTICS_WH", res_type="Warehouse",
              sku="SNOW-COMPUTE-ENTERPRISE", provider="Snowflake", host="AWS", pricing_currency="Snowflake Credits",
              pc_list=8.0, pc_contr=7.2, pc_eff=r6(cr_used * 0.9))
         crow(d, "snow", "Snowflake Storage", "Storage", "Data Warehouses", "Database storage", consumed=round(85 / 30, 4),
              cunit="TB-Month", list_up=23.0, contr_up=23.0, list_cost=85 / 30 * 23, contr_cost=85 / 30 * 23,
-             eff_cost=85 / 30 * 23, billed=85 / 30 * 23, region="aws_us_east_1", res_id="PHARMA_PROD.STORAGE",
+             eff_cost=85 / 30 * 23, billed=85 / 30 * 23, region="aws_us_east_1", res_id=f"{SNOW_ACCOUNT}.STORAGE",
              res_name="STORAGE", res_type="Storage", sku="SNOW-STORAGE", provider="Snowflake", host="AWS")
         if d.day == 1 and d.month in (7, 10):
             crow(d, "snow", "Snowflake Capacity", "Analytics", "Data Warehouses", "Capacity purchase: 20,000 credits",

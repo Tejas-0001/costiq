@@ -1,4 +1,5 @@
-"""Examiner Request Responder: draft answers to tax examiners' information document requests (IDRs).
+"""Data request responder: draft answers to a reviewer's requests on a filing (pharma: tax examiners' information
+document requests, IDRs; a utility: commission staff and intervenor data requests). Wording comes from the tenant's copy.
 
 The analyst pastes a request; the deterministic Ask engine (BM25 over the use-case catalog, no LLM, nothing leaves the
 boundary) picks the use case that answers it, runs it for the filing, and drafts a response: the table, a narrative
@@ -8,6 +9,12 @@ approves it (separation of duties) and the approval is written to the ledger.
 from __future__ import annotations
 import datetime as dt, json
 from fastapi import HTTPException
+from . import tenant
+
+
+def ledger_target() -> str:
+    """Ledger target type for data requests (pack.yaml data_requests.ledger_target; pharma: examiner_request)."""
+    return (tenant.pack().get("data_requests") or {}).get("ledger_target", "data_request")
 
 
 def rows(res):
@@ -28,12 +35,17 @@ class DataRequests:
     def get(self, rid):
         r = [x for x in self.list() if x["RequestId"] == rid]
         if not r:
-            raise HTTPException(404, f"Unknown examiner request {rid}")
+            try:
+                msg = tenant.text("tax.unknown_request", rid=rid)   # copy/rates.json backend.tax.unknown_request
+            except KeyError:
+                msg = f"Unknown request {rid}"
+            raise HTTPException(404, msg)
         return r[0]
 
     def _next_id(self, filing):
         n = self.db.query("SELECT COUNT(*) FROM data_request WHERE FilingId = :d", {"d": filing})["rows"][0][0]
-        return f"IDR-{filing}-{n + 1:03d}"
+        prefix = (tenant.pack().get("data_requests") or {}).get("id_prefix", "REQ")
+        return f"{prefix}-{filing}-{n + 1:03d}"
 
     def draft(self, p, run_use_case, filing, requester, text):
         rc = rows(self.db.query("SELECT * FROM ref_tax_filing WHERE FilingId = :d", {"d": filing}, None, limit=1))
@@ -55,19 +67,15 @@ class DataRequests:
             res = ans["result"]
             n = len(res["rows"])
             verify = self.ledger.verify()
-            narrative = (
-                f"In response to {requester}'s request on filing {filing}, {rc['LegalEntity']} provides the attached "
-                f"table \"{uc['title']}\" ({n} rows). {ans['headline']} "
-                f"Figures are drawn from provider billing data and vendor invoices for the review period "
-                f"{str(rc['ReviewPeriodStart'])[:10]} to {str(rc['ReviewPeriodEnd'])[:10]} (data as of {self.eng.as_of()}), allocated "
-                f"to {rc['LegalEntity']} and {rc['Jurisdiction']} under approved allocation policies. Each figure traces to "
-                f"its invoice line and allocation steps in the audit file workpapers; the decision ledger supporting them "
-                f"verifies ({verify.get('entries', 0)} entries).")
+            narrative = tenant.text(
+                "requests.narrative", requester=requester, filing=filing, entity=rc["LegalEntity"], title=uc["title"], rows=n,
+                headline=ans["headline"], review_start=str(rc["ReviewPeriodStart"])[:10], review_end=str(rc["ReviewPeriodEnd"])[:10],
+                as_of=self.eng.as_of(), jurisdiction=rc["Jurisdiction"], entries=verify.get("entries", 0))
             draft = {"status": "drafted", "use_case": uc, "confidence": ans["confidence"], "interpreted": ans["interpreted"],
                      "headline": ans["headline"], "narrative": narrative,
                      "result": {"columns": res["columns"], "rows": res["rows"]},
                      "attachments": [{"label": f"{uc['id']} table (CSV)", "href": f"/api/usecases/{uc['id']}/export.csv"
-                                      + (f"?filing={filing}" if uc["id"] in ("PH-05", "PH-06") else "")},
+                                      + (f"?filing={filing}" if uc["id"] in tenant.usecase("filing_exhibits") else "")},
                                      {"label": f"Audit file for {filing}",
                                       "href": f"/api/tax/filing/{filing}/audit-file.zip"}],
                      "alternatives": ans.get("alternatives", [])}
@@ -79,7 +87,7 @@ class DataRequests:
                          VALUES (:i, :d, :r, :t, :m, :j, 'draft', :u, :at)""",
                       dict(i=rid, d=filing, r=requester, t=text, m=matched, j=json.dumps(draft, default=str), u=p.user, at=now),
                       limit=None)
-        self.ledger.append(p.user, p.persona, "prepare", f"examiner_request:{rid}", matched or "no match")
+        self.ledger.append(p.user, p.persona, "prepare", f"{ledger_target()}:{rid}", matched or "no match")
         return self.get(rid)
 
     def decide(self, rid, action, p, note=""):
@@ -96,5 +104,5 @@ class DataRequests:
         now = dt.datetime.now(dt.timezone.utc).replace(tzinfo=None, microsecond=0)
         self.db.query("""UPDATE data_request SET Status = :s, ApprovedBy = :u, ApprovedAt = :at WHERE RequestId = :i""",
                       {"s": "approved" if action == "approve" else "returned", "u": p.user, "at": now, "i": rid}, limit=None)
-        entry = self.ledger.append(p.user, p.persona, action, f"examiner_request:{rid}", note)
+        entry = self.ledger.append(p.user, p.persona, action, f"{ledger_target()}:{rid}", note)
         return self.get(rid), entry

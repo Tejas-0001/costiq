@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AutoChart } from "@/components/charts";
+import { useCopy } from "@/components/copy";
 import { useMe } from "@/components/shell";
 import { UseCaseRunner } from "@/components/usecases";
 import { DataTable, Formula, Head, Loading } from "@/components/ui";
-import { post, useApi, type Result } from "@/lib/api";
+import { download, post, useApi, type Result } from "@/lib/api";
 
 type Summary = { id: string; title: string; business_question: string; category: string; source: string; module: string; allowed: boolean };
 
@@ -14,9 +15,19 @@ export function CatalogView() {
   const [q, setQ] = useState("");
   const [src, setSrc] = useState("");
   const [cat, setCat] = useState("");
+  const [dbt, setDbt] = useState<{ busy: boolean; error?: string }>({ busy: false });
+  function downloadDbt() {
+    setDbt({ busy: true });
+    download("/codebase/dbt.zip", "client-cloud-ledger.zip")
+      .then(() => setDbt({ busy: false }))
+      .catch((e: Error) => setDbt({ busy: false, error: e.message }));
+  }
   return (
     <div className="stack">
-      <Head title="Use Case Catalog" />
+      <Head title="Use Case Catalog">
+        <button className="btn" onClick={downloadDbt} disabled={dbt.busy}>{dbt.busy ? "Preparing…" : "Download dbt project"}</button>
+      </Head>
+      {dbt.error && <div className="error">{dbt.error}</div>}
       <Loading state={state}>
         {(list) => {
           const cats = [...new Set(list.map((u) => u.category))].sort();
@@ -62,14 +73,9 @@ export function UseCasePage({ id }: { id: string }) {
 type Answer = { status: string; message?: string; suggestions?: { id: string; title: string }[]; use_case?: { id: string; title: string };
   confidence?: string; interpreted?: string[]; headline?: string; result?: Result; formula?: string; sources?: string[]; alternatives?: { id: string; title: string }[] };
 
-const EXAMPLES = [
-  "Which GxP vendors are missing quality-agreement clauses?", "How much deduction is at risk?", "What R&D credit could cloud fees unlock?",
-  "Are GxP entities carrying Consumer Health work?", "Which GPU endpoints are idle?", "Cost per accepted outcome by LLM app",
-  "Database lock cost by study event", "Unused Copilot seats", "Which non-production servers run 24x7?", "Forecast bridge by vendor",
-];
-
 export function AskView() {
   const { period } = useMe();
+  const examples = useCopy().get<string[]>("catalog.examples") ?? [];  // the tenant's example questions
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
   const [a, setA] = useState<Answer | null>(null);
@@ -87,7 +93,7 @@ export function AskView() {
           <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={500} placeholder="Question" style={{ flex: 1 }} />
           <button className="btn primary" disabled={busy || !q.trim()}>{busy ? "Thinking…" : "Ask"}</button>
         </form>
-        <div className="small">Examples: {EXAMPLES.map((x, i) => <span key={x}>{i > 0 && " · "}<a href="#" onClick={(e) => { e.preventDefault(); ask(x); }}>{x}</a></span>)}</div>
+        <div className="small">Examples: {examples.map((x, i) => <span key={x}>{i > 0 && " · "}<a href="#" onClick={(e) => { e.preventDefault(); ask(x); }}>{x}</a></span>)}</div>
       </div>
       {err && <div className="error">{err}</div>}
       {a && a.status !== "answered" && (

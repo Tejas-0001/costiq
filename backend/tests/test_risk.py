@@ -1,11 +1,13 @@
 """Tax risk: deduction at risk, remediation, credit unlock, audit file, Examiner Request Responder."""
 import io, zipfile
+import pytest
 from fastapi.testclient import TestClient
 from costiq.main import app
 from costiq.context import db, eng
 from costiq.prudence import PrudenceEngine
 
 client = TestClient(app)
+pytestmark = pytest.mark.tenant("pharma")  # pharma filings, reasons and the R&D credit
 pe = PrudenceEngine(db, eng)
 
 

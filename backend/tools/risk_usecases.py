@@ -1,4 +1,4 @@
-"""Write registry/usecases/PH-12..14.yaml: the tax-risk catalog entries (deduction at risk, credit unlock, evidence
+"""Write tenants/pharma/usecases/PH-12..14.yaml: the tax-risk catalog entries (deduction at risk, credit unlock, evidence
 completeness). Run from mvp/backend: python tools/risk_usecases.py
 """
 from __future__ import annotations

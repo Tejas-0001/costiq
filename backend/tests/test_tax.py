@@ -6,6 +6,7 @@ from costiq.main import app
 from costiq.context import db, eng, reg
 
 client = TestClient(app)
+pytestmark = pytest.mark.tenant("pharma")  # PH use cases, pharma entities, filings and policies
 
 
 def h(persona):

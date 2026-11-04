@@ -1,5 +1,5 @@
 id: BF-04
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'AI budget burn-down and projected exhaustion date'
 category: 'Budgeting & Forecasting'
 module: budgets

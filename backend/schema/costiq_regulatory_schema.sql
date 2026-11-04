@@ -1,15 +1,15 @@
--- MM CostIQ pharma reference registers and allocation output.
--- Registers are maintained by the client's Tax, Transfer Pricing, GxP Quality and Data Privacy teams; the sample ships
--- sample rows (data/pharma.py). allocated_cost is computed by costiq/allocation.py and never edited
--- by hand.
+-- MM CostIQ regulatory core: the reference registers the shared engines read, and their computed outputs.
+-- Shared by every tenant; each tenant pack adds its own registers (tenants/<tenant>/schema.sql). Registers are
+-- maintained by the client's finance, regulatory and compliance teams; the sample ships generated rows.
+-- allocated_cost and filing_evidence are computed by costiq/allocation.py and costiq/prudence.py, never edited by hand.
 
 -- Legal entities in the group: the shared-services entity, operating companies, the research entity, affiliates.
 CREATE TABLE IF NOT EXISTS ref_legal_entity (
     LegalEntity   VARCHAR,
     Parent        VARCHAR,
     EntityType    VARCHAR,   -- service_company | opco | research | affiliate
-    Regulated     BOOLEAN,   -- GxP-regulated entity
-    Jurisdictions VARCHAR    -- comma-separated tax jurisdictions
+    Regulated     BOOLEAN,   -- regulated entity (the tenant decides what regulated means)
+    Jurisdictions VARCHAR    -- comma-separated jurisdictions
 );
 
 -- Which entity owns each cost center's work (cross-charging checks compare this with where cost lands).
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS ref_cost_center (
 
 -- Statistical allocation keys by entity and month (transfer-pricing recharge bases).
 CREATE TABLE IF NOT EXISTS ref_allocation_driver (
-    DriverName   VARCHAR,   -- EnrolledPatients | TrialSites | ActiveStudies | Employees | Workstations
+    DriverName   VARCHAR,   -- allocation key, e.g. Employees | Workstations (tenant-specific keys)
     PeriodStart  TIMESTAMP,
     LegalEntity  VARCHAR,
     DriverValue  DECIMAL(38,10)
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS ref_allocation_policy (
     ApprovedAt    TIMESTAMP
 );
 
--- Jurisdiction factors per entity (share of an entity's cost that belongs to each tax jurisdiction).
+-- Jurisdiction factors per entity (share of an entity's cost that belongs to each jurisdiction).
 CREATE TABLE IF NOT EXISTS ref_jurisdiction_factor (
     LegalEntity  VARCHAR,
     Jurisdiction VARCHAR,
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS ref_gl_account_map (
     GlTitle      VARCHAR
 );
 
--- Per jurisdiction: do recurring cloud and SaaS fees count as qualifying R&D expenditure, and are they claimed?
+-- Per jurisdiction: how recurring cloud and SaaS fees are treated (tenant pack: CreditStatus, CreditClaimed).
 CREATE TABLE IF NOT EXISTS ref_jurisdiction_policy (
     Jurisdiction  VARCHAR,
     CreditStatus  VARCHAR,   -- claimed | eligible | ineligible | not_applicable
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS ref_jurisdiction_policy (
     Reference     VARCHAR
 );
 
--- Tax filings: the review period an examiner tests, the forecast year for the budget bridge, and the R&D credit rate.
+-- Filings: the review period that is tested, the forecast year for the budget bridge, and the filing's rate.
 CREATE TABLE IF NOT EXISTS ref_tax_filing (
     FilingId          VARCHAR,
     Jurisdiction      VARCHAR,
@@ -89,70 +89,6 @@ CREATE TABLE IF NOT EXISTS ref_tax_filing (
     Status            VARCHAR,
     CreditRate        DECIMAL(38,10),   -- percent of qualifying expenditure
     Authority         VARCHAR
-);
-
--- GxP and patient-data register: cloud workloads, their GxP impact and whether they hold patient data.
-CREATE TABLE IF NOT EXISTS ref_gxp_system (
-    Application      VARCHAR,
-    SystemName       VARCHAR,
-    GxpImpact        VARCHAR,   -- High | Medium | Low | None
-    HoldsPatientData BOOLEAN,
-    KeyOwnership     VARCHAR,   -- customer | provider
-    Owner            VARCHAR,
-    NextReviewDate   DATE       -- next periodic validation review (NULL when not a validated system)
-);
-
--- Vendors: quality-agreement clauses, renewals and price escalators.
-CREATE TABLE IF NOT EXISTS ref_vendor (
-    Vendor              VARCHAR,   -- matches ServiceProviderName
-    GxpScoped           BOOLEAN,
-    QualityClauses      JSON,      -- {"quality_agreement": bool, "audit_rights": bool, "change_notification": bool, "data_integrity": bool}
-    ContractEnd         TIMESTAMP,
-    RenewalDate         TIMESTAMP,
-    EscalatorPct        DECIMAL(38,10),
-    AnnualContractValue DECIMAL(38,10)
-);
-
--- Study events that drive surges (database lock, interim analysis).
-CREATE TABLE IF NOT EXISTS ref_study_event (
-    StudyEventId  VARCHAR,
-    Name          VARCHAR,
-    StartDate     DATE,
-    EndDate       DATE,
-    Jurisdictions VARCHAR
-);
-
--- Volume drivers for unit costs.
-CREATE TABLE IF NOT EXISTS ref_volume (
-    PeriodStart      TIMESTAMP,
-    LegalEntity      VARCHAR,
-    EnrolledPatients BIGINT,
-    TrialSites       BIGINT,
-    ActiveStudies    BIGINT
-);
-
--- AI use register, flagging GxP contexts.
-CREATE TABLE IF NOT EXISTS ref_ai_use (
-    Application   VARCHAR,
-    UseCase       VARCHAR,
-    GxpContext    BOOLEAN,
-    ReviewStatus  VARCHAR,   -- Approved | Pending | Rejected
-    ApprovedOn    DATE,
-    RiskTier      VARCHAR,   -- internal risk tier set by AI governance: High | Limited | Minimal
-    EuAiActClass  VARCHAR,   -- EU AI Act classification once recorded (NULL = not yet classified)
-    GmpContext    BOOLEAN    -- used in GMP work (batch release, deviations, quality control)
-);
-
--- Pipeline programs and the applications that serve each one (board view: cost by program and phase).
-CREATE TABLE IF NOT EXISTS ref_program (
-    ProgramId        VARCHAR,
-    Name             VARCHAR,
-    Phase            VARCHAR,   -- Discovery | Phase 1 | Phase 2 | Phase 3 | Marketed
-    AnnualTechBudget DECIMAL(38,10)
-);
-CREATE TABLE IF NOT EXISTS ref_program_application (
-    Application VARCHAR,
-    ProgramId   VARCHAR
 );
 
 -- Allocation output: one row per charge × entity × jurisdiction share (computed; lineage at every step).
@@ -179,14 +115,14 @@ CREATE TABLE IF NOT EXISTS allocated_cost (
     PnlFunction         VARCHAR,
     GlAccount           VARCHAR,
     GlTitle             VARCHAR,
-    CostClass           VARCHAR,   -- capital | opex | qre
+    CostClass           VARCHAR,   -- from the tenant pack's allocation.classes (pharma: capital | opex | qre)
     Share               DECIMAL(38,10),
     SourceCost          DECIMAL(38,10),
     AllocatedCost       DECIMAL(38,10),
     Exception           VARCHAR    -- NULL | no_opco_policy | no_gl_account
 );
 
--- Filing evidence: one row per allocated charge line in a filing's review period, with the evidence a tax examiner
+-- Filing evidence: one row per allocated charge line in a filing's review period, with the evidence a reviewer
 -- would test (computed by costiq/prudence.py; never edited by hand).
 CREATE TABLE IF NOT EXISTS filing_evidence (
     FilingId            VARCHAR,
@@ -214,7 +150,7 @@ CREATE TABLE IF NOT EXISTS filing_evidence (
     EvidenceScore       DECIMAL(38,10)   -- 0..1 weighted share of evidence present
 );
 
--- Examiner requests (IDRs) from tax authorities, with the drafted and approved response.
+-- Data requests on a filing (examiner or regulator requests), with the drafted and approved response.
 CREATE TABLE IF NOT EXISTS data_request (
     RequestId       VARCHAR,
     FilingId        VARCHAR,

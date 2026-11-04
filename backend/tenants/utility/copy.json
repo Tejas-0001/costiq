@@ -1,0 +1,188 @@
+{
+  "backend": {
+    "findings": {
+      "ai_owner": "AI & Copilot Program Owner",
+      "residency_formula": "CEII-classified usage where inference_geo ≠ us. Compliance exposure (the cost shown is the affected spend)."
+    },
+    "controls": {
+      "c08": "Every allocated dollar has a FERC account",
+      "c09": "No regulated operating company carries non-utility affiliate work (cross-subsidy)",
+      "c09_evidence": "{amount} on regulated operating companies"
+    },
+    "disclaimers": {
+      "compliance": "Decision support for regulatory accounting, rates and the NERC CIP program. CostIQ flags and masks; the client's CIP program decides what is BES Cyber System Information, and the reference registers are maintained by the owning teams."
+    },
+    "risk": {
+      "reasons": {
+        "no_benefit": "Not shown used and useful (idle, unused seats or commitments)",
+        "unreconciled": "Not reconciled to an invoice",
+        "no_approved_policy": "Allocated without an approved policy",
+        "unmapped_gl": "No FERC account",
+        "unactioned_savings": "Known savings left unactioned for 60+ days"
+      },
+      "fix_gl": "Map to a FERC account",
+      "formula": "Disallowance at risk = test-period spend a commission could challenge: whole lines failing the reconciliation, approved-policy, FERC-account or used-and-useful tests (unless remediated), the unused share of seat purchases, and the share of a line equal to a savings estimate left unactioned for 60+ days. Evidence score = cost-weighted share of evidence present.",
+      "disclaimer": "Decision support for the regulatory team; not a prediction of any commission's order."
+    },
+    "tax": {
+      "bridge_formula": "Test period: allocated O&M for the docket's operating company and jurisdiction, annualized. Rate year: annualized test period plus contract escalators from each renewal date. Invoice tie-out compares the vendor's invoices with its charges.",
+      "bridge_csv_header": "# Technology cost test-year bridge | docket {filing} | {entity} ({jurisdiction}) | test period {review_start} to {review_end} | rate year {forecast_start} to {forecast_end} | prepared by {user} on {prepared} UTC | source: MM CostIQ {usecase}",
+      "bridge_csv_filename": "{filing}-technology-cost-bridge.csv",
+      "recharge_formula": "Technology costs billed by the service company to each associate company, by allocation policy and factor. Covers costs allocated through CostIQ only.",
+      "credit_schedule_formula": "Deferred cloud and SaaS costs by month, jurisdiction and vendor, where a commission order allows deferral."
+    },
+    "requests": {
+      "requester": "Commission staff",
+      "narrative": "In response to {requester}'s data request in docket {filing}, {entity} provides the attached table \"{title}\" ({rows} rows). {headline} Figures are drawn from provider billing data and vendor invoices for the test period {review_start} to {review_end} (data as of {as_of}), allocated to {entity} and {jurisdiction} under approved allocation policies. Each figure traces to its invoice line and allocation steps in the audit file workpapers; the decision ledger supporting them verifies ({entries} entries)."
+    },
+    "evidence": {
+      "methodology": [
+        "# Technology cost evidence: {filing}",
+        "",
+        "{entity} ({jurisdiction}), {authority}. Test period {review_start} to",
+        "{review_end} (actuals); rate year {forecast_start} to",
+        "{forecast_end}. Prepared with MM CostIQ.",
+        "",
+        "## Sources",
+        "Provider billing exports in FOCUS format (cloud and AI), SaaS vendor invoices (file drop), invoice detail, and the",
+        "company's reference registers (legal entities, allocation factors and policies, FERC account map, jurisdiction factors).",
+        "",
+        "## Allocation (workpapers, one row per allocated charge)",
+        "1. Pool: cost center from split-cost allocation tags, resource tags or approved rules.",
+        "2. Operating company: first approved policy by priority; shares from the policy's allocation factor for the month, or",
+        "   100% to a fixed entity.",
+        "3. Jurisdiction: the entity's jurisdiction factors.",
+        "4. Cost class: build work under an open work order to construction work in progress (account 107); recurring cloud and",
+        "   SaaS fees to functional O&M.",
+        "5. FERC account: the company's account map.",
+        "Allocated totals tie to source totals for every period (control C-10).",
+        "",
+        "## Test-year bridge (forecast_bridge.csv)",
+        "Test-period cost by vendor, annualized; the rate year adds contract escalators from each renewal date. Invoice",
+        "tie-out compares each vendor's invoices with its charges.",
+        "",
+        "## Evidence tests (workpapers and risk_summary.csv)",
+        "Reconciled to the invoice line (within $1); allocated under an approved, effective-dated policy; mapped to a FERC",
+        "account; used and useful (no idle day, unused commitment or unused seat share) unless remediated by an implemented",
+        "optimization; no known savings left unactioned for 60+ days.",
+        "",
+        "## Integrity",
+        "approvals.csv lists the ledger entries for every policy, optimization and exhibit decision with their hashes.",
+        "ledger_certificate.json records that the hash chain verified and the last decision entry. The SHA-256 of this ZIP is",
+        "written to the ledger on export as `audit_file:{filing}`.",
+        "",
+        "Decision support for the regulatory team; not a legal opinion or a prediction of any commission's order.",
+        ""
+      ]
+    },
+    "board": {
+      "compliance_checks": "NERC CIP and data checks needing attention",
+      "caution": "Before showing this pack to a board, confirm the FERC account map and the work-order register with regulatory accounting."
+    },
+    "summary": {
+      "risk": {
+        "section": {"key": "risk", "title": "Prudence risk", "state": "At risk"},
+        "page": {"headline": "Disallowance at risk", "by_filing": "By docket", "by_reason": "By reason", "largest": "Largest risks"},
+        "labels": {
+          "amount": "Disallowance at risk",
+          "open_filings": "Open dockets",
+          "evidenced": "Share of test-period spend evidenced",
+          "top_reason": "Largest cause of risk",
+          "reason_amount": "Risk from this cause",
+          "top_item": "Largest single risk",
+          "top_amount": "Its disallowance at risk",
+          "top_filing": "Docket it sits in",
+          "next_filing": "Next docket ({entity}, {jurisdiction})",
+          "filing_date": "Filing date of {filing}",
+          "days_until": "Days until the filing date",
+          "days_past": "Days past the filing date",
+          "filing_amount": "Disallowance at risk in this docket"
+        },
+        "open_filing": "open docket",
+        "reasons": {
+          "unactioned_savings": "known savings left unactioned for 60+ days",
+          "no_benefit": "spend not shown used and useful",
+          "unreconciled": "spend not reconciled to an invoice",
+          "unmapped_gl": "spend with no FERC account",
+          "no_approved_policy": "allocations with no approved policy"
+        },
+        "lead": "A commission could challenge {amount} of recovery across {filings}; {evidenced} of test-period spend is evidenced.",
+        "headline": "{amount} of recovery could be challenged",
+        "cause": "The main cause is {reason}, at {amount}.",
+        "largest": "The largest single exposure is {item} ({vendor}, {entity}) at {amount} in {filing}",
+        "largest_fix": "; {verb} {action} removes it and saves {saving} a month",
+        "fix_detail": "{title}. Also clears {amount} of disallowance risk in {filing}.",
+        "due": "{filing} is due in {days} ({date})",
+        "late": "{filing} is due {days} late ({date})",
+        "due_amount": " and carries {amount} of the risk"
+      },
+      "compliance": {
+        "section": {"key": "cip", "title": "NERC CIP and data", "state": "Needs attention"}
+      },
+      "credit": {
+        "page": {"tax": "Earnings unlock", "tax_claimed": "Earned today under an order", "tax_tab": "credit", "command": "Earnings unlock"},
+        "labels": {
+          "unclaimed": "Earnings unlock not yet requested",
+          "jurisdiction_credit": "{jurisdiction} earnings unlock",
+          "jurisdiction": "Jurisdiction",
+          "claimed": "Earned today on balances deferred under orders"
+        },
+        "per_year": "{amount} a year",
+        "line": "Deferring eligible cloud and SaaS costs where an order allows it would add {amount} of earnings",
+        "line_top": ", {credit} of it in {jurisdiction}",
+        "line_claimed": ", on top of {claimed} earned today on balances deferred under orders.",
+        "action_title": "Request deferral in {jurisdiction}",
+        "action_detail": "Eligible cloud and SaaS costs not yet deferred{in_filing}.",
+        "action_in_filing": " in {filing}",
+        "headline": "{amount} of earnings is not yet unlocked"
+      }
+    }
+  },
+  "frontend": {
+    "nav": {
+      "groups": {
+        "overview": "Overview",
+        "monitor": "Monitor",
+        "optimize": "Optimize",
+        "finance": "Financial management",
+        "regulatory": "Regulatory & compliance",
+        "intelligence": "Intelligence"
+      },
+      "items": {
+        "summary": "AI Summary",
+        "command": "Command Center",
+        "board": "Board Pack",
+        "explorer": "Spend Explorer",
+        "cloud": "Cloud Cost Monitor",
+        "ai": "AI & LLM Cost Monitor",
+        "alerts": "Alerts",
+        "optimization": "Optimization Center",
+        "anomalies": "Anomalies",
+        "rates": "Commitments & Discounts",
+        "budgets": "Budgets & Forecasts",
+        "allocation": "Allocation & Chargeback",
+        "risk": "Prudence Radar",
+        "tax": "Regulatory Accounting & Rates",
+        "compliance": "NERC CIP & Data",
+        "reconciliation": "Reconciliation & Close",
+        "governance": "Governance & Evidence",
+        "catalog": "Use Case Catalog",
+        "ask": "Ask CostIQ",
+        "glossary": "Glossary",
+        "deploy": "Deployment planner"
+      }
+    },
+    "periodNotes": {
+      "board": "Board Pack: data to date",
+      "budgets": "Budgets: by month",
+      "optimization": "Savings pipeline: current",
+      "risk": "Prudence risk: docket test periods",
+      "tax": "Rates: docket periods",
+      "compliance": "CIP checks: current",
+      "reconciliation": "Invoices: by billing period",
+      "governance": "Ledger: all decisions",
+      "anomalies": "Findings: all open"
+    },
+    "tax": {}
+  }
+}

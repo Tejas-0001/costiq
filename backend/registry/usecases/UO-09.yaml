@@ -1,5 +1,5 @@
 id: UO-09
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'Idle GPU and model endpoints'
 category: 'Optimization · AI'
 module: optimization

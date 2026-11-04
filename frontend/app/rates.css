@@ -1,0 +1,36 @@
+/* Regulatory ledger tabs of the tax module page (components/views/rates.tsx). Uses the app's tokens from globals.css;
+   fonts inherit (Times New Roman). */
+.rt-period { gap: 8px; font-size: 13px; color: var(--ink-2); }
+.rt-msg { margin: 8px 16px; }
+.rt-pad { padding: 0 16px 12px; }
+a.rt-acct { font-weight: 700; text-decoration: none; border-bottom: 1px dotted currentColor; }
+.rt-amt { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.rt-amt .btn { padding: 2px 7px; font-size: 11.5px; }
+
+/* rule register */
+.rt-rules td { font-size: 12.5px; }
+.rt-rules td.rt-rule { min-width: 220px; }
+.rt-rules td.small { min-width: 160px; }
+
+/* work-order cards */
+.rt-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; }
+.rt-wo { display: flex; flex-direction: column; gap: 8px; text-align: left; font: inherit; color: var(--ink); cursor: pointer; width: 100%;
+  transition: border-color 0.15s, box-shadow 0.15s; }
+.rt-wo:hover { border-color: var(--brand-2); }
+.rt-wo.on { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft, #eaf2fb), var(--shadow); }
+.rt-wo-id { font-weight: 700; font-size: 15px; }
+.rt-wo-desc { min-height: 2.4em; }
+.rt-path { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: stretch; }
+.rt-node { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; padding: 8px 9px; border-radius: 8px;
+  background: var(--panel-2); border: 1px solid var(--line); min-width: 0; }
+.rt-node b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.rt-arrow { align-self: center; color: var(--ink-2); }
+.rt-wo-foot { justify-content: space-between; }
+
+/* held lines */
+tr.rt-group td { background: var(--panel-2); }
+
+@media (max-width: 760px) {
+  .rt-path { grid-template-columns: 1fr; }
+  .rt-arrow { display: none; }
+}

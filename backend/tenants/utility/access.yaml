@@ -1,0 +1,170 @@
+# MM CostIQ access model, utility tenant. Mounted into the API as a ConfigMap (Helm: values.access).
+#
+# personas           CostIQ personas: the modules each can open and the actions each can take. The first persona is the
+#                    default on the sign-in page.
+#                    enterprise: true    sees every cost center and company
+#                    entity_scoped: true sees only its companies' allocated cost (the affiliate wall); never the shared,
+#                                        pre-allocation charges
+# roleMap            Entra ID app role value -> persona (create these app roles on the API app registration).
+# scopeGroups        Entra ID security group -> cost centers the member may see.
+# entityScopeGroups  Entra ID security group -> legal entities, for entity-scoped personas.
+# demoScope          cost-center scopes used when COSTIQ_AUTH_MODE=demo (no identity provider).
+# demoEntityScope    legal-entity scopes used when COSTIQ_AUTH_MODE=demo.
+#
+# Separation of duties is enforced on the person, not the persona: whoever submits a finding, allocation policy,
+# optimization or data-request response cannot also approve (or verify) it.
+
+modules:
+  command: Command Center
+  explorer: Spend Explorer & Reporting
+  cloud: Cloud Cost Monitor
+  ai: AI & LLM Cost Monitor
+  optimization: Optimization Center
+  allocation: Allocation & Chargeback
+  rates: Rate & Commitments
+  budgets: Budgets & Forecasting
+  anomalies: Anomalies & Optimization
+  risk: Prudence Radar
+  tax: Regulatory Accounting & Rates
+  compliance: NERC CIP & Data
+  reconciliation: Reconciliation & Close
+  governance: Governance & Evidence
+  catalog: Use Case Catalog
+  ask: Ask CostIQ
+  board: Board Pack
+  readiness: Data Readiness
+
+defaultPersona: finance_controller
+
+personas:
+  finance_controller:
+    label: Controller / Regulatory Accounting
+    group: Finance & Regulatory Accounting
+    enterprise: true
+    modules: [board, command, explorer, ai, allocation, reconciliation, budgets, risk, tax, compliance, governance, readiness,
+              catalog, ask]
+    actions: [rule.approve, close.approve, datarequest.approve, exhibit.export]
+  cfo:
+    label: Chief Financial Officer
+    group: Finance & Regulatory Accounting
+    enterprise: true
+    modules: [board, command, explorer, cloud, ai, optimization, allocation, rates, budgets, anomalies, risk, tax,
+              compliance, reconciliation, governance, catalog, ask]
+    actions: [forecast.approve, recommendation.approve, budget.approve, exhibit.export, datarequest.approve]
+  regulatory_analyst:
+    label: Rates & Regulatory Analyst
+    group: Finance & Regulatory Accounting
+    enterprise: true
+    modules: [command, explorer, allocation, budgets, risk, tax, compliance, reconciliation, catalog, ask]
+    actions: [exhibit.export, datarequest.prepare]
+  affiliate_accounting:
+    label: Service Company Accounting
+    group: Finance & Regulatory Accounting
+    enterprise: true
+    modules: [command, explorer, allocation, tax, reconciliation, governance, catalog, ask]
+    actions: [driver.submit, datarequest.prepare]
+  transmission_finance:
+    label: Transmission Finance
+    group: Business Unit Finance
+    enterprise: false
+    modules: [command, explorer, cloud, ai, allocation, budgets, catalog, ask]
+    actions: [forecast.submit]
+  distribution_finance:
+    label: Distribution Finance
+    group: Business Unit Finance
+    enterprise: false
+    modules: [command, explorer, cloud, ai, allocation, budgets, catalog, ask]
+    actions: [forecast.submit]
+  opco_finance:
+    label: Operating Company Finance Manager
+    group: Business Unit Finance
+    enterprise: false
+    entity_scoped: true
+    modules: [risk, tax, catalog, ask]
+    actions: []
+  finops_analyst:
+    label: Corporate IT Finance / Cloud CoE (FinOps)
+    group: Technology
+    enterprise: true
+    modules: [command, explorer, cloud, ai, optimization, allocation, rates, budgets, anomalies, risk, reconciliation, catalog, ask]
+    actions: [recommendation.submit, optimization.verify, datarequest.prepare]
+  cip_compliance:
+    label: NERC CIP Compliance
+    group: Governance & Compliance
+    enterprise: true
+    modules: [compliance, ai, governance, catalog, ask]
+    actions: []
+  auditor:
+    label: Internal Audit
+    group: Governance & Compliance
+    enterprise: true
+    modules: [board, command, allocation, risk, tax, reconciliation, governance, catalog, ask]
+    actions: []
+  ai_program_owner:
+    label: AI & Copilot Program Owner
+    group: Technology
+    enterprise: true
+    modules: [command, explorer, ai, optimization, anomalies, governance, catalog, ask]
+    actions: [recommendation.submit, optimization.implement]
+  tech_exec:
+    label: CIO / CITO
+    group: Technology
+    enterprise: true
+    modules: [board, command, explorer, cloud, ai, optimization, rates, budgets, anomalies, compliance, governance, catalog, ask]
+    actions: [recommendation.approve]
+  cloud_ops:
+    label: Cloud Operations
+    group: Technology
+    enterprise: false
+    modules: [command, explorer, cloud, optimization, rates, anomalies, catalog, ask]
+    actions: [recommendation.submit, optimization.implement]
+  pl_exec:
+    label: Business Unit Executive
+    group: Business Unit Finance
+    enterprise: false
+    modules: [command, explorer, cloud, ai, budgets, anomalies, catalog, ask]
+    actions: [recommendation.endorse]
+
+roleMap:
+  CostIQ.FinanceController: finance_controller
+  CostIQ.CFO: cfo
+  CostIQ.RegulatoryAnalyst: regulatory_analyst
+  CostIQ.ServiceCompanyAccounting: affiliate_accounting
+  CostIQ.TransmissionFinance: transmission_finance
+  CostIQ.DistributionFinance: distribution_finance
+  CostIQ.OpCoFinance: opco_finance
+  CostIQ.FinOpsAnalyst: finops_analyst
+  CostIQ.CIPCompliance: cip_compliance
+  CostIQ.Auditor: auditor
+  CostIQ.AIProgramOwner: ai_program_owner
+  CostIQ.TechExecutive: tech_exec
+  CostIQ.CloudOperations: cloud_ops
+  CostIQ.BusinessUnitExecutive: pl_exec
+
+# Grant `pii.view` to roles allowed to see real user names in AI views (default: nobody).
+piiRoles: []
+
+scopeGroups:
+  SG-CostIQ-Transmission: [Transmission Operations, Transmission Planning, Transmission Asset Management]
+  SG-CostIQ-Distribution: [Distribution Operations, Grid Modernization (AMI), Field Work Management, Customer Operations]
+  SG-CostIQ-CorporateIT: [Enterprise Applications, End-User Computing, Data & Analytics Platform, Cyber Security Operations,
+                          Network & Connectivity]
+  SG-CostIQ-SharedServices: [Finance & Regulatory Services]
+
+entityScopeGroups:
+  SG-CostIQ-Company-North: [North Electric Company]
+  SG-CostIQ-Company-Central: [Central Electric Company]
+  SG-CostIQ-Company-Valley: [Valley Power Company]
+  SG-CostIQ-Company-Southern: [Southern Electric Company]
+  SG-CostIQ-Company-Metro: [Metro Wires Company]
+  SG-CostIQ-Company-Plains: [Plains Wires Company]
+  SG-CostIQ-Transmission-Companies: [North Transmission Company, Central Transmission Company, West Transmission Company]
+
+demoScope:
+  transmission_finance: [Transmission Operations, Transmission Planning, Transmission Asset Management]
+  distribution_finance: [Distribution Operations, Grid Modernization (AMI), Field Work Management, Customer Operations]
+  cloud_ops: [Data & Analytics Platform, Network & Connectivity, End-User Computing]
+  pl_exec: [Transmission Operations]
+
+demoEntityScope:
+  opco_finance: [North Electric Company]

@@ -1,0 +1,393 @@
+{
+  "frontend": {
+    "landing": {
+      "band": "From molecule to patient,",
+      "art": "helix",
+      "groups": [
+        [
+          "Finance Leadership & Planning",
+          "fin",
+          "bars",
+          "Budgets, forecasts and executive decisions"
+        ],
+        [
+          "Regulatory & Compliance",
+          "ctl",
+          "shield",
+          "Tax, transfer pricing, GxP and patient data"
+        ],
+        [
+          "Technology & Operations",
+          "tech",
+          "gear",
+          "Spend, consumption and optimization"
+        ],
+        [
+          "Board & Investor",
+          "brd",
+          "chart",
+          "Board Pack and investor reporting"
+        ]
+      ],
+      "personas": [
+        [
+          "cfo",
+          "crown",
+          "Enterprise financial exposure, deduction at risk, R&D credit and verified savings."
+        ],
+        [
+          "pl_exec",
+          "bars",
+          "Business-unit leader accountable for allocated cloud and AI expense against budget."
+        ],
+        [
+          "fpa_partner",
+          "doc",
+          "Prepares budget and forecast revisions, writes variance commentary and submits for review."
+        ],
+        [
+          "fpa_analyst",
+          "trend",
+          "Detailed cost exploration, reconciliation support, trend analysis and evidence-backed reports."
+        ],
+        [
+          "finance_controller",
+          "calc",
+          "Invoice reconciliation, exception investigation, allocation rules and close readiness."
+        ],
+        [
+          "auditor",
+          "search",
+          "Control coverage, invoice-to-charge evidence, approved rules and lineage."
+        ],
+        [
+          "tax_analyst",
+          "doc",
+          "Tax filings, deduction-at-risk evidence, R&D credit claims and examiner requests."
+        ],
+        [
+          "transfer_pricing",
+          "arrow",
+          "Intercompany recharges, allocation keys and transfer-pricing documentation."
+        ],
+        [
+          "gxp_compliance",
+          "shield",
+          "Patient data in the cloud, GxP vendor quality agreements and AI validation reviews."
+        ],
+        [
+          "tech_exec",
+          "monitor",
+          "Enterprise cloud and AI spending, budget variance, risk and savings at a glance."
+        ],
+        [
+          "finops_analyst",
+          "cloud",
+          "Multi-cloud spend analysis, normalized FOCUS records, allocation and optimization."
+        ],
+        [
+          "cloud_ops",
+          "server",
+          "Cloud-invoiced consumption, resource anomalies, utilization and engineering review."
+        ],
+        [
+          "ai_program_owner",
+          "spark",
+          "AI vendor spend, token and model economics, Copilot and Claude utilization and adoption."
+        ],
+        [
+          "investor_relations",
+          "up",
+          "Board Pack, spend run-rate, verified savings and R&D credit for investor reporting."
+        ]
+      ],
+      "value": [
+        [
+          "cloud",
+          "One view of all spend",
+          "AWS, Azure, Google Cloud, Snowflake, and AI services such as Claude, OpenAI and Microsoft Copilot: usage, seats and credits side by side."
+        ],
+        [
+          "search",
+          "Answers you can audit",
+          "More than 115 ready-made analyses. Each figure shows the formula behind it, and every approval is recorded in a log that can’t be quietly edited."
+        ],
+        [
+          "target",
+          "A view for every role",
+          "CFOs, technology leaders, FinOps analysts, internal controllers and auditors each see what their role needs. There are one-page summaries for the board and for regulators."
+        ],
+        [
+          "shield",
+          "Made for regulated work",
+          "Industry packs, such as life sciences and energy & utilities, check cloud and AI spend against the rules you report under. Sign-in uses your existing company login, and each person sees only their own business units."
+        ]
+      ]
+    },
+    "glossary": {
+      "how": [
+        {
+          "t": "Month forecast",
+          "eq": "Forecast = non-usage charges booked this month + (usage cost month to date ÷ days elapsed) × days in month",
+          "d": "Fixed charges (subscriptions, commitments, support) are counted once; usage is projected at its average daily rate so far. Closed months use actual cost. Computed per cost center, then added up."
+        },
+        {
+          "t": "Budget status",
+          "eq": "Variance = forecast − budget",
+          "d": "Command Center: over budget above 0%, at risk within 3% of budget. Budgets & Forecasts: warning above +2%, critical above +5%."
+        },
+        {
+          "t": "Full-year run-rate",
+          "eq": "Run-rate = open-month forecast × 12",
+          "d": "A straight-line view of the current month, not a seasonal model. Board Pack program run-rates use spend to date ÷ days in the data window × 365."
+        },
+        {
+          "t": "Forecast confidence",
+          "eq": "Confidence = mean(share of month elapsed, share of spend from live adapters, allocation coverage, share of closed invoice lines that tie out)",
+          "d": "Rises as the month progresses and as more spend comes from live feeds that reconcile to invoices. Each input is shown next to the score."
+        },
+        {
+          "t": "Forecast-year bridge (tax filings)",
+          "eq": "Forecast year = review-period actuals, annualized, + renewal escalators landing in the forecast year",
+          "d": "Built by vendor for the filing's entity and jurisdiction (PH-05). Renewals and escalators come from the vendor register (PH-06). An invoice exception is flagged because it weakens the support."
+        },
+        {
+          "t": "How CostIQ predicts",
+          "d": "There is no machine-learning model and no language model in any figure. Every projection is a fixed formula over billed data, so the same data always gives the same answer, and each figure shows its formula."
+        },
+        {
+          "t": "Anomaly detection",
+          "eq": "Sub-account spike: daily cost > 3 × its average over the prior 14 days, and > $500\nAPI key spike: daily cost > 3σ above its trailing 14-day mean, and > $25\nCopilot Studio surge: daily credits ≥ 3 × trailing 7-day average",
+          "d": "Rules run over every day in the data. The excess above the baseline is reported as already spent."
+        },
+        {
+          "t": "Savings estimates",
+          "eq": "Commitment-eligible spend × 28% (assumed Savings Plan discount)\nStandard-tier AI cost × 50% (batch discount)\nIdle seats = seat price of seats with no activity in 28 days",
+          "d": "Estimates are opportunities, not savings. They stay labelled as estimates until verified."
+        },
+        {
+          "t": "Verified savings",
+          "eq": "Verified = 30-day run-rate before the change − run-rate after (14+ days of data)",
+          "d": "Measured on the scope that changed. With less than 14 days of data the estimate is shown as provisional."
+        },
+        {
+          "t": "Deduction at risk",
+          "eq": "Review-period spend failing the reconciliation, approved-policy, GL-account or benefit tests\n+ unused share of seat purchases\n+ share of a line equal to a savings estimate left unactioned for 60+ days",
+          "d": "Evidence score = cost-weighted share of evidence present. Decision support for the tax team, not a prediction of any tax authority's ruling."
+        },
+        {
+          "t": "R&D credit",
+          "eq": "Credit = annualized review-period recurring cloud and SaaS fees × the jurisdiction's credit rate",
+          "d": "Claimed where the group already claims these fees; unlock where they qualify but are not yet claimed."
+        },
+        {
+          "t": "AI summary",
+          "d": "The AI Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, deduction at risk, unclaimed R&D credit, open savings, GxP findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages. Saved wording is used while the figures behind it are unchanged; every figure in it is still read live from the linked page."
+        },
+        {
+          "t": "Ask CostIQ",
+          "d": "Your question is matched to one of the tested use cases by keyword ranking (BM25), parameters such as periods and providers are read from the text, and the use case runs in your scope. Nothing is generated; if nothing matches, CostIQ says so."
+        }
+      ],
+      "terms": [
+        [
+          "FOCUS 1.0",
+          "The FinOps Foundation's open billing standard. Every provider's bill is loaded into the same FOCUS columns, so AWS, Azure, Google Cloud, Snowflake and AI vendors compare line for line."
+        ],
+        [
+          "Billed cost",
+          "What the invoice charges for a line."
+        ],
+        [
+          "Effective cost",
+          "Cost after discounts and with commitment purchases spread over the usage they cover. Most CostIQ figures use it."
+        ],
+        [
+          "List cost / contracted cost",
+          "Price at public rates / at your negotiated rates. List − contracted = negotiated discount."
+        ],
+        [
+          "Commitment",
+          "Savings Plan, reservation, committed-use discount or provisioned AI throughput (PTU) paid for in advance. Unused commitment is cost with no usage behind it."
+        ],
+        [
+          "Run-rate",
+          "Spend projected to a year from a recent period."
+        ],
+        [
+          "Cost center / business unit",
+          "Where cost is reported, from tags, approved allocation rules or split-cost data. Each person sees only their own."
+        ],
+        [
+          "Allocation coverage",
+          "1 − unallocated cost ÷ total cost."
+        ],
+        [
+          "Allocation policy",
+          "An approved, effective-dated rule that splits shared cost (for example by enrolled patients or trial sites). One person submits, another approves."
+        ],
+        [
+          "Legal entity / jurisdiction",
+          "The company in the group that bears a cost, and the tax jurisdiction it is reported in."
+        ],
+        [
+          "Recharge / transfer pricing",
+          "Technology cost charged from the shared-services entity to the operating entities, on a documented key."
+        ],
+        [
+          "Cost class",
+          "opex, capital, or qre (qualifying research expenditure for R&D credits)."
+        ],
+        [
+          "Review period / forecast year",
+          "The actual period a tax filing rests on, and the year it projects to."
+        ],
+        [
+          "Examiner request",
+          "A tax authority's information request. CostIQ drafts the answer from a tested use case; someone else approves it."
+        ],
+        [
+          "Audit file",
+          "A ZIP of the filing's evidence. Its SHA-256 fingerprint is sealed in the decision ledger, so anyone can check it later."
+        ],
+        [
+          "Incurred exposure / already spent",
+          "Money already spent on waste or error (spikes, idle capacity, invoice mismatches)."
+        ],
+        [
+          "Estimated saving",
+          "A saving that has not happened yet. Never added to verified savings."
+        ],
+        [
+          "Compliance exposure",
+          "Spend on a workload that fails a compliance check. Reported separately; never summed with savings."
+        ],
+        [
+          "Optimization lifecycle",
+          "Identified → approved → implemented → verified, with a different person signing each step."
+        ],
+        [
+          "GxP",
+          "Good practice rules (clinical, laboratory, manufacturing) for systems that affect product quality or patient safety."
+        ],
+        [
+          "21 CFR Part 11 / EU GMP Annex 11",
+          "US and EU rules for electronic records and signatures in regulated systems."
+        ],
+        [
+          "Validation review",
+          "The documented check that a GxP system, or AI used in GxP work, does what it should. Systems are re-reviewed on a schedule."
+        ],
+        [
+          "Customer-managed keys",
+          "Encryption keys the company controls, so the provider cannot read patient data."
+        ],
+        [
+          "Quality agreement",
+          "The contract terms a GxP vendor must sign: quality, audit rights, change notification, data integrity."
+        ],
+        [
+          "Cost per enrolled subject",
+          "Technology operating cost ÷ patients enrolled in trials, annualized."
+        ],
+        [
+          "Separation of duties",
+          "Whoever submits a finding, policy, optimization or examiner response cannot approve or verify it."
+        ],
+        [
+          "Decision ledger",
+          "A hash-chained log of every approval. Changing an old entry breaks the chain, which the Governance page checks."
+        ],
+        [
+          "Use case",
+          "A tested, named analysis with its SQL and formula. CostIQ runs 145 of them."
+        ],
+        [
+          "Board Pack status",
+          "In CostIQ: computed from data CostIQ holds. Partial: part of the section needs a feed or an approval. Needs data: the missing input is named; nothing is estimated in its place."
+        ]
+      ]
+    },
+    "agent": {
+      "questions": {
+        "risk": "What could an examiner disallow?",
+        "credit": "What R&D credit could we unlock?"
+      },
+      "route": {
+        "risk": "risk|disallow|deduct|examiner|audit|challenge|evidence",
+        "credit": "credit|unlock|r&d|qre"
+      },
+      "reasons": {
+        "unactioned_savings": "savings left unactioned",
+        "no_benefit": "no benefit shown",
+        "unreconciled": "not reconciled to an invoice",
+        "unmapped_gl": "no GL account",
+        "no_approved_policy": "no approved allocation policy"
+      },
+      "risk": {
+        "step": "Reading the question: deduction at risk across open filings",
+        "call": "Testing review-period lines for evidence",
+        "answer": "An examiner could disallow **{amount}** of recharged technology spend; {score}% is evidenced ({atRisk} of {lines} lines at risk). The biggest driver is **{reason}**. I'd fix these first: {top}."
+      },
+      "credit": {
+        "step": "Reading the question: R&D credit on cloud fees",
+        "call": "Computing the credit by jurisdiction",
+        "split": "Separating claimed credit from eligible, unclaimed credit",
+        "answer": "Claiming qualifying cloud fees where they are eligible but unclaimed would add **{unlock}/yr** of R&D credit, on top of **{claimed}/yr** claimed today. ",
+        "best": "The biggest opportunity is **{jurisdiction}** at {amount}/yr.",
+        "chart": "Credit a year, by jurisdiction"
+      },
+      "brief": {
+        "step": "Planning: spend, tax risk, GxP, savings and operations for your role"
+      },
+      "topics": "spend, risk, savings, credit or alerts"
+    },
+    "command": {
+      "risk": {
+        "label": "Deduction at risk",
+        "sub": "{score}% evidenced · {filings} open filings"
+      },
+      "unlock": {
+        "label": "R&D credit unlock",
+        "sub": "{amount}/yr claimed today"
+      },
+      "status": {
+        "claimed": "claimed",
+        "eligible": "eligible",
+        "ineligible": "ineligible"
+      }
+    },
+    "risk": {
+      "all": "All open filings",
+      "amount": "Deduction at risk",
+      "spend": "Review-period spend",
+      "byFiling": "By filing",
+      "filing": "Filing",
+      "fixTitle": "Remove deduction risk on {item}",
+      "useCases": {
+        "risk": "PH-12",
+        "glMap": "PH-01"
+      }
+    },
+    "catalog": {
+      "examples": [
+        "Which GxP vendors are missing quality-agreement clauses?",
+        "How much deduction is at risk?",
+        "What R&D credit could cloud fees unlock?",
+        "Are GxP entities carrying Consumer Health work?",
+        "Which GPU endpoints are idle?",
+        "Cost per accepted outcome by LLM app",
+        "Database lock cost by study event",
+        "Unused Copilot seats",
+        "Which non-production servers run 24x7?",
+        "Forecast bridge by vendor"
+      ]
+    },
+    "format": {
+      "moneyColumns": "perpatient|persite|perstudy|qre|crosscharge",
+      "notMoneyColumns": "sites$|patients$|studies$",
+      "idColumns": "filing",
+      "columnLabels": []
+    }
+  }
+}

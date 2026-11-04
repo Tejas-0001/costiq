@@ -5,7 +5,36 @@ translated for the client's database and filtered to the caller's scope like eve
 Every figure returned carries a `formula` string: the evidence shown next to the number.
 """
 from __future__ import annotations
-import calendar, datetime as dt, json
+import calendar, datetime as dt, json, re
+from . import tenant
+
+_IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")  # table names read from pack.yaml
+_MONTH = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+# Reconciling-item category -> the invoice line it sits on, when the register has no InvoiceDetailId column
+_ITEM_LINE = {"tax_not_in_cost_data": "Tax", "rounding": "Adjustment", "late_charge": "Usage", "correction_next_period": "Credit"}
+
+
+def _t(key: str, default: str = "", **values) -> str:
+    """Backend copy under `ledger.` (tenants/<t>/copy/ledger.json), or the neutral default when the key is missing."""
+    try:
+        v = tenant.lookup("ledger." + key)
+    except (KeyError, TypeError):
+        v = default
+    if isinstance(v, list):
+        v = "\n".join(v)
+    return v.format(**values) if values else v
+
+
+def _lit(v) -> str:
+    return "'" + str(v).replace("'", "''") + "'"
+
+
+def _pack_table(*path):
+    """A table name from pack.yaml (e.g. ("tags", "required_table")); None when the key is absent or not an identifier."""
+    node = tenant.pack()
+    for p in path:
+        node = node.get(p) if isinstance(node, dict) else None
+    return node if isinstance(node, str) and _IDENT.match(node) else None
 
 CHARGE_KEY = ("md5(COALESCE(CAST(ChargePeriodStart AS VARCHAR), '') || '|' || COALESCE(BillingAccountId, '') || '|' || "
               "COALESCE(SubAccountId, '') || '|' || COALESCE(ServiceName, '') || '|' || COALESCE(ChargeCategory, '') || '|' || "
@@ -51,15 +80,31 @@ class Engines:
     def allocation_rules(self):
         return rows(self.db.query("SELECT * FROM allocation_rule ORDER BY Priority, RuleId", limit=None))
 
+    def first_period(self):
+        """Start of the first billing period in the data (rules effective from then apply to every charge)."""
+        if getattr(self, "_first", None) is None:
+            v = self.db.query("SELECT MIN(BillingPeriodStart) FROM CostAndUsage")["rows"][0][0]
+            self._first = dt.datetime.fromisoformat(str(v)[:19]) if v else None
+        return self._first
+
     def cost_center_expr(self):
         """SQL expression + params assigning every charge to one cost center, in this order:
-        split-cost allocation tags, resource tags, approved rules by priority, else Unallocated."""
+        split-cost allocation tags, resource tags, approved rules by priority, else Unallocated. A rule effective after
+        the first billing period applies from its EffectiveFrom (restated history starts there)."""
         parts, params = [], {}
         allowed = {"SubAccountId", "ServiceName", "ChargeCategory", "x_WorkspaceName", "ServiceProviderName"}
+        first = None
         for i, r in enumerate(self.allocation_rules()):
             if r["MatchColumn"] not in allowed:
                 continue
-            parts.append(f"WHEN {r['MatchColumn']} = :rv{i} THEN :rc{i}")
+            ef = dt.datetime.fromisoformat(str(r["EffectiveFrom"])[:19]) if r.get("EffectiveFrom") else None
+            if ef is not None and first is None:
+                first = self.first_period()
+            if ef is not None and first is not None and ef > first:
+                parts.append(f"WHEN {r['MatchColumn']} = :rv{i} AND ChargePeriodStart >= :rf{i} THEN :rc{i}")
+                params[f"rf{i}"] = ef
+            else:
+                parts.append(f"WHEN {r['MatchColumn']} = :rv{i} THEN :rc{i}")
             params[f"rv{i}"], params[f"rc{i}"] = r["MatchValue"], r["CostCenter"]
         rules = f"CASE {' '.join(parts)} END" if parts else "NULL"
         expr = ("COALESCE(json_extract_string(AllocatedTags, '$.cost_center'), "
@@ -203,11 +248,27 @@ class Engines:
                                                 if inv else "Not yet invoiced (open period)")}],
             "charge": {k: v for k, v in c.items() if not k.startswith("__") and v not in (None, "")}}
 
+    def ledger_columns(self) -> list[str]:
+        """The tenant's extra ledger columns (allocation.extra_columns(), utility: RuleId, Citation, WorkOrderId, ...) that
+        allocated_cost really has; empty for pharma."""
+        try:
+            from .allocation import extra_columns
+            want = list(extra_columns())
+        except (ImportError, AttributeError):
+            return []
+        if not want:
+            return []
+        have = set(self.db.query("SELECT * FROM allocated_cost WHERE 1 = 0", limit=1)["columns"])
+        return [c for c in want if c in have]
+
     def entity_lineage(self, key):
-        """Steps 3-5 of the entity allocation chain for one charge (entity split, jurisdiction, GL account)."""
-        parts = rows(self.db.query("""
+        """Steps 3-5 of the entity allocation chain for one charge (entity split, jurisdiction, GL account). With the
+        tenant's rule columns (utility) the account step also names the rule, its policy flag and citation, and a work
+        order step follows when the charge carries one."""
+        extra = [c for c in ("RuleId", "Citation", "PolicyFlag", "WorkOrderId", "BillingClass") if c in self.ledger_columns()]
+        parts = rows(self.db.query(f"""
             SELECT LegalEntity, OpcoPolicy, OpcoPolicyVersion, DriverName, OpcoShare, Jurisdiction, JurisdictionFactor,
-                   GlAccount, GlTitle, CostClass, AllocatedCost, Exception
+                   GlAccount, GlTitle, CostClass, AllocatedCost, Exception{''.join(', ' + c for c in extra)}
             FROM allocated_cost WHERE ChargeKey = :k ORDER BY AllocatedCost DESC""", {"k": key}, None, limit=None))
         if not parts:
             return []
@@ -215,13 +276,27 @@ class Engines:
         basis = f"driver {p0['DriverName']}" if p0["DriverName"] else "fixed entity"
         opco = "; ".join(f"{e} {100 * s:.1f}%" for e, s in dict((r["LegalEntity"], r["OpcoShare"]) for r in parts).items())
         jur = "; ".join(sorted({f"{r['LegalEntity']} → {r['Jurisdiction']} {100 * r['JurisdictionFactor']:.0f}%" for r in parts}))
-        gl = "; ".join(sorted({f"{r['GlAccount'] or 'UNMAPPED'} {r['GlTitle'] or ''} ({r['CostClass']})".strip() for r in parts}))
-        return [
+        if "RuleId" in extra:
+            gl = "; ".join(sorted({" · ".join(x for x in (
+                f"{r['GlAccount'] or 'UNMAPPED'} {r['GlTitle'] or ''} ({r['CostClass']})".replace("  ", " "),
+                f"{r['RuleId'] or ''} {r.get('PolicyFlag') or ''}".strip(), r.get("Citation") or "") if x) for r in parts}))
+        else:
+            gl = "; ".join(sorted({f"{r['GlAccount'] or 'UNMAPPED'} {r['GlTitle'] or ''} ({r['CostClass']})".strip() for r in parts}))
+        billing = sorted({r["BillingClass"] for r in parts if r.get("BillingClass")}) if "BillingClass" in extra else []
+        steps = [
             {"step": "Entity split", "detail": (f"Policy {p0['OpcoPolicy']} v{p0['OpcoPolicyVersion']} ({basis}): {opco}"
-                                              if p0["OpcoPolicy"] else "No approved policy matched: stays on the shared-services entity")},
+                                              if p0["OpcoPolicy"] else "No approved policy matched: stays on the shared-services entity")
+                                             + (f" · {', '.join(billing)}" if billing else "")},
             {"step": "Jurisdiction", "detail": jur},
-            {"step": "GL account and cost class", "detail": gl + (f" · exception: {p0['Exception']}" if p0["Exception"] else "")},
+            {"step": _t("lineage.account_step", "GL account and cost class"),
+             "detail": gl + (f" · exception: {p0['Exception']}" if p0["Exception"] else "")},
         ]
+        orders = sorted({r["WorkOrderId"] for r in parts if r.get("WorkOrderId")}) if "WorkOrderId" in extra else []
+        if orders:
+            held = sorted({r["Exception"] for r in parts if r.get("Exception")})
+            steps.append({"step": _t("lineage.work_order_step", "Capital project"),
+                          "detail": ", ".join(orders) + f" · {p0['CostClass']}" + (f" · held: {', '.join(held)}" if held else "")})
+        return steps
 
     # ------------------------------------------------------------------ AI economics
     def ai_overview(self, scope):
@@ -294,16 +369,16 @@ class Engines:
         if r:
             add("UO-02", "Prompt cache writes that never pay back", "estimate", "low",
                 -sum(x["NetCacheBenefitAtList"] for x in r), f"{r[0]['Workspace']} · {r[0]['ReadsPerWrite']} reads per write",
-                "Clinical Operations", "Cache write premium − cache read savings, at list price.", r)
+                tenant.text("findings.ai_owner"), "Cache write premium − cache read savings, at list price.", r)
         r = self._uc("UO-03", scope)
         if r:
             add("UO-03", "Workloads eligible for the Batch API", "estimate", "low", sum(x["PotentialBatchSavings"] or 0 for x in r),
-                f"{len(r)} standard-tier workloads", "Clinical Operations", "Standard-tier cost × 50% (batch discount). Over the data window.", r)
+                f"{len(r)} standard-tier workloads", tenant.text("findings.ai_owner"), "Standard-tier cost × 50% (batch discount). Over the data window.", r)
         r = self._uc("UO-04", scope)
         if r:
             pos = [x for x in r if (x["EstimatedListSavings"] or 0) > 0]
             add("UO-04", "Frontier models on simple tasks", "estimate", "low", sum(x["EstimatedListSavings"] for x in pos),
-                f"{len(pos)} application/model pairs", "Clinical Operations", "Current list cost − same tokens at the vendor's balanced-tier price.", pos)
+                f"{len(pos)} application/model pairs", tenant.text("findings.ai_owner"), "Current list cost − same tokens at the vendor's balanced-tier price.", pos)
         r = self._uc("F-46", scope)
         if r:
             add("F-46", "Commitment-eligible spend not covered", "estimate", "low",
@@ -318,7 +393,7 @@ class Engines:
         if r:
             add("GV-02", "Regulated workload served outside the US", "compliance", "high", sum(x["EffectiveCost"] or 0 for x in r),
                 f"{r[0]['Application']} · {r[0]['DaysInViolation']} days", "AI Governance",
-                "Genomic-data usage where inference_geo ≠ us. Compliance exposure (the cost shown is the affected spend).", r)
+                tenant.text("findings.residency_formula"), r)
         if scope is None:
             r = self._uc("IC-01", scope)
             if r:
@@ -335,39 +410,15 @@ class Engines:
             add("RO-01", "Copilot Credit pack overage", "incurred", "low", sum(x["PaygCost"] for x in r),
                 f"{sum(x['PaygCredits'] for x in r):,.0f} credits billed pay-as-you-go", "Business application owner",
                 "Σ billed cost of credits consumed beyond the monthly pack.", r)
-        if scope is None:
-            for detect in (self._pharma_findings, ):
-                try:
-                    detect(scope, add)
-                except Exception as e:  # noqa: BLE001 - one detector never breaks the list
-                    import logging
-                    logging.getLogger("costiq.engines").warning("detector %s failed: %s", detect.__name__, e)
+        if scope is None:  # the tenant's own detectors (tenants/<t>/hooks.py findings), enterprise scope only
+            try:
+                tenant.hooks().findings(self, scope, add)
+            except Exception as e:  # noqa: BLE001 - one detector never breaks the list
+                import logging
+                logging.getLogger("costiq.engines").warning("tenant detectors failed: %s", e)
         order = {"high": 0, "medium": 1, "low": 2}
         out.sort(key=lambda f: (order[f["severity"]], -f["exposure"]))
         return out
-
-    def _pharma_findings(self, scope, add):
-        """Transfer-pricing, GxP and patient-data findings from the pharma use cases (enterprise scope only)."""
-        r = [x for x in self._uc("PH-03", scope) if (x["CrossCharge"] or 0) > 0]
-        if r:
-            add("PH-03", "GxP entities carrying Consumer Health work (cross-charging)", "compliance", "high",
-                sum(x["CrossCharge"] for x in r), f"{r[0]['CostCenter']} via {r[0]['OpcoPolicy']} · {len(r)} allocations",
-                "Transfer Pricing", "Allocated cost from Consumer Health cost centers that landed on GxP entities.", r)
-        r = [x for x in self._uc("PH-07", scope) if x["Status"] == "Provider can decrypt patient data"]
-        if r:
-            add("PH-07", "Patient data in cloud without customer-managed keys", "compliance", "high", sum(x["EffectiveCost"] or 0 for x in r),
-                ", ".join(x["Application"] for x in r), "GxP Quality & Data Privacy",
-                "Workloads holding patient data where the provider manages the keys (spend shown).", r)
-        r = [x for x in self._uc("PH-01", scope) if x["Status"] == "Unmapped"]
-        if r:
-            add("PH-01", "Technology spend with no GL account", "exception", "medium", sum(x["AllocatedCost"] or 0 for x in r),
-                f"{len(r)} entity lines unmapped", "Internal Controller",
-                "Allocated opex with no ref_gl_account_map match; needs a manual entry before close and filing.", r)
-        r = [x for x in self._uc("PH-06", scope) if x["Timing"] == "In forecast year"]
-        if r:
-            add("PH-06", "Contract escalators landing in the forecast year", "estimate", "low", sum(x["AnnualEscalation"] or 0 for x in r),
-                f"{len(r)} renewals in {r[0]['FilingId']}'s forecast year", "FP&A Analyst",
-                "Annual contract value × escalator for renewals inside the forecast year. Renegotiate or budget for it.", r)
 
     def _daily_spikes(self, scope):
         return rows(self.db.query("""
@@ -426,6 +477,14 @@ class Engines:
             l["Status"] = "matched" if abs(l["Difference"] or 0) <= 1 else "exception"
             l["Reason"] = None if l["Status"] == "matched" else ("Tax rate differs from expected" if l["ChargeCategory"] == "Tax"
                                                                 else "Invoice amount exceeds charge detail" if l["Difference"] > 0 else "Charges exceed invoice")
+        items = self.reconciling_items(lines)
+        if items is not None:  # the tenant keeps a register of labeled reconciling items (utility)
+            for l in lines:
+                its = items.get(l["InvoiceDetailId"], [])
+                l.update(self._item_fields(its))
+                if its and l["Status"] == "exception" and abs((l["Difference"] or 0) - sum(float(i["Amount"] or 0) for i in its)) <= 1:
+                    l["Status"] = "labeled" if l["Explained"] else "awaiting"
+                    l["Reason"] = l["Label"]
         periods = rows(self.db.query("""SELECT strftime(BillingPeriodStart, '%Y-%m') AS Period, InvoiceIssuerName AS Issuer,
                                         BillingPeriodStatus AS Status FROM BillingPeriod ORDER BY 1, 2""", {}, None, limit=None))
         close = {}
@@ -434,20 +493,295 @@ class Engines:
             c["Issuers"] += 1
             c["Closed"] += p["Status"] == "Closed"
         for l in lines:
-            if l["Status"] == "exception" and l["Period"] in close:
+            if l["Status"] in ("exception", "awaiting") and l["Period"] in close:
                 close[l["Period"]]["Exceptions"] += 1
         for c in close.values():
             c["Readiness"] = ("Open period" if c["Closed"] < c["Issuers"] else "Exceptions" if c["Exceptions"] else "Ready")
-        return {"lines": lines, "close": list(close.values()),
-                "formula": "Each Invoice Detail line is compared with Σ BilledCost of the FOCUS charges carrying its InvoiceDetailId. "
-                           "Differences above $1 become exceptions."}
+        formula = ("Each Invoice Detail line is compared with Σ BilledCost of the FOCUS charges carrying its InvoiceDetailId. "
+                   "Differences above $1 become exceptions.")
+        if items is not None:
+            formula += " " + _t("reconciliation_note", "A difference that registered reconciling items account for (±$1) is "
+                                "labeled when they are explained, or awaiting when one is still open.")
+        return {"lines": lines, "close": list(close.values()), "formula": formula}
+
+    # ------------------------------------------------------------------ bill unbundling: reconciling items, invoice to ledger
+    def reconciling_items(self, lines):
+        """{InvoiceDetailId: [register rows]} from the tenant's labeled reconciling items (pack reconciliation.items_table),
+        or None when the tenant keeps no register. Items match on InvoiceDetailId; a register without that column falls
+        back to the invoice line of the item's kind (tax, rounding, usage, credit) or the invoice's largest difference."""
+        tbl = _pack_table("reconciliation", "items_table")
+        if not tbl:
+            return None
+        try:
+            items = rows(self.db.query(f"SELECT * FROM {tbl}", {}, None, limit=None))
+        except Exception:  # noqa: BLE001 - register not loaded: no labels rather than a broken page
+            return None
+        by_invoice = {}
+        for l in lines:
+            by_invoice.setdefault(l["InvoiceId"], []).append(l)
+        out = {}
+        for it in items:
+            d = it.get("InvoiceDetailId")
+            if not d:
+                cands = by_invoice.get(it.get("InvoiceId"), [])
+                want = _ITEM_LINE.get(it.get("Category"))
+                hit = next((l for l in cands if want and l["ChargeCategory"] == want), None) or \
+                    max(cands, key=lambda l: abs(l["Difference"] or 0), default=None)
+                d = hit["InvoiceDetailId"] if hit else None
+            if d:
+                out.setdefault(d, []).append(it)
+        return out
+
+    @staticmethod
+    def _item_fields(its):
+        join = lambda k: "; ".join(dict.fromkeys(str(i[k]) for i in its if i.get(k))) or None  # noqa: E731
+        return {"Label": join("Item"), "Category": join("Category"),
+                "Explained": all(bool(i.get("Explained")) for i in its) if its else None,
+                "Treatment": join("Treatment"), "ExpectedResolution": join("ExpectedResolution")}
+
+    def invoice_ledger(self, detail_id):
+        """One invoice line unbundled into the ledger: where every dollar went (company, function, account, rule,
+        citation, billing class), what the cost rows do not cover (labeled reconciling items) and the largest charges,
+        each of which opens its lineage. None when the line does not exist."""
+        rec = self.reconciliation()
+        line = next((l for l in rec["lines"] if l["InvoiceDetailId"] == detail_id), None)
+        if line is None:
+            return None
+        cc, p = self.cost_center_expr()
+        p["d"] = detail_id
+        src = rows(self.db.query("""SELECT COUNT(*) AS n, SUM(BilledCost) AS billed, SUM(EffectiveCost) AS effective
+                                    FROM CostAndUsage WHERE InvoiceDetailId = :d""", {"d": detail_id}, None))[0]
+        charges = rows(self.db.query(f"""
+            SELECT {CHARGE_KEY} AS ChargeKey, CAST(ChargePeriodStart AS DATE) AS Day, ServiceName AS Service,
+                   COALESCE(x_ModelName, ResourceName, ChargeDescription) AS Item, {cc} AS CostCenter,
+                   BilledCost AS Billed, EffectiveCost AS Effective
+            FROM CostAndUsage WHERE InvoiceDetailId = :d
+            ORDER BY GREATEST(ABS(BilledCost), ABS(EffectiveCost)) DESC, ChargePeriodStart""", p, None, limit=25))
+        extra = self.ledger_columns()
+        if "InvoiceDetailId" in extra:
+            src_sql = "FROM allocated_cost a WHERE a.InvoiceDetailId = :d"
+        else:  # join through the charge key
+            src_sql = (f"FROM allocated_cost a JOIN (SELECT DISTINCT {CHARGE_KEY} AS ChargeKey FROM CostAndUsage "
+                       "WHERE InvoiceDetailId = :d) k ON k.ChargeKey = a.ChargeKey")
+        dims = ["a.LegalEntity"] + (["a.FunctionCode"] if "FunctionCode" in extra else []) + ["a.GlAccount"]
+        sel = dims + ["MAX(a.GlTitle) AS GlTitle", "a.CostClass"]
+        grp = dims + ["a.CostClass"]
+        if "RuleId" in extra:
+            sel += ["a.RuleId"] + [f"MAX(a.{c}) AS {c}" for c in ("Citation", "PolicyFlag") if c in extra]
+            grp.append("a.RuleId")
+        if "BillingClass" in extra:
+            sel.append("a.BillingClass")
+            grp.append("a.BillingClass")
+        sel += ["a.Exception", "COUNT(*) AS Lines", "SUM(a.AllocatedCost) AS AllocatedCost"]
+        grp.append("a.Exception")
+        groups = rows(self.db.query(f"SELECT {', '.join(sel)} {src_sql} GROUP BY {', '.join(grp)} ORDER BY SUM(a.AllocatedCost) DESC",
+                                    {"d": detail_id}, None, limit=None))
+        by_entity = rows(self.db.query(f"""SELECT a.LegalEntity, SUM(a.AllocatedCost) AS AllocatedCost {src_sql}
+                                           GROUP BY 1 ORDER BY 2 DESC""", {"d": detail_id}, None, limit=None))
+        allocated = sum(g["AllocatedCost"] or 0 for g in groups)
+        for r in groups + by_entity:
+            r["AllocatedCost"] = round(r["AllocatedCost"] or 0, 2)
+        invoiced, billed = float(line["Invoiced"] or 0), float(src["billed"] or 0)
+        items = (self.reconciling_items(rec["lines"]) or {}).get(detail_id, [])
+        residuals = [{"Item": i.get("Item"), "Amount": round(float(i.get("Amount") or 0), 2), "Category": i.get("Category"),
+                      "Explained": bool(i.get("Explained")), "Treatment": i.get("Treatment"),
+                      "ExpectedResolution": i.get("ExpectedResolution")} for i in items]
+        unexplained = invoiced - billed - sum(r["Amount"] for r in residuals)
+        if abs(unexplained) > 1:
+            residuals.append({"Item": _t("unexplained", "Difference not explained"), "Amount": round(unexplained, 2),
+                              "Category": None, "Explained": False, "Treatment": None, "ExpectedResolution": None})
+        invoice = {k: line[k] for k in ("InvoiceId", "InvoiceDetailId", "Issuer", "Period", "ChargeCategory", "IssueStatus", "Invoiced")}
+        invoice.update({k: line.get(k) for k in ("Status", "Reason", "Label") if k in line})
+        return {
+            "invoice": invoice,
+            "totals": {"invoiced": round(invoiced, 2), "billed_rows": round(billed, 2),
+                       "effective_rows": round(float(src["effective"] or 0), 2), "allocated": round(float(allocated), 2),
+                       "difference": round(invoiced - billed, 2), "charge_lines": int(src["n"] or 0)},
+            "groups": groups, "by_entity": by_entity, "residuals": residuals, "charges": charges,
+            "formula": _t("invoice_formula", "Invoice line − Σ BilledCost of its charges = the difference, explained by the "
+                          "reconciling items. Allocated = Σ effective cost of the line's charges, split by entity and account "
+                          "(ties to effective cost, control C-10 per invoice line). Effective cost spreads commitment fees into "
+                          "the usage they cover, so billed and effective cost differ on usage and fee lines."),
+        }
+
+    # ------------------------------------------------------------------ tag enforcement
+    # Spend that cannot carry a tag (UT-15's definition), by kind; NULL = taggable.
+    NOT_TAGGABLE = ("CASE WHEN ChargeCategory = 'Tax' THEN 'tax' WHEN ChargeCategory = 'Credit' THEN 'credit' "
+                    "WHEN ChargeCategory = 'Adjustment' THEN 'adjustment' "
+                    "WHEN ChargeCategory = 'Purchase' AND ServiceProviderName <> InvoiceIssuerName THEN 'marketplace' "
+                    "WHEN ResourceId IS NULL AND ChargeCategory = 'Purchase' THEN 'purchase' "
+                    "WHEN ResourceId IS NULL THEN 'no_resource' END")
+
+    def _tag_rules(self, table):
+        """The tenant's required-tag policy as checks: [{key, cond (key, value) | None, valid SQL, fallback}]. Allowed
+        values are a comma-separated list, a reference table (its first column), or free text (any value)."""
+        out = []
+        for r in rows(self.db.query(f"SELECT * FROM {table}", {}, None, limit=None)):
+            key, need = str(r.get("TagKey") or ""), str(r.get("Requirement") or "").lower()
+            if not _IDENT.match(key) or need not in ("required", "conditional"):
+                continue
+            cond = None
+            if need == "conditional":
+                m = re.match(r"^\s*(\w+)\s*=\s*([\w.-]+)\s*$", str(r.get("RequiredOn") or ""))
+                if not m:
+                    continue  # a condition on something other than a tag value is not checked here
+                cond = (m.group(1), m.group(2))
+            allowed = str(r.get("AllowedValues") or "")
+            toks = [x.strip() for x in allowed.split(",")]
+            ref = re.search(r"\b(ref_\w+)\b", allowed)
+            col = f"tag_{key}"
+            if len(toks) > 1 and all(re.match(r"^[\w&.\-]+$", x) for x in toks):
+                valid = f"{col} IN ({', '.join(_lit(x) for x in toks)})"
+            elif ref:
+                first = self.db.query(f"SELECT * FROM {ref.group(1)} WHERE 1 = 0", limit=1)["columns"][0]
+                valid = f"{col} IN (SELECT {first} FROM {ref.group(1)} WHERE {first} IS NOT NULL)"
+            else:
+                valid = f"{col} IS NOT NULL"
+            out.append({"key": key, "cond": cond, "valid": valid, "fallback": r.get("FallbackOrder")})
+        return out
+
+    def tag_compliance(self, scope, win=None, month=None):
+        """Tag enforcement for one period (`month` YYYY-MM overrides the window): coverage by required tag (UT-15), by
+        company (through the ledger) and business unit, spend that cannot be tagged, violations with their age, and the
+        suspense: taggable spend with no cost center after tags and approved rules, which waits with an owner instead of
+        being spread. {"available": False} when the tenant has no required-tag policy."""
+        req = _pack_table("tags", "required_table")
+        if not req:
+            return {"available": False}
+        cfg = tenant.pack().get("tags") or {}
+        vmap, acct = _pack_table("tags", "value_map_table"), _pack_table("tags", "account_table")
+        if month:
+            if not _MONTH.match(month):
+                raise ValueError("month must be YYYY-MM")
+            y, m = int(month[:4]), int(month[5:])
+            start, end = dt.date(y, m, 1), dt.date(y + (m == 12), m % 12 + 1, 1)
+            period = {"label": f"{calendar.month_name[m]} {y}", "start": start.isoformat(),
+                      "end": (end - dt.timedelta(days=1)).isoformat(), "month": month}
+        else:
+            if win is None:
+                from .window import window
+                win = window("mtd", self.as_of())
+            start, end = win.start, win.end + dt.timedelta(days=1)
+            period = win.as_dict()
+        t0, t1 = dt.datetime.combine(start, dt.time()), dt.datetime.combine(end, dt.time())
+        rules = self._tag_rules(req)
+        cc, p = self.cost_center_expr()
+        p.update(t0=t0, t1=t1)
+        keys = list(dict.fromkeys([r["key"] for r in rules] + [r["cond"][0] for r in rules if r["cond"]]))
+        tag_cols = ", ".join(f"COALESCE(json_extract_string(AllocatedTags, '$.{k}'), json_extract_string(Tags, '$.{k}')) AS tag_{k}"
+                             for k in keys)
+        ok = {r["key"]: (f"CASE WHEN {'tag_' + r['cond'][0] + ' = ' + _lit(r['cond'][1]) if r['cond'] else 'TRUE'} THEN "
+                         f"CASE WHEN tag_{r['key']} IS NOT NULL AND {r['valid']} THEN 1 ELSE 0 END ELSE 1 END") for r in rules}
+        compliant = " * ".join(f"({v})" for v in ok.values()) or "1"
+
+        def cte(with_key=False, history=True):
+            return f"""WITH c AS (
+              SELECT SubAccountId, SubAccountName, ChargePeriodStart, EffectiveCost AS Cost,
+                     CASE WHEN ChargePeriodStart >= :t0 THEN 1 ELSE 0 END AS InPeriod,
+                     {self.NOT_TAGGABLE} AS NotTaggable, {cc} AS PoolCostCenter{', ' + CHARGE_KEY + ' AS ChargeKey' if with_key else ''}
+                     {', ' + tag_cols if tag_cols else ''}
+              FROM CostAndUsage WHERE ChargePeriodStart < :t1{'' if history else ' AND ChargePeriodStart >= :t0'}
+            ), k AS (SELECT c.*, {compliant} AS Compliant FROM c WHERE NotTaggable IS NULL AND Cost <> 0)"""
+        q = lambda sql, lim=None: rows(self.db.query(sql, p, scope, limit=lim))  # noqa: E731
+
+        names, owners = {}, {}
+        if acct:
+            for r in rows(self.db.query(f"SELECT * FROM {acct}", {}, None, limit=None)):
+                names[r.get("SubAccountId")] = r.get("SubAccountName")
+                owners[r.get("SubAccountId")] = r.get("Owner")
+        default_owner = cfg.get("suspense_owner") or _t("tags.unassigned", "Unassigned")
+        as_of = self.as_of()
+        age = lambda d: (as_of - dt.date.fromisoformat(str(d)[:10])).days if d else None  # noqa: E731
+
+        # spend that cannot be tagged, by kind
+        nt = q(f"""{cte(history=False)} SELECT NotTaggable AS Category, SUM(Cost) AS Amount FROM c
+                   WHERE NotTaggable IS NOT NULL GROUP BY 1 ORDER BY 2 DESC""")
+        cannot = {"amount": round(sum(r["Amount"] or 0 for r in nt), 2),
+                  "by_category": [{"Category": _t(f"tags.not_taggable.{r['Category']}", r["Category"]),
+                                   "Amount": round(r["Amount"] or 0, 2)} for r in nt]}
+
+        # violations: a required tag missing or holding a value outside the register, per account, with first sighting
+        vm = {}
+        if vmap:
+            for r in rows(self.db.query(f"SELECT * FROM {vmap}", {}, None, limit=None)):
+                vm[(r.get("TagKey"), r.get("RawValue"))] = r
+        parts = []
+        for r in rules:
+            k = r["key"]
+            applies = f"tag_{r['cond'][0]} = {_lit(r['cond'][1])}" if r["cond"] else "TRUE"
+            parts.append(f"""SELECT SubAccountId, MAX(SubAccountName) AS Name, {_lit(k)} AS TagKey,
+                                    CASE WHEN tag_{k} IS NULL THEN 'missing' ELSE 'invalid' END AS Issue, tag_{k} AS RawValue,
+                                    SUM(CASE WHEN InPeriod = 1 THEN Cost ELSE 0 END) AS Spend, SUM(InPeriod) AS n,
+                                    MIN(ChargePeriodStart) AS FirstSeen
+                             FROM k WHERE ({applies}) AND ({ok[k]}) = 0 GROUP BY 1, 3, 4, 5 HAVING SUM(InPeriod) > 0""")
+        fallback = {r["key"]: r["fallback"] for r in rules}
+        violations = []
+        if parts:
+            for v in q(f"{cte()} SELECT * FROM ({' UNION ALL '.join(parts)}) v ORDER BY Spend DESC, TagKey", 200):
+                m = vm.get((v["TagKey"], v["RawValue"]))
+                res = ((fallback.get(v["TagKey"]) or "").strip(" -") or None if v["Issue"] == "missing" else
+                       _t("tags.normalized", "Normalized to {value}", value=m.get("NormalizedValue"))
+                       if m and m.get("NormalizedValue") else _t("tags.queued", "Exception queue") if m else
+                       _t("tags.not_in_register", "Not in the register: fix at source"))
+                violations.append({"SubAccountId": v["SubAccountId"], "Account": names.get(v["SubAccountId"]) or v["Name"] or v["SubAccountId"],
+                                   "Owner": owners.get(v["SubAccountId"]) or default_owner, "TagKey": v["TagKey"], "Issue": v["Issue"],
+                                   "RawValue": v["RawValue"], "Spend": round(v["Spend"] or 0, 2), "FirstSeen": str(v["FirstSeen"])[:10],
+                                   "AgeDays": age(v["FirstSeen"]), "Resolution": res})
+
+        # suspense: taggable spend that no tag or approved rule puts on a cost center
+        sus = q(f"""{cte()} SELECT SubAccountId, MAX(SubAccountName) AS Name, SUM(CASE WHEN InPeriod = 1 THEN Cost ELSE 0 END) AS Amount,
+                           SUM(InPeriod) AS Lines, MIN(ChargePeriodStart) AS FirstSeen
+                    FROM k WHERE PoolCostCenter = 'Unallocated' GROUP BY 1 HAVING SUM(InPeriod) > 0 ORDER BY 3 DESC""")
+        usage_where = f" AND SubAccountId IN (SELECT SubAccountId FROM {acct})" if acct else ""
+        usage = float(q(f"""SELECT SUM(EffectiveCost) AS u FROM CostAndUsage WHERE ChargeCategory = 'Usage'
+                            AND ChargePeriodStart >= :t0 AND ChargePeriodStart < :t1{usage_where}""")[0]["u"] or 0)
+        amount = sum(r["Amount"] or 0 for r in sus)
+        accounts = [{"SubAccountId": r["SubAccountId"], "Account": names.get(r["SubAccountId"]) or r["Name"] or r["SubAccountId"],
+                     "Owner": owners.get(r["SubAccountId"]) or default_owner, "Amount": round(r["Amount"] or 0, 2),
+                     "Lines": int(r["Lines"] or 0), "FirstSeen": str(r["FirstSeen"])[:10], "AgeDays": age(r["FirstSeen"])}
+                    for r in sus]
+        suspense = {"amount": round(amount, 2), "share_pct": round(100 * amount / usage, 1) if usage else None,
+                    "usage": round(usage, 2), "lines": sum(a["Lines"] for a in accounts), "owner": default_owner,
+                    "oldest_days": max((a["AgeDays"] or 0 for a in accounts), default=None), "accounts": accounts}
+
+        # coverage (every required tag present and valid) by business unit and, through the ledger, by company
+        def cover(rs, name):
+            return [{name: r["Name"], "TaggableSpend": round(r["T"] or 0, 2), "ValidSpend": round(r["V"] or 0, 2),
+                     "CoveragePct": round(100 * (r["V"] or 0) / r["T"], 1) if r["T"] else None} for r in rs]
+        unresolved = _t("tags.unresolved", "Not resolved")
+        p["unres"] = unresolved
+        try:
+            by_bu = cover(q(f"""{cte(history=False)} SELECT COALESCE(rc.BusinessUnit, :unres) AS Name, SUM(k.Cost) AS T,
+                                       SUM(k.Cost * k.Compliant) AS V
+                                FROM k LEFT JOIN ref_cost_center rc ON rc.CostCenter = k.PoolCostCenter
+                                GROUP BY 1 ORDER BY 2 DESC"""), "BusinessUnit")
+        except Exception:  # noqa: BLE001 - no business units in the cost-center register
+            by_bu = []
+        by_entity = cover(q(f"""{cte(with_key=True, history=False)}
+                                SELECT a.LegalEntity AS Name, SUM(a.AllocatedCost) AS T, SUM(a.AllocatedCost * k.Compliant) AS V
+                                FROM allocated_cost a JOIN k ON k.ChargeKey = a.ChargeKey
+                                WHERE a.ChargePeriodStart >= :t0 AND a.ChargePeriodStart < :t1
+                                GROUP BY 1 ORDER BY 2 DESC"""), "Entity")
+
+        uid = (tenant.pack().get("usecases") or {}).get("tag_compliance")
+        keys_rows = self._uc(uid, scope, {"period_start": t0, "period_end": t1}) if uid and uid in self.reg.items else []
+        months = [r[0] for r in self.db.query("SELECT DISTINCT strftime(BillingPeriodStart, '%Y-%m') FROM CostAndUsage ORDER BY 1",
+                                              limit=None)["rows"]]
+        centers = [r[0] for r in self.db.query("SELECT CostCenter FROM ref_cost_center WHERE CostCenter <> 'Unallocated' ORDER BY 1",
+                                               limit=None)["rows"]]
+        return {"available": True, "period": period, "months": months, "keys": keys_rows, "by_entity": by_entity,
+                "by_business_unit": by_bu, "cannot_be_tagged": cannot, "violations": violations, "suspense": suspense,
+                "cost_centers": centers,
+                "formula": _t("tags.formula", "Coverage = spend whose required tags are all present and valid ÷ taggable "
+                              "spend, by cost. Tax, credits, adjustments, fees and Marketplace purchases cannot be tagged and "
+                              "are reported apart. Suspense = taggable spend with no cost center after tags and approved "
+                              "rules; it waits with an owner. Share = suspense ÷ usage in the tagged cloud accounts.")}
 
     # ------------------------------------------------------------------ compliance scorecards (any module)
     # Areas come from the use cases' `compliance.area` values, in catalog order. One disclaimer per module.
-    DISCLAIMERS = {
-        "compliance": "Decision support for Tax, Transfer Pricing, GxP Quality and Data Privacy teams. CostIQ does not "
-                      "determine GxP, privacy or tax compliance; the reference registers are maintained by those teams.",
-    }
+    @property
+    def DISCLAIMERS(self):  # noqa: N802 - per module, from the tenant's copy (backend.disclaimers)
+        return tenant.lookup("disclaimers")
 
     def compliance_score(self, uc, scope, params=None):
         """(items checked, items flagged, amount on flagged items) for one use case with a `compliance` block."""
@@ -487,7 +821,7 @@ class Engines:
     def controls(self, ledger_verify):
         rec = self.reconciliation()
         closed_lines = [l for l in rec["lines"] if l["IssueStatus"] == "Issued"]
-        exc = [l for l in closed_lines if l["Status"] == "exception"]
+        exc = [l for l in closed_lines if l["Status"] in ("exception", "awaiting")]  # labeled lines are explained
         alloc = self.allocation_summary(None)
         rules = self.allocation_rules()
         man = rows(self.db.query("SELECT * FROM ingest_manifest ORDER BY SourceSystem, BillingPeriodStart", {}, None, limit=None))
@@ -519,9 +853,20 @@ class Engines:
         total, unmapped = q("""SELECT SUM(AllocatedCost), SUM(CASE WHEN GlAccount IS NULL THEN AllocatedCost ELSE 0 END)
                                FROM allocated_cost""")[0]
         total, unmapped = float(total or 0), float(unmapped or 0)
-        xsub = float(q("""SELECT COALESCE(SUM(a.AllocatedCost), 0) FROM allocated_cost a
-                          JOIN ref_cost_center c ON c.CostCenter = a.CostCenter
-                          WHERE NOT c.Regulated AND a.Regulated""")[0][0] or 0)
+        accounts = _pack_table("controls", "cross_subsidy_accounts")
+        if accounts:  # also regulated lines from cloud accounts a non-regulated affiliate owns, whatever their cost center
+            own = f"""SELECT r.SubAccountId FROM {accounts} r JOIN ref_legal_entity o ON o.LegalEntity = r.OwningEntity
+                      WHERE NOT o.Regulated"""
+            hit = ("a.SubAccountId IN (SELECT SubAccountId FROM own)" if "SubAccountId" in self.ledger_columns() else
+                   f"a.ChargeKey IN (SELECT {CHARGE_KEY} FROM CostAndUsage WHERE SubAccountId IN (SELECT SubAccountId FROM own))")
+            xsub = float(q(f"""WITH own AS ({own})
+                               SELECT COALESCE(SUM(a.AllocatedCost), 0) FROM allocated_cost a
+                               LEFT JOIN ref_cost_center c ON c.CostCenter = a.CostCenter
+                               WHERE a.Regulated AND (NOT c.Regulated OR {hit})""")[0][0] or 0)
+        else:
+            xsub = float(q("""SELECT COALESCE(SUM(a.AllocatedCost), 0) FROM allocated_cost a
+                              JOIN ref_cost_center c ON c.CostCenter = a.CostCenter
+                              WHERE NOT c.Regulated AND a.Regulated""")[0][0] or 0)
         ties = q("""SELECT s.p, s.src, COALESCE(a.alloc, 0) FROM
                       (SELECT BillingPeriodStart AS p, SUM(EffectiveCost) AS src FROM CostAndUsage GROUP BY 1) s
                       LEFT JOIN (SELECT PeriodStart AS p, SUM(AllocatedCost) AS alloc FROM allocated_cost GROUP BY 1) a ON a.p = s.p""")
@@ -531,11 +876,11 @@ class Engines:
         bad = [r for r in applied if not (r["ApprovedBy"] and r["EffectiveFrom"])]
         pending = [r for r in pol if r["Status"] == "submitted"]
         return [
-            {"id": "C-08", "control": "Every allocated dollar has a GL account",
+            {"id": "C-08", "control": tenant.text("controls.c08"),
              "result": "pass" if unmapped < 0.01 else "exceptions",
              "evidence": f"${unmapped:,.2f} of ${total:,.2f} unmapped ({100 * unmapped / total if total else 0:.2f}%)"},
-            {"id": "C-09", "control": "No GxP entity carries Consumer Health cost centers' work (cross-charging)",
-             "result": "pass" if xsub < 0.01 else "exceptions", "evidence": f"${xsub:,.2f} on GxP entities"},
+            {"id": "C-09", "control": tenant.text("controls.c09"),
+             "result": "pass" if xsub < 0.01 else "exceptions", "evidence": tenant.text("controls.c09_evidence", amount=f"${xsub:,.2f}")},
             {"id": "C-10", "control": "Allocated total ties to source total for every period (±$0.01)",
              "result": "pass" if not off else "fail", "evidence": f"{len(ties)} periods, {len(off)} out of balance"},
             {"id": "C-11", "control": "Allocation policies applied are approved and effective-dated",

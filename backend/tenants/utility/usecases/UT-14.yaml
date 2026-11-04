@@ -1,0 +1,48 @@
+id: UT-14
+source: MM CostIQ Utility extension
+title: 'Evidence completeness by docket'
+category: 'Utility · Prudence'
+module: risk
+business_question: 'How complete is the evidence behind each docket''s test-period technology O&M?'
+personas:
+- regulatory_analyst
+- auditor
+- finance_controller
+catalog_persona: 'Rates & Regulatory, Internal Audit'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Share of test-period spend that is reconciled to an invoice, allocated under an approved policy, mapped to a FERC account, shown used and useful, and free of savings left unactioned.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'evidence'
+- 'prudence'
+- 'completeness'
+- 'docket'
+- 'audit file'
+products: Any provider
+sql: |-
+  SELECT
+    e.FilingId AS Docket, r.LegalEntity, r.Jurisdiction, r.Status AS DocketStatus,
+    COUNT(*) AS Lines,
+    ROUND(SUM(e.AllocatedCost), 2) AS TestPeriodSpend,
+    ROUND(100 * SUM(CASE WHEN e.Reconciled THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS ReconciledPct,
+    ROUND(100 * SUM(CASE WHEN e.PolicyApproved THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS PolicyApprovedPct,
+    ROUND(100 * SUM(CASE WHEN e.GlMapped THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS FercMappedPct,
+    ROUND(100 * SUM(CASE WHEN e.BenefitShown OR e.Remediated THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS UsedAndUsefulPct,
+    ROUND(100 * SUM(CASE WHEN e.SavingsActioned OR e.Remediated THEN e.AllocatedCost ELSE 0 END) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS SavingsActionedPct,
+    ROUND(100 * SUM(e.AllocatedCost * e.EvidenceScore) / NULLIF(SUM(e.AllocatedCost), 0), 1) AS EvidenceScore,
+    ROUND(SUM(e.RiskAmount), 2) AS DisallowanceRisk,
+    CASE WHEN SUM(e.RiskAmount) > 0 THEN 'Evidence gaps' ELSE 'Complete' END AS Status
+  FROM filing_evidence e
+  JOIN ref_tax_filing r ON r.FilingId = e.FilingId
+  GROUP BY e.FilingId, r.LegalEntity, r.Jurisdiction, r.Status
+  ORDER BY DisallowanceRisk DESC
+params: []
+notes: 'Weights: reconciled 25%, approved policy 15%, FERC account 15%, used and useful 30%, savings actioned 15%.'
+compliance:
+  area: 'Prudence'
+  reference: 'Prudent-investment and used-and-useful standards'
+  unit: 'dockets'
+  flag: 'Status = ''Evidence gaps'''
+  amount: DisallowanceRisk

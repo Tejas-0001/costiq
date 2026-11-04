@@ -2,6 +2,10 @@
 // migration route, cutover strategies, the exact configuration for a client's own F5 and Cisco devices, and the cyber
 // defense layers with the attacks they stop. Product names, versions and control IDs were checked in November 2026
 // against vendor docs (F5 techdocs and clouddocs, Cisco Secure Firewall docs), NIST, CISA, OWASP, SLSA and MITRE ATT&CK.
+// The constants below are the pharma tenant's; releaseFor("utility") swaps in the NERC CIP references (end of file).
+
+/** The tenant pack the planner speaks for (/api/config `tenant`); anything else reads as pharma. */
+export type Tenant = "pharma" | "utility";
 
 export type Gate = { name: string; tool: string; rule: string; std: string };
 export type Stage = { id: string; name: string; where: string; gates: Gate[] };
@@ -338,3 +342,39 @@ export const RELEASE_SOURCES: [string, string][] = [
   ["PostgreSQL point-in-time recovery", "https://www.postgresql.org/docs/current/continuous-archiving.html"],
   ["Trivy supply-chain incident, March 2026", "https://www.aquasec.com/blog/trivy-supply-chain-attack-what-you-need-to-know"],
 ];
+
+/* ------------------------------------------------------------------ per tenant */
+
+export type ReleaseContent = { stages: Stage[]; standards: Standard[]; routes: Record<string, Route>; threats: Threat[]; defenseSources: [string, string][] };
+
+const CIP013 = "https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-013-2.pdf";
+const CIP005 = "https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-005-7.pdf";
+
+// Utility: the same gates, standards, routes and attacks, with the NERC CIP references a utility's reviewers look for.
+// CostIQ is corporate IT, not a BES Cyber System; these show how a release can still be checked the way CIP asks.
+const UTILITY: ReleaseContent = {
+  stages: STAGES.map((s) => (s.id !== "sign" ? s : {
+    ...s, gates: s.gates.map((g) => (g.name === "Signature" ? { ...g, std: "SSDF PS.2 · CIP-013-2 R1.2.5" } : g)),
+  })),
+  standards: STANDARDS.map((s) => (s.id !== "gamp5" ? s : {
+    id: "cip013", name: "NERC CIP-013-2", version: "R1.2.5", what: "Verification of software integrity and authenticity, from the supply-chain standard for high and medium impact BES Cyber Systems.",
+    how: "CostIQ is corporate IT, not a BES Cyber System, but every release can be verified the way CIP-013-2 asks of vendors to in-scope systems.", url: CIP013,
+  })),
+  routes: {
+    ...ROUTES,
+    pam: { ...ROUTES.pam,
+      short: "Our engineer runs the release from your jump host in a time-boxed, recorded session you approve and can end at any time, following the CIP-005-7 R2 vendor remote access pattern.",
+      security: ["Approved per session and time-boxed", "Every session recorded", "You can see and end active sessions (CIP-005-7 R2.4, R2.5)"] },
+  },
+  threats: THREATS.map((t) => (t.id !== "exfil" ? t : {
+    ...t, steps: t.steps.map((s) => (s.layer === "access" ? { ...s, text: "Each persona sees only its scope; one operating company's users can't see another's data." } : s)),
+  })),
+  defenseSources: [...DEFENSE_SOURCES, ["NERC CIP-005-7 (vendor remote access, R2)", CIP005]],
+};
+
+const PHARMA: ReleaseContent = { stages: STAGES, standards: STANDARDS, routes: ROUTES, threats: THREATS, defenseSources: DEFENSE_SOURCES };
+
+/** Gates, standards, routes, attacks and defense sources for a tenant. */
+export function releaseFor(t: Tenant): ReleaseContent {
+  return t === "utility" ? UTILITY : PHARMA;
+}

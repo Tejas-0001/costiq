@@ -1,0 +1,49 @@
+id: UT-10
+source: MM CostIQ Utility extension
+title: 'Technology unit costs: per retail customer, per customer contact, per work order'
+category: 'Utility · Unit costs'
+module: tax
+business_question: 'What does technology O&M cost per customer, and what does AI cost per customer contact?'
+personas:
+- regulatory_analyst
+- cfo
+- distribution_finance
+- opco_finance
+catalog_persona: 'Rates & Regulatory, CFO'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Allocated O&M per operating company and month against its volumes (counts from the volume register).'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'unit cost'
+- 'per customer'
+- 'per contact'
+- 'per work order'
+- 'benchmark'
+- 'o&m per customer'
+products: Any provider
+sql: |-
+  WITH cost AS (
+    SELECT PeriodStart, LegalEntity, SUM(AllocatedCost) AS OAndM,
+           SUM(CASE WHEN Application = 'contact-center-summarization' THEN AllocatedCost ELSE 0 END) AS ContactAi
+    FROM allocated_cost
+    WHERE CostClass = 'om'
+    GROUP BY PeriodStart, LegalEntity
+  )
+  SELECT
+    CAST(c.PeriodStart AS DATE) AS Month,
+    c.LegalEntity,
+    ROUND(c.OAndM, 2) AS TechnologyOAndM,
+    v.RetailCustomers,
+    ROUND(c.OAndM * 12 / NULLIF(v.RetailCustomers, 0), 2) AS AnnualizedPerCustomer,
+    v.CustomerContacts,
+    ROUND(c.ContactAi / NULLIF(v.CustomerContacts, 0), 4) AS AiCostPerContact,
+    v.WorkOrdersCompleted,
+    ROUND(c.OAndM / NULLIF(v.WorkOrdersCompleted, 0), 2) AS OAndMPerWorkOrder,
+    v.FieldCrewReports
+  FROM cost c
+  JOIN ref_volume v ON v.PeriodStart = c.PeriodStart AND v.LegalEntity = c.LegalEntity
+  ORDER BY Month, c.LegalEntity
+params: []
+notes: 'October is a partial month (data through 22 Oct). Counts are the volume register''s, not benchmarks.'

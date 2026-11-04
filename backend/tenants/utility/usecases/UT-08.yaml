@@ -1,0 +1,50 @@
+id: UT-08
+source: MM CostIQ Utility extension
+title: 'CIP-scoped vendors missing CIP-013 supply-chain clauses'
+category: 'Utility · NERC CIP & data'
+module: compliance
+business_question: 'Which vendors in CIP scope lack supply-chain risk clauses in their contracts?'
+personas:
+- cip_compliance
+- auditor
+- finops_analyst
+catalog_persona: 'NERC CIP Compliance'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Contract clause flags from vendor management: vulnerability disclosure, incident notification, remote-access controls and software integrity.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'cip-013'
+- 'supply chain'
+- 'vendor risk'
+- 'contract clauses'
+- 'nerc'
+products: Any provider
+sql: |-
+  WITH c AS (
+    SELECT Vendor, CipScoped, AnnualContractValue,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.vulnerability_disclosure') = 'true' THEN '' ELSE 'vulnerability disclosure; ' END AS m1,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.incident_notification') = 'true' THEN '' ELSE 'incident notification; ' END AS m2,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.remote_access_controls') = 'true' THEN '' ELSE 'remote-access controls; ' END AS m3,
+           CASE WHEN json_extract_string(Cip013Clauses, '$.software_integrity') = 'true' THEN '' ELSE 'software integrity; ' END AS m4
+    FROM ref_vendor
+  )
+  SELECT
+    Vendor,
+    CipScoped,
+    CONCAT(m1, m2, m3, m4) AS MissingClauses,
+    ROUND(AnnualContractValue, 2) AS AnnualContractValue,
+    CASE WHEN CipScoped AND CONCAT(m1, m2, m3, m4) <> '' THEN 'Missing CIP-013 clauses'
+         WHEN CipScoped THEN 'Clauses in place'
+         ELSE 'Not CIP-scoped' END AS Status
+  FROM c
+  ORDER BY CASE WHEN CipScoped AND CONCAT(m1, m2, m3, m4) <> '' THEN 0 ELSE 1 END, AnnualContractValue DESC
+params: []
+notes: 'Clause flags come from vendor management (ref_vendor.Cip013Clauses).'
+compliance:
+  area: 'NERC CIP & data'
+  reference: 'CIP-013-2 R1.2'
+  unit: 'vendors'
+  flag: 'Status = ''Missing CIP-013 clauses'''
+  amount: AnnualContractValue

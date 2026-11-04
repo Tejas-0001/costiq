@@ -42,7 +42,7 @@ sql: |-
 params:
 - name: application
   type: string
-  default: web-store
+  default: '{{default_application}}'
   label: Application tag value
 - name: period_start
   type: date

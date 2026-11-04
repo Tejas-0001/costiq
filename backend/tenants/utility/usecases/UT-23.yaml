@@ -1,0 +1,45 @@
+id: UT-23
+source: MM CostIQ Utility extension
+title: 'Account 920 guard: no non-labor line in A&G salaries'
+category: 'Utility · FERC accounting'
+module: governance
+business_question: 'Does any cloud or software line, or any proposed mapping rule, land in account 920?'
+personas:
+- finance_controller
+- auditor
+- regulatory_analyst
+catalog_persona: 'Controller, Internal Audit'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Account 920 is A&G salaries (compensation only). The guard checks the ledger, the account map and every proposed rule change; a proposal that would send a non-labor line to 920 is blocked (labor_account_on_non_labor).'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- '920'
+- 'a&g salaries'
+- 'guard'
+- 'labor account'
+- 'rule change'
+- 'blocked'
+products: Any provider
+sql: |-
+  SELECT 'Allocated ledger' AS Source, '920' AS Account, NULL AS ChangeId, NULL AS Description,
+         COUNT(*) AS Lines, ROUND(COALESCE(SUM(AllocatedCost), 0), 2) AS Amount,
+         CASE WHEN COUNT(*) = 0 THEN 'Pass' ELSE 'Fail' END AS Status
+  FROM allocated_cost WHERE GlAccount = '920'
+  UNION ALL
+  SELECT 'Account map', '920', NULL, NULL, COUNT(*), 0,
+         CASE WHEN COUNT(*) = 0 THEN 'Pass' ELSE 'Fail' END
+  FROM ref_gl_account_map WHERE GlAccount = '920'
+  UNION ALL
+  SELECT 'Proposed rule change', ProposedAccount, ChangeId, Description, 0, 0,
+         CASE WHEN Status = 'blocked' THEN 'Blocked' ELSE 'Fail' END
+  FROM ref_rule_change WHERE ProposedAccount = '920'
+params: []
+notes: 'The same guard ships as a singular test in the Client-Owned Codebase (tests/assert_no_non_labor_in_920.sql).'
+compliance:
+  area: 'FERC accounting'
+  reference: 'Acct 920 (compensation only) · rule R7'
+  unit: 'checks'
+  flag: 'Status = ''Fail'''
+  amount: Amount

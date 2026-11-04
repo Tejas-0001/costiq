@@ -1,0 +1,88 @@
+id: UT-16
+source: MM CostIQ Utility extension
+title: 'Capital path by work order: 107 to in service to 403'
+category: 'Utility · Capital'
+module: tax
+business_question: 'What sits in construction work in progress by work order, what went into service, and what depreciates through 403?'
+personas:
+- finance_controller
+- regulatory_analyst
+- transmission_finance
+- distribution_finance
+catalog_persona: 'Controller, Regulatory Accounting'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Per work order and module: CWIP before the window, additions from the ledger (cost class cwip, by the ledger''s WorkOrderId), the transfer to the Order No. 898 software account on the ready-for-use date, and monthly depreciation at the existing rate (¶137). Capitalized lines without a work order, or on a work order without a threshold date, are held out of 107.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'cwip'
+- '107'
+- 'work order'
+- 'in service'
+- '351.2'
+- '363.2'
+- '397.2'
+- '403'
+- 'depreciation'
+- 'capital'
+products: Any provider
+sql: |-
+  WITH adds AS (
+    SELECT WorkOrderId, SUM(AllocatedCost) AS Additions
+    FROM allocated_cost WHERE CostClass = 'cwip' AND WorkOrderId IS NOT NULL
+    GROUP BY WorkOrderId
+  ),
+  held AS (
+    SELECT WorkOrderId, SUM(AllocatedCost) AS Held
+    FROM allocated_cost
+    WHERE Exception IN ('no_work_order', 'capitalizable_without_threshold_date')
+    GROUP BY WorkOrderId
+  ),
+  asof AS (SELECT MAX(CAST(ChargePeriodStart AS DATE)) AS d FROM CostAndUsage WHERE ChargeCategory = 'Usage'),
+  x AS (
+    SELECT w.*, COALESCE(a.Additions, 0) * w.ModuleShare AS AddInWindow,
+           w.CwipBeforeWindow + COALESCE(a.Additions, 0) * w.ModuleShare AS Cwip,
+           COALESCE(h.Held, 0) AS Held,
+           CASE WHEN w.ReadyForUseDate IS NOT NULL AND w.ReadyForUseDate <= asof.d THEN 1 ELSE 0 END AS InService,
+           asof.d AS AsOf
+    FROM ref_work_order w
+    CROSS JOIN asof
+    LEFT JOIN adds a ON a.WorkOrderId = w.WorkOrderId
+    LEFT JOIN held h ON h.WorkOrderId = w.WorkOrderId
+  )
+  SELECT
+    WorkOrderId, Module, Description, FercFunction, TargetPlantAccount,
+    CapitalizationStartDate, ReadyForUseDate,
+    ROUND(CwipBeforeWindow, 2) AS Cwip107Opening,
+    ROUND(AddInWindow, 2) AS Cwip107Additions,
+    ROUND(CASE WHEN InService = 1 THEN 0 ELSE Cwip END, 2) AS Cwip107Balance,
+    ROUND(CASE WHEN InService = 1 THEN Cwip ELSE 0 END, 2) AS TransferredToPlant,
+    DepreciationRate,
+    ROUND(CASE WHEN InService = 1 THEN Cwip * DepreciationRate / 100 / 12 ELSE 0 END, 2) AS MonthlyDepreciation403,
+    CASE WHEN InService = 1 THEN DATE_DIFF('month', ReadyForUseDate, AsOf) + 1 ELSE 0 END AS MonthsInService,
+    ROUND(CASE WHEN InService = 1 THEN Cwip * DepreciationRate / 100 / 12 * (DATE_DIFF('month', ReadyForUseDate, AsOf) + 1) ELSE 0 END, 2)
+      AS Depreciation403ToDate,
+    ROUND(Held, 2) AS HeldOutOf107,
+    CASE WHEN CapitalizationStartDate IS NULL THEN 'Held: capitalizable_without_threshold_date'
+         WHEN InService = 1 THEN 'In service: depreciating through 403'
+         ELSE 'Building in 107' END AS Status
+  FROM x
+  UNION ALL
+  SELECT
+    '(none)' AS WorkOrderId, '-' AS Module, 'Capitalized lines with no work order' AS Description, NULL AS FercFunction,
+    NULL AS TargetPlantAccount, NULL AS CapitalizationStartDate, NULL AS ReadyForUseDate,
+    0 AS Cwip107Opening, 0 AS Cwip107Additions, 0 AS Cwip107Balance, 0 AS TransferredToPlant, NULL AS DepreciationRate,
+    0 AS MonthlyDepreciation403, 0 AS MonthsInService, 0 AS Depreciation403ToDate,
+    ROUND(SUM(Held), 2) AS HeldOutOf107,
+    'Held: no_work_order' AS Status
+  FROM held WHERE WorkOrderId IS NULL
+  ORDER BY WorkOrderId, Module
+params: []
+notes: 'R1 (107 with a valid work order), R2 (ready for use: 351.2 Transmission, 363.2 Distribution, 397.2 General or multi-function) and R3 (403/108 at the existing rate). Lines held out of 107 are expensed until the work order or threshold date exists.'
+compliance:
+  area: 'Capital'
+  reference: 'Acct 107 · Order No. 898 ¶112-113, ¶137 · ASU 2025-06'
+  unit: 'work orders'
+  flag: 'Status LIKE ''Held%'''
+  amount: HeldOutOf107

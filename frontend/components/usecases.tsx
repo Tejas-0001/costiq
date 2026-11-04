@@ -125,15 +125,19 @@ export function UseCaseRunner({ id, compact }: { id: string; compact?: boolean }
 }
 
 function SqlTabs({ uc }: { uc: UseCase }) {
-  const [t, setT] = useState<"sql" | "translated_sql" | "published_sql">("sql");
-  const opts: [typeof t, string][] = [["sql", "Executable (portable)"], ["translated_sql", "As run on this database"]];
+  const [t, setT] = useState<"sql" | "translated_sql" | "snowflake" | "published_sql">("sql");
+  // Snowflake SQL is compiled on request (Native Snowflake Pipeline), only when that view is open
+  const snowflake = useApi<{ sql: string }>(t === "snowflake" ? `/codebase/usecases/${uc.id}/sql?target=snowflake` : null);
+  const opts: [typeof t, string][] = [["sql", "Executable (portable)"], ["translated_sql", "As run on this database"], ["snowflake", "Snowflake"]];
   if (uc.published_sql) opts.push(["published_sql", "Published by FinOps Foundation"]);
   return (
     <div>
       <div className="row" style={{ marginBottom: 8 }}>
         {opts.map(([k, l]) => <button key={k} className={`chip ${t === k ? "on" : ""}`} onClick={() => setT(k)}>{l}</button>)}
       </div>
-      <pre className="sql">{uc[t]}</pre>
+      {t === "snowflake"
+        ? <Loading state={snowflake}>{(d) => <pre className="sql">{d.sql}</pre>}</Loading>
+        : <pre className="sql">{uc[t]}</pre>}
     </div>
   );
 }

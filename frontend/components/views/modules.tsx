@@ -1,10 +1,13 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { BarChart } from "@/components/charts";
+import { useCopy } from "@/components/copy";
 import { Gate, useMe, type PeriodInfo } from "@/components/shell";
 import { Findings, LineageDrawer, ModuleUseCases, type Finding } from "@/components/usecases";
 import { Formula, Head, Kpi, Loading, RecordTable, StatusBadge } from "@/components/ui";
+import { InvoiceLedgerDrawer, TagCompliancePanel } from "@/components/views/ledger";
 import { useApi, type Row } from "@/lib/api";
 import { money, pct } from "@/lib/format";
 
@@ -15,11 +18,12 @@ export function ExplorerView() {
   const { period } = useMe();
   const [f, setF] = useState({ month: "", provider: "", cost_center: "" });
   const [lineage, setLineage] = useState<string | null>(null);
+  const { t } = useCopy();
   const q = new URLSearchParams([...Object.entries(f).filter(([, v]) => v), ["range", period]]).toString();
   const state = useApi<Explorer>(`/explorer?${q}`);
   return (
     <Gate module="explorer">
-      <Head title="Spend Explorer" />
+      <Head title={t("nav.items.explorer")} />
       <Loading state={state}>
         {(d) => (
           <div className="stack">
@@ -56,9 +60,10 @@ export function ExplorerView() {
 export function BudgetsView() {
   const state = useApi<{ lines: Row[]; open_month: string; formula: string }>("/budgets");
   const [month, setMonth] = useState<string | null>(null);
+  const { t } = useCopy();
   return (
     <Gate module="budgets">
-      <Head title="Budgets & Forecasts" />
+      <Head title={t("nav.items.budgets")} />
       <Loading state={state}>
         {(b) => {
           const months = [...new Set(b.lines.map((l) => String(l.Month)))].sort();
@@ -83,12 +88,18 @@ export function BudgetsView() {
 }
 
 export function AllocationView() {
-  const { period } = useMe();
-  const state = useApi<{ rules: Row[]; by_method: Row[]; by_cost_center: Row[]; coverage: number; formula: string; period: PeriodInfo | null }>(`/allocation?range=${period}`);
+  // the tag-compliance panel reads ?month= (useSearchParams needs a Suspense boundary)
+  return <Suspense fallback={<div className="muted small">Loading…</div>}><Allocation /></Suspense>;
+}
+
+function Allocation() {
+  const { period, version } = useMe();
+  const { t } = useCopy();
+  const state = useApi<{ rules: Row[]; by_method: Row[]; by_cost_center: Row[]; coverage: number; formula: string; period: PeriodInfo | null }>(`/allocation?range=${period}`, version);
   return (
     <Gate module="allocation">
-      <Head title="Allocation & Chargeback">
-        <Link href="/tax?tab=chain">Entity, jurisdiction and GL steps</Link>
+      <Head title={t("nav.items.allocation")}>
+        <Link href="/tax?tab=chain">{t("allocation.chainLink")}</Link>
       </Head>
       <Loading state={state}>
         {(a) => (
@@ -98,6 +109,7 @@ export function AllocationView() {
               <Kpi label="Approved rules" value={a.rules.length} />
               <Kpi label="Unallocated" value={money(a.by_method.find((m) => m.Method === "Unallocated")?.EffectiveCost ?? 0)} />
             </div>
+            <TagCompliancePanel />
             <div className="grid g2">
               <div className="card flush"><RecordTable rows={a.by_method} /></div>
               <div className="card"><h2>By cost center <span className="small muted">· {a.period?.long}</span></h2><BarChart horizontal labels={a.by_cost_center.map((r) => String(r.CostCenter))}
@@ -114,9 +126,10 @@ export function AllocationView() {
 }
 
 export function RatesView() {
+  const { t } = useCopy();
   return (
     <Gate module="rates">
-      <Head title="Rates & Commitments" />
+      <Head title={t("nav.items.rates")} />
       <ModuleUseCases module="rates" />
     </Gate>
   );
@@ -147,20 +160,54 @@ export function AnomaliesView() {
 
 // ------------------------------------------------------------------------------------------------ reconciliation, governance
 export function ReconciliationView() {
+  // ?detail=<InvoiceDetailId> opens the invoice-to-ledger drawer (useSearchParams needs a Suspense boundary)
+  return <Suspense fallback={<div className="muted small">Loading…</div>}><Reconciliation /></Suspense>;
+}
+
+// open lines first: exceptions, then lines awaiting a re-run, then labeled differences
+const REC_ORDER: Record<string, number> = { exception: 0, awaiting: 1, labeled: 2 };
+
+function Reconciliation() {
   const state = useApi<{ lines: Row[]; close: Row[]; formula: string }>("/reconciliation");
+  const { t } = useCopy();
+  const router = useRouter();
+  const asked = useSearchParams().get("detail");
+  const [picked, setPicked] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const open = picked ?? (asked && asked !== dismissed ? asked : null);
+  function close() {
+    setPicked(null);
+    setDismissed(asked);
+    if (asked) router.replace("/reconciliation");
+  }
   return (
     <Gate module="reconciliation">
-      <Head title="Reconciliation & Close" />
+      <Head title={t("nav.items.reconciliation")} />
       <Loading state={state}>
-        {(r) => (
-          <div className="stack">
-            <div className="row">{r.close.map((c) => <span key={String(c.Period) + String(c.Issuers)} className="pill">{String(c.Period)} <StatusBadge s={c.Readiness} /></span>)}</div>
-            <div className="card flush"><RecordTable rows={[...r.lines].sort((a, b) => (a.Status === "exception" ? -1 : 0) - (b.Status === "exception" ? -1 : 0))}
-              columns={["Period", "Issuer", "InvoiceId", "ChargeCategory", "IssueStatus", "Invoiced", "ChargeTotal", "Difference", "Status", "Reason"]} /></div>
-            <Formula>{r.formula}</Formula>
-            <ModuleUseCases module="reconciliation" />
-          </div>
-        )}
+        {(r) => {
+          // labeled reconciling items and the invoice-to-ledger drill come with the tenant's reconciling-item register
+          const drill = r.lines.some((l) => "Label" in l);
+          const lines = drill ? [...r.lines].sort((a, b) => (REC_ORDER[String(a.Status)] ?? 3) - (REC_ORDER[String(b.Status)] ?? 3)) : r.lines;
+          return (
+            <div className="stack">
+              <div className="row">{r.close.map((c) => <span key={String(c.Period) + String(c.Issuers)} className="pill">{String(c.Period)} <StatusBadge s={c.Readiness} /></span>)}</div>
+              <div className="card flush">{drill ? (
+                <RecordTable rows={lines.map((l) => ({ ...l, Label: l.Label ?? l.Reason }))}
+                  columns={["Period", "Issuer", "InvoiceId", "ChargeCategory", "IssueStatus", "Invoiced", "ChargeTotal", "Difference", "Status", "Label", "ExpectedResolution"]}
+                  onRow={(row) => {
+                    const hit = r.lines.find((l) => l.InvoiceId === row.InvoiceId && l.ChargeCategory === row.ChargeCategory && l.Period === row.Period && l.Invoiced === row.Invoiced);
+                    if (hit) setPicked(String(hit.InvoiceDetailId));
+                  }} />
+              ) : (
+                <RecordTable rows={lines}
+                  columns={["Period", "Issuer", "InvoiceId", "ChargeCategory", "IssueStatus", "Invoiced", "ChargeTotal", "Difference", "Status", "Reason"]} />
+              )}</div>
+              <Formula>{r.formula}</Formula>
+              <ModuleUseCases module="reconciliation" />
+              {drill && open && <InvoiceLedgerDrawer detailId={open} onClose={close} />}
+            </div>
+          );
+        }}
       </Loading>
     </Gate>
   );
@@ -168,10 +215,11 @@ export function ReconciliationView() {
 
 export function GovernanceView() {
   const { version } = useMe();
+  const { t } = useCopy();
   const state = useApi<{ controls: Row[]; ledger: Row[]; manifests: Row[]; ledger_verified: { verified: boolean; entries?: number; broken_at?: number } }>("/evidence", version);
   return (
     <Gate module="governance">
-      <Head title="Governance & Evidence" />
+      <Head title={t("nav.items.governance")} />
       <Loading state={state}>
         {(g) => (
           <div className="stack">
@@ -194,15 +242,16 @@ export function GovernanceView() {
   );
 }
 
-// ------------------------------------------------------------------------------------------------ GxP & patient-data scorecard
+// ------------------------------------------------------------------------------------------------ compliance scorecard
 type Area = { area: string; checks: number; attention: number; items: { id: string; title: string; reference: string; unit: string; checked: number;
   flagged: number; amount_affected: number; has_amount: boolean; status: string; error: string | null }[] };
 
 export function ComplianceView() {
   const state = useApi<{ areas: Area[]; as_of: string; formula: string; disclaimer: string }>("/compliance/compliance");
+  const { t } = useCopy();
   return (
     <Gate module="compliance">
-      <Head title="GxP & Patient Data" />
+      <Head title={t("nav.items.compliance")} />
       <Loading state={state}>
         {(c) => {
           const items = c.areas.flatMap((a) => a.items);

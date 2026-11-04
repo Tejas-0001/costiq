@@ -1,0 +1,188 @@
+{
+  "backend": {
+    "findings": {
+      "ai_owner": "Clinical Operations",
+      "residency_formula": "Genomic-data usage where inference_geo ≠ us. Compliance exposure (the cost shown is the affected spend)."
+    },
+    "controls": {
+      "c08": "Every allocated dollar has a GL account",
+      "c09": "No GxP entity carries Consumer Health cost centers' work (cross-charging)",
+      "c09_evidence": "{amount} on GxP entities"
+    },
+    "disclaimers": {
+      "compliance": "Decision support for Tax, Transfer Pricing, GxP Quality and Data Privacy teams. CostIQ does not determine GxP, privacy or tax compliance; the reference registers are maintained by those teams."
+    },
+    "risk": {
+      "reasons": {
+        "no_benefit": "No benefit shown (idle, unused seats or commitments)",
+        "unreconciled": "Not reconciled to an invoice",
+        "no_approved_policy": "Allocated without an approved policy",
+        "unmapped_gl": "No GL account",
+        "unactioned_savings": "Known savings left unactioned for 60+ days"
+      },
+      "fix_gl": "Map to a GL account",
+      "formula": "Deduction at risk = review-period spend an examiner could challenge: whole lines failing the reconciliation, approved-policy, GL-account or benefit tests (unless remediated), the unused share of seat purchases, and the share of a line equal to a savings estimate left unactioned for 60+ days. Evidence score = cost-weighted share of evidence present.",
+      "disclaimer": "Decision support for the tax team; not a prediction of any tax authority's ruling."
+    },
+    "tax": {
+      "bridge_formula": "Review period: allocated operating cost for the filing's entity and jurisdiction, annualized. Forecast year: annualized review period plus contract escalators from each renewal date. Invoice tie-out compares the vendor's invoices with its charges.",
+      "bridge_csv_header": "# Technology cost forecast bridge | filing {filing} | {entity} ({jurisdiction}) | review period {review_start} to {review_end} | forecast year {forecast_start} to {forecast_end} | prepared by {user} on {prepared} UTC | source: MM CostIQ {usecase}",
+      "bridge_csv_filename": "{filing}-technology-cost-bridge.csv",
+      "recharge_formula": "Technology costs recharged by Global Services to each entity, by allocation policy and key (transfer-pricing local file). Covers costs allocated through CostIQ only.",
+      "credit_schedule_formula": "Credit = recurring cloud and SaaS fees claimed as qualifying research expenditure (cost class qre) x the jurisdiction's credit rate."
+    },
+    "requests": {
+      "requester": "Tax examiner",
+      "narrative": "In response to {requester}'s request on filing {filing}, {entity} provides the attached table \"{title}\" ({rows} rows). {headline} Figures are drawn from provider billing data and vendor invoices for the review period {review_start} to {review_end} (data as of {as_of}), allocated to {entity} and {jurisdiction} under approved allocation policies. Each figure traces to its invoice line and allocation steps in the audit file workpapers; the decision ledger supporting them verifies ({entries} entries)."
+    },
+    "evidence": {
+      "methodology": [
+        "# Technology cost evidence: {filing}",
+        "",
+        "{entity} ({jurisdiction}), {authority}. Review period {review_start} to",
+        "{review_end} (actuals); forecast year {forecast_start} to",
+        "{forecast_end}. Prepared with MM CostIQ.",
+        "",
+        "## Sources",
+        "Provider billing exports in FOCUS format (cloud and AI), SaaS vendor invoices (file drop), invoice detail, and the",
+        "group's reference registers (legal entities, allocation keys and policies, GL account map, jurisdiction factors).",
+        "",
+        "## Allocation (workpapers, one row per allocated charge)",
+        "1. Pool: cost center from split-cost allocation tags, resource tags or approved rules.",
+        "2. Entity: first approved policy by priority; shares from the policy's allocation key for the month, or 100% to a",
+        "   fixed entity.",
+        "3. Jurisdiction: the entity's jurisdiction factors.",
+        "4. Cost class: capitalizable implementation (ASC 350-40), qre where the jurisdiction claims cloud fees as qualifying",
+        "   research expenditure, else opex.",
+        "5. GL account: the group's map.",
+        "Allocated totals tie to source totals for every period (control C-10).",
+        "",
+        "## Forecast bridge (forecast_bridge.csv)",
+        "Review-period cost by vendor, annualized; the forecast year adds contract escalators from each renewal date. Invoice",
+        "tie-out compares each vendor's invoices with its charges.",
+        "",
+        "## Evidence tests (workpapers and risk_summary.csv)",
+        "Reconciled to the invoice line (within $1); allocated under an approved, effective-dated policy; mapped to a GL",
+        "account; benefit shown (no idle day, unused commitment or unused seat share) unless remediated by an implemented",
+        "optimization; no known savings left unactioned for 60+ days.",
+        "",
+        "## Integrity",
+        "approvals.csv lists the ledger entries for every policy, optimization and exhibit decision with their hashes.",
+        "ledger_certificate.json records that the hash chain verified and the last decision entry. The SHA-256 of this ZIP is",
+        "written to the ledger on export as `audit_file:{filing}`.",
+        "",
+        "Decision support for the tax team; not a legal opinion or a prediction of any tax authority's ruling.",
+        ""
+      ]
+    },
+    "board": {
+      "compliance_checks": "GxP, Part 11 and privacy checks needing attention",
+      "caution": "Before showing rows 6 and 10 to a board, check the EU AI Act dates in force and the current US R&D tax rules."
+    },
+    "summary": {
+      "risk": {
+        "section": {"key": "risk", "title": "Tax risk", "state": "At risk"},
+        "page": {"headline": "Deduction at risk", "by_filing": "By filing", "by_reason": "By reason", "largest": "Largest risks"},
+        "labels": {
+          "amount": "Deduction at risk",
+          "open_filings": "Open filings",
+          "evidenced": "Share of review-period spend evidenced",
+          "top_reason": "Largest cause of risk",
+          "reason_amount": "Risk from this cause",
+          "top_item": "Largest single risk",
+          "top_amount": "Its deduction at risk",
+          "top_filing": "Filing it sits in",
+          "next_filing": "Next filing ({entity}, {jurisdiction})",
+          "filing_date": "Filing date of {filing}",
+          "days_until": "Days until the filing date",
+          "days_past": "Days past the filing date",
+          "filing_amount": "Deduction at risk in this filing"
+        },
+        "open_filing": "open filing",
+        "reasons": {
+          "unactioned_savings": "known savings left unactioned for 60+ days",
+          "no_benefit": "spend with no benefit shown",
+          "unreconciled": "spend not reconciled to an invoice",
+          "unmapped_gl": "spend with no GL account",
+          "no_approved_policy": "allocations with no approved policy"
+        },
+        "lead": "An examiner could challenge {amount} of deductions across {filings}; {evidenced} of review-period spend is evidenced.",
+        "headline": "{amount} of deductions could be challenged",
+        "cause": "The main cause is {reason}, at {amount}.",
+        "largest": "The largest single exposure is {item} ({vendor}, {entity}) at {amount} in {filing}",
+        "largest_fix": "; {verb} {action} removes it and saves {saving} a month",
+        "fix_detail": "{title}. Also clears {amount} of deduction risk in {filing}.",
+        "due": "{filing} is due in {days} ({date})",
+        "late": "{filing} is due {days} late ({date})",
+        "due_amount": " and carries {amount} of the risk"
+      },
+      "compliance": {
+        "section": {"key": "gxp", "title": "GxP and patient data", "state": "Needs attention"}
+      },
+      "credit": {
+        "page": {"tax": "Credit unlock", "tax_claimed": "Claimed today", "tax_tab": "credit", "command": "R&D credit unlock"},
+        "labels": {
+          "unclaimed": "R&D credit eligible but not claimed",
+          "jurisdiction_credit": "{jurisdiction} credit",
+          "jurisdiction": "Jurisdiction",
+          "claimed": "R&D credit claimed today"
+        },
+        "per_year": "{amount} a year",
+        "line": "Claiming eligible cloud and SaaS fees would add {amount} of R&D credit",
+        "line_top": ", {credit} of it in {jurisdiction}",
+        "line_claimed": ", on top of {claimed} claimed today.",
+        "action_title": "Claim the {jurisdiction} R&D credit",
+        "action_detail": "Eligible recurring cloud and SaaS fees not yet claimed{in_filing}.",
+        "action_in_filing": " in {filing}",
+        "headline": "{amount} of R&D credit is unclaimed"
+      }
+    }
+  },
+  "frontend": {
+    "nav": {
+      "groups": {
+        "overview": "Overview",
+        "monitor": "Monitor",
+        "optimize": "Optimize",
+        "finance": "Financial management",
+        "regulatory": "Regulatory & compliance",
+        "intelligence": "Intelligence"
+      },
+      "items": {
+        "summary": "AI Summary",
+        "command": "Command Center",
+        "board": "Board Pack",
+        "explorer": "Spend Explorer",
+        "cloud": "Cloud Cost Monitor",
+        "ai": "AI & LLM Cost Monitor",
+        "alerts": "Alerts",
+        "optimization": "Optimization Center",
+        "anomalies": "Anomalies",
+        "rates": "Rates & Commitments",
+        "budgets": "Budgets & Forecasts",
+        "allocation": "Allocation & Chargeback",
+        "risk": "Tax Risk Radar",
+        "tax": "Tax & Transfer Pricing",
+        "compliance": "GxP & Patient Data",
+        "reconciliation": "Reconciliation & Close",
+        "governance": "Governance & Evidence",
+        "catalog": "Use Case Catalog",
+        "ask": "Ask CostIQ",
+        "glossary": "Glossary",
+        "deploy": "Deployment planner"
+      }
+    },
+    "periodNotes": {
+      "board": "Board Pack: data to date",
+      "budgets": "Budgets: by month",
+      "optimization": "Savings pipeline: current",
+      "risk": "Tax risk: filing review periods",
+      "tax": "Tax: filing periods",
+      "compliance": "GxP checks: current",
+      "reconciliation": "Invoices: by billing period",
+      "governance": "Ledger: all decisions",
+      "anomalies": "Findings: all open"
+    },
+    "tax": {}
+  }
+}

@@ -1,0 +1,37 @@
+id: UT-12
+source: MM CostIQ Utility extension
+title: 'Disallowance risk by docket, reason and vendor'
+category: 'Utility · Prudence'
+module: risk
+business_question: 'Which test-period spend could a commission challenge, and why?'
+personas:
+- regulatory_analyst
+- cfo
+- auditor
+- opco_finance
+catalog_persona: 'Rates & Regulatory, CFO'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'The prudence evidence tests on every allocated O&M line of each docket''s test period, summed by reason and vendor.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'disallowance'
+- 'prudence'
+- 'used and useful'
+- 'evidence'
+- 'docket'
+- 'risk'
+products: Any provider
+sql: |-
+  SELECT
+    e.FilingId AS Docket, e.LegalEntity, e.RiskReason, e.ServiceProviderName AS Vendor,
+    COUNT(*) AS Lines,
+    ROUND(SUM(e.AllocatedCost), 2) AS TestPeriodSpend,
+    ROUND(SUM(e.RiskAmount), 2) AS DisallowanceRisk
+  FROM filing_evidence e
+  WHERE e.RiskAmount > 0
+  GROUP BY e.FilingId, e.LegalEntity, e.RiskReason, e.ServiceProviderName
+  ORDER BY DisallowanceRisk DESC
+params: []
+notes: 'Decision support, not a prediction of any commission''s order. Recomputed after allocation, ingestion and every policy or optimization decision.'

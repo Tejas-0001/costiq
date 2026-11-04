@@ -1,0 +1,51 @@
+id: UT-09
+source: MM CostIQ Utility extension
+title: 'Incremental technology cost by storm event'
+category: 'Utility · Rate cases'
+module: tax
+business_question: 'How much extra cloud cost did each storm cause, by application, for the storm-cost recovery filing?'
+personas:
+- regulatory_analyst
+- distribution_finance
+- finops_analyst
+catalog_persona: 'Rates & Regulatory, Distribution Finance'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Cost tagged to a storm event against the application''s daily average over the 14 days before the event.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'storm'
+- 'storm cost'
+- 'recovery'
+- 'outage'
+- 'event'
+- 'surge'
+products: Any provider
+sql: |-
+  WITH ev AS (SELECT * FROM ref_storm_event),
+  storm AS (
+    SELECT json_extract_string(Tags, '$.storm_event') AS StormEventId, json_extract_string(Tags, '$.application') AS Application,
+           COUNT(DISTINCT CAST(ChargePeriodStart AS DATE)) AS Days, SUM(EffectiveCost) AS Cost
+    FROM CostAndUsage
+    WHERE json_extract_string(Tags, '$.storm_event') IS NOT NULL
+    GROUP BY json_extract_string(Tags, '$.storm_event'), json_extract_string(Tags, '$.application')
+  ),
+  pre AS (
+    SELECT ev.StormEventId, json_extract_string(c.Tags, '$.application') AS Application, SUM(c.EffectiveCost) / 14 AS DailyBaseline
+    FROM CostAndUsage c CROSS JOIN ev
+    WHERE CAST(c.ChargePeriodStart AS DATE) >= ev.StartDate - 14 AND CAST(c.ChargePeriodStart AS DATE) < ev.StartDate
+      AND c.ChargeCategory = 'Usage'
+    GROUP BY ev.StormEventId, json_extract_string(c.Tags, '$.application')
+  )
+  SELECT
+    s.StormEventId, ev.Name, ev.Jurisdictions, s.Application, s.Days,
+    ROUND(s.Cost, 2) AS StormPeriodCost,
+    ROUND(COALESCE(p.DailyBaseline, 0) * s.Days, 2) AS BaselineCost,
+    ROUND(s.Cost - COALESCE(p.DailyBaseline, 0) * s.Days, 2) AS IncrementalCost
+  FROM storm s
+  JOIN ev ON ev.StormEventId = s.StormEventId
+  LEFT JOIN pre p ON p.StormEventId = s.StormEventId AND p.Application = s.Application
+  ORDER BY IncrementalCost DESC
+params: []
+notes: 'Flagged rows are recoverable costs to include in the event''s filing, not errors.'

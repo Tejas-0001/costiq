@@ -6,7 +6,9 @@ from __future__ import annotations
 import os, sys
 
 sys.path.insert(0, os.path.dirname(__file__))
-from pharma_usecases import OUT, render  # noqa: E402
+from pharma_usecases import SHARED_OUT as OUT, render  # noqa: E402
+
+SOURCE = "'{{extension_source}}'"   # tenant pack usecase_vars
 
 PERIOD = [("period_start", "date", "2026-07-01", "Start of the period (inclusive)"),
           ("period_end", "date", "2026-10-23", "End of the period (exclusive)")]
@@ -57,8 +59,7 @@ ORDER BY EstimatedMonthlySavings DESC""", AS_OF,
        "Which resources are running and billing but doing no work?",
        ["finops_analyst", "cloud_ops", "tech_exec"], "Cloud Operations",
        "Resources whose CPU p95 stayed under 5% with no requests for 14 days (utilization exports), and unattached volumes. "
-       "Recharged spend on resources that serve no one fails the transfer-pricing benefit test, so idle resources are "
-       "both waste and tax risk.",
+       "{{idle_risk_note}}",
        ["idle", "unused", "unattached", "orphaned volume", "zombie", "no benefit", "stop instance"],
        f"""
 WITH u AS (
@@ -150,7 +151,7 @@ LEFT JOIN optimization_recommendation r ON r.ResourceName = s.ResourceName AND r
 WHERE s.LastMonthCost > 500
 ORDER BY EstimatedMonthlySavings DESC, LastMonthCost DESC""",
        [("first_month", "date", "2026-07-01", "First month"), ("last_month", "date", "2026-09-01", "Last full month")],
-       "Clinical trial data has GxP retention rules (often 25 years after the trial); check them before moving tiers."),
+       "{{storage_tier_note}}"),
     uc("CO-06", "optimization", "Optimization · Cloud", "Data transfer and egress hotspots",
        "Where is data-transfer and egress cost concentrated, by account, region and cost center?",
        ["finops_analyst", "cloud_ops"], "Cloud Operations",
@@ -415,5 +416,5 @@ ORDER BY BurnPct DESC""",
 if __name__ == "__main__":
     for u in USE_CASES:
         with open(os.path.join(OUT, f"{u['id']}.yaml"), "w", encoding="utf-8", newline="\n") as fh:
-            fh.write(render(u))
+            fh.write(render(u, SOURCE))
         print("wrote", u["id"])

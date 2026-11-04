@@ -6,8 +6,8 @@
 .lp-top { background: #fff; border-bottom: 1px solid var(--mm-line); display: flex; justify-content: space-between; align-items: center; padding: 14px 32px; gap: 16px; flex-wrap: wrap; }
 .lp-logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .mm-lockup { display: flex; align-items: center; gap: 10px; }
-.mm-word { color: var(--mm-blue); font-weight: 700; letter-spacing: .16em; font-size: 12.5px; line-height: 1.15; }
-.mm-div { width: 1px; height: 40px; background: var(--mm-line); margin: 0 8px; }
+.mm-lockup img { display: block; }
+.mm-div { width: 1px; height: 44px; background: var(--mm-line); margin: 0 8px; }
 .ciq { display: flex; flex-direction: column; line-height: 1; }
 .ciq-name { font-weight: 700; font-size: 34px; color: var(--mm-ink); letter-spacing: -.02em; }
 .ciq-name em { font-style: normal; color: var(--mm-blue); }
@@ -85,3 +85,10 @@
 .lp-value p { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--mm-body); }
 @media (max-width: 1000px) { .lp-value-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 600px) { .lp-value-grid { grid-template-columns: 1fr; } }
+
+/* industry button in the footer (one address, several tenants) */
+.lp-industry { white-space: nowrap; }
+.lp-industry button { font: inherit; font-size: 13px; margin-left: 8px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--mm-blue);
+  background: #fff; color: var(--mm-blue); cursor: pointer; }
+.lp-industry button:hover { background: var(--mm-blue); color: #fff; }
+.lp-industry button:disabled { opacity: .6; cursor: progress; }

@@ -1,0 +1,90 @@
+id: UT-05
+source: MM CostIQ Utility extension
+title: 'Rate-case test-year bridge for cloud, SaaS and AI O&M by vendor'
+category: 'Utility · Rate cases'
+module: tax
+business_question: 'How does each vendor''s cloud, SaaS and AI O&M move from the test period to the rate year, and does it tie to invoices?'
+personas:
+- regulatory_analyst
+- cfo
+- finance_controller
+- opco_finance
+catalog_persona: 'Rates & Regulatory'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Test-period actuals for the docket''s company and jurisdiction, annualized, then carried to the rate year with known-and-measurable renewal escalators. Each vendor''s test period is tied to its invoices; an invoice difference is flagged.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'rate case'
+- 'test year'
+- 'test period'
+- 'rate year'
+- 'exhibit'
+- 'bridge'
+- 'known and measurable'
+- 'docket'
+products: Any provider
+sql: |-
+  WITH rc AS (SELECT * FROM ref_tax_filing WHERE FilingId = :filing),
+  base AS (
+    SELECT a.ServiceProviderName AS Vendor, SUM(a.AllocatedCost) AS BaseActual
+    FROM allocated_cost a JOIN rc ON a.LegalEntity = rc.LegalEntity AND a.Jurisdiction = rc.Jurisdiction
+    WHERE a.CostClass = 'om' AND a.PeriodStart >= rc.ReviewPeriodStart AND a.PeriodStart < rc.ReviewPeriodEnd
+    GROUP BY a.ServiceProviderName
+  ),
+  mo AS (
+    SELECT COUNT(DISTINCT a.PeriodStart) AS n FROM allocated_cost a JOIN rc
+      ON a.PeriodStart >= rc.ReviewPeriodStart AND a.PeriodStart < rc.ReviewPeriodEnd
+  ),
+  inv AS (
+    SELECT i.InvoiceIssuerName AS Vendor, SUM(i.BilledCost) AS Invoiced
+    FROM InvoiceDetail i JOIN rc ON i.BillingPeriodStart >= rc.ReviewPeriodStart AND i.BillingPeriodStart < rc.ReviewPeriodEnd
+    GROUP BY i.InvoiceIssuerName
+  ),
+  chg AS (
+    SELECT c.InvoiceIssuerName AS Vendor, SUM(c.BilledCost) AS Charged
+    FROM CostAndUsage c JOIN rc ON c.BillingPeriodStart >= rc.ReviewPeriodStart AND c.BillingPeriodStart < rc.ReviewPeriodEnd
+    GROUP BY c.InvoiceIssuerName
+  ),
+  fx AS (
+    SELECT b.Vendor, b.BaseActual, b.BaseActual * 12 / mo.n AS Annualized, COALESCE(v.EscalatorPct, 0) AS EscalatorPct,
+           v.RenewalDate,
+           CASE WHEN v.RenewalDate >= rc.ForecastYearStart AND v.RenewalDate < rc.ForecastYearEnd
+                THEN (12 - ((EXTRACT(YEAR FROM v.RenewalDate) - EXTRACT(YEAR FROM rc.ForecastYearStart)) * 12
+                            + EXTRACT(MONTH FROM v.RenewalDate) - EXTRACT(MONTH FROM rc.ForecastYearStart))) / 12.0
+                WHEN v.RenewalDate < rc.ForecastYearStart THEN 1.0 ELSE 0.0 END AS EscalatedShare,
+           i.Invoiced, c.Charged
+    FROM base b CROSS JOIN mo CROSS JOIN rc
+    LEFT JOIN ref_vendor v ON v.Vendor = b.Vendor
+    LEFT JOIN inv i ON i.Vendor = b.Vendor
+    LEFT JOIN chg c ON c.Vendor = b.Vendor
+  )
+  SELECT
+    Vendor,
+    ROUND(BaseActual, 2) AS ReviewPeriodActual,
+    ROUND(Annualized, 2) AS ReviewAnnualized,
+    EscalatorPct,
+    CAST(RenewalDate AS DATE) AS RenewalDate,
+    ROUND(Annualized * (1 + EscalatorPct / 100 * EscalatedShare), 2) AS ForecastYear,
+    ROUND(Annualized * EscalatorPct / 100 * EscalatedShare, 2) AS ContractEscalation,
+    CASE WHEN EscalatedShare > 0 AND EscalatorPct > 0 THEN 'Contract escalator at renewal'
+         ELSE 'Test period annualized' END AS Reason,
+    CASE WHEN Invoiced IS NULL THEN 'Billed via another issuer'
+         WHEN ABS(Invoiced - COALESCE(Charged, 0)) <= 1 THEN 'Tied to invoices'
+         ELSE 'Invoice exception' END AS InvoiceTieOut,
+    ROUND(COALESCE(Invoiced, 0) - COALESCE(Charged, 0), 2) AS InvoiceDifference
+  FROM fx
+  ORDER BY ReviewAnnualized DESC
+params:
+- name: filing
+  type: string
+  default: 'SA-26-0418-EL'
+  label: 'Rate case docket'
+notes: 'Columns follow the shared exhibit layout: review period = test period, forecast year = rate year. Invoice tie-out compares the vendor''s invoices with all of its charges in the test period (every company); labeled reconciling items (UT-18) explain by-design differences such as tax that is not in the Azure cost data.'
+compliance:
+  area: 'Rates'
+  reference: 'Test period and known-and-measurable adjustments'
+  unit: 'vendors'
+  flag: 'InvoiceTieOut = ''Invoice exception'''
+  amount: ReviewPeriodActual

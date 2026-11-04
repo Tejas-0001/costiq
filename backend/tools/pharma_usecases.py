@@ -1,4 +1,4 @@
-"""Write registry/usecases/PH-01..11.yaml: the pharma use cases (tax and transfer pricing, R&D credit, GxP and patient
+"""Write tenants/pharma/usecases/PH-01..11.yaml: the pharma use cases (tax and transfer pricing, R&D credit, GxP and patient
 data, clinical operations and AI). Run from mvp/backend: python tools/pharma_usecases.py
 
 Kept as code so the entries share one structure; the YAML files are what the platform loads.
@@ -7,7 +7,8 @@ from __future__ import annotations
 import os, textwrap
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OUT = os.path.join(ROOT, "registry", "usecases")
+OUT = os.path.join(ROOT, "tenants", "pharma", "usecases")   # the pharma tenant pack's own use cases
+SHARED_OUT = os.path.join(ROOT, "registry", "usecases")        # shared use cases (tools/optimization_usecases.py)
 PERIOD = [("period_start", "date", "2026-07-01", "Start of the period (inclusive)"),
           ("period_end", "date", "2026-11-01", "End of the period (exclusive)")]
 FILING = [("filing", "string", "US-1120-FY2026", "Tax filing")]
@@ -399,8 +400,9 @@ def q(s):
     return "'" + s.replace("'", "''") + "'"
 
 
-def render(u):
-    lines = [f"id: {u['id']}", "source: MM CostIQ Pharma extension", f"title: {q(u['title'])}",
+def render(u, source="MM CostIQ Pharma extension"):
+    """YAML for one use case. Shared use cases pass source="'{{extension_source}}'" (filled per tenant by the registry)."""
+    lines = [f"id: {u['id']}", f"source: {source}", f"title: {q(u['title'])}",
              f"category: {q(u['category'])}", f"module: {u['module']}", f"business_question: {q(u['question'])}",
              "personas:", *[f"- {p}" for p in u["personas"]], f"catalog_persona: {q(u['catalog_persona'])}",
              "datasets:", *[f"- {q(d)}" for d in u.get("datasets", ["Cost and Usage", "Pharma reference tables"])],

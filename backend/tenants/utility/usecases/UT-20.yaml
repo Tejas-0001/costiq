@@ -1,0 +1,71 @@
+id: UT-20
+source: MM CostIQ Utility extension
+title: 'M365 Copilot seat re-harvest list (30-day rule, latency buffer, grace period)'
+category: 'Utility · Copilot and AI'
+module: ai
+business_question: 'Which M365 Copilot licenses have had no activity for more than 30 days and can be reassigned?'
+personas:
+- ai_program_owner
+- finops_analyst
+- tech_exec
+- cfo
+catalog_persona: 'AI & Copilot Program Owner'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Seats whose last activity (or assignment date, if later) is more than the threshold before the refresh date, after a buffer for data latency. Seats assigned within the grace period are held back. Reassigning a seat avoids buying a new one; the bill drops at the renewal true-down.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 're-harvest'
+- 'reassign'
+- 'copilot licenses'
+- 'm365 copilot'
+- 'license reclaim'
+- 'true-down'
+- 'graph activity'
+products: Any provider
+sql: |-
+  WITH snap AS (SELECT MAX(SnapshotDate) AS d FROM ai_seat_assignment WHERE x_AIProduct = 'm365_copilot'),
+  act AS (
+    SELECT UserPrincipal, MAX(ActivityDate) AS LastActivity
+    FROM ai_user_activity WHERE x_AIProduct = 'm365_copilot'
+    GROUP BY UserPrincipal
+  ),
+  s AS (
+    SELECT a.UserPrincipal, a.Department, a.AssignedByGroupId, a.AssignedDate, a.MonthlySeatCost, t.LastActivity,
+           DATE_DIFF('day', CASE WHEN t.LastActivity IS NULL OR t.LastActivity < a.AssignedDate THEN a.AssignedDate ELSE t.LastActivity END,
+                     snap.d) - CAST(:buffer_days AS INTEGER) AS DaysIdle,
+           DATE_DIFF('day', a.AssignedDate, snap.d) AS DaysAssigned
+    FROM ai_seat_assignment a
+    CROSS JOIN snap
+    LEFT JOIN act t ON t.UserPrincipal = a.UserPrincipal
+    WHERE a.x_AIProduct = 'm365_copilot'
+  )
+  SELECT
+    UserPrincipal,
+    Department,
+    CASE WHEN AssignedByGroupId IS NULL THEN 'Direct' ELSE 'Group' END AS AssignedVia,
+    AssignedByGroupId,
+    AssignedDate,
+    LastActivity,
+    DaysIdle,
+    MonthlySeatCost,
+    CASE WHEN DaysAssigned < CAST(:grace_days AS INTEGER) AND LastActivity IS NULL THEN 'Grace period'
+         ELSE 'Idle' END AS Status
+  FROM s
+  WHERE (DaysAssigned < CAST(:grace_days AS INTEGER) AND LastActivity IS NULL) OR DaysIdle > CAST(:threshold_days AS INTEGER)
+  ORDER BY CASE WHEN DaysAssigned < CAST(:grace_days AS INTEGER) AND LastActivity IS NULL THEN 1 ELSE 0 END, DaysIdle DESC
+params:
+- name: threshold_days
+  type: string
+  default: '30'
+  label: 'Days without activity'
+- name: buffer_days
+  type: string
+  default: '2'
+  label: 'Data latency buffer (days)'
+- name: grace_days
+  type: string
+  default: '14'
+  label: 'Grace period after assignment (days)'
+notes: 'Activity comes from daily Graph snapshots kept since 2026-07-01 (the report returns only the latest values). Group-assigned seats are released through the group; direct assignments one by one.'

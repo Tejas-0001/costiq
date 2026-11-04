@@ -1,0 +1,73 @@
+{
+  "frontend": {
+    "allocation": {
+      "chainLink": "Company, jurisdiction and FERC account steps",
+      "tags": {
+        "title": "Tag compliance",
+        "suspense": "In suspense",
+        "suspenseSub": "{share}% of AWS and Azure usage · owner {owner} · oldest {days} days",
+        "invalid": "Invalid tag values",
+        "cannot": "Cannot be tagged",
+        "cannotSub": "Tax, credits, support and Marketplace, reported apart",
+        "covered": "Fully tagged",
+        "coveredSub": "Every required tag present and valid",
+        "byKey": "Coverage by required tag",
+        "byEntity": "By operating company (through the ledger)",
+        "byUnit": "By business unit",
+        "cannotTitle": "Cannot be tagged, by kind",
+        "suspenseTitle": "Suspense: no operating company, held at the service company",
+        "violations": "Tag violations",
+        "propose": "Propose rule"
+      },
+      "proposals": {
+        "title": "Pooling rule proposals",
+        "note": "A tag fixed in AWS or Azure does not restate history (AWS backfills at most 12 months, Azure only the current month); an approved rule with an effective date does. One person proposes, another approves, and both actions go to the decision ledger.",
+        "submit": "Submit for approval"
+      }
+    },
+    "reconciliation": {
+      "drawerTitle": "Invoice line to ledger",
+      "where": "Allocated by operating company, function and FERC account",
+      "byEntity": "By operating company",
+      "items": "Reconciling items",
+      "noItems": "Ties to the cost rows: nothing to reconcile.",
+      "charges": "Largest charges (click for lineage)",
+      "columns": {
+        "entity": "Company",
+        "function": "Function",
+        "account": "FERC account",
+        "title": "Account title",
+        "rule": "Rule",
+        "citation": "Citation",
+        "billing": "457 class"
+      }
+    }
+  },
+  "backend": {
+    "ledger": {
+      "reconciliation_note": "A difference that registered reconciling items account for (±$1) is labeled when they are explained (tax not in the cost data, overbilling), or awaiting when one is still open (a late charge expected in the re-run).",
+      "invoice_formula": "Invoice line − Σ billed cost of its cost rows = the difference, explained by labeled reconciling items. Allocated = Σ effective cost of the line's cost rows, split by operating company, FERC function and account, each row with the rule and citation that placed it; it ties to effective cost (C-10 for this line). Effective cost spreads commitment fees (Savings Plan, reservations) into the usage they cover, so a usage line's effective cost exceeds its billed cost and the fee line's effective cost is zero.",
+      "unexplained": "Difference not explained",
+      "lineage": {
+        "account_step": "FERC account, rule and citation",
+        "work_order_step": "Work order"
+      },
+      "tags": {
+        "formula": "Coverage = spend whose required tags are all present and valid ÷ taggable spend, weighted by cost; by operating company through the ledger. Tax, credits, adjustments, support and commitment fees, Marketplace purchases and usage with no resource id cannot be tagged and are reported apart, never as violations. Suspense = taggable spend with no cost center after tags and approved rules; it waits at the service company with an owner instead of being spread into Corporate IT. Share = suspense ÷ AWS and Azure usage in the tagged accounts.",
+        "unassigned": "Unassigned",
+        "unresolved": "Not resolved",
+        "normalized": "Normalized to {value}",
+        "queued": "Exception queue",
+        "not_in_register": "Not in the register: fix at source",
+        "not_taggable": {
+          "tax": "Tax",
+          "credit": "Credits and refunds",
+          "adjustment": "Rounding and adjustments",
+          "marketplace": "Marketplace purchases",
+          "purchase": "Support, commitment and seat fees",
+          "no_resource": "Usage with no resource id"
+        }
+      }
+    }
+  }
+}

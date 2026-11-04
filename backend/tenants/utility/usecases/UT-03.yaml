@@ -1,0 +1,71 @@
+id: UT-03
+source: MM CostIQ Utility extension
+title: 'Cross-subsidy: non-utility affiliate work carried by regulated companies'
+category: 'Utility · Affiliate rules'
+module: tax
+business_question: 'Are regulated companies paying for work that belongs to the non-utility affiliate?'
+personas:
+- affiliate_accounting
+- regulatory_analyst
+- auditor
+- cfo
+catalog_persona: 'Service Company Accounting, Internal Audit'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Two tests. Cost centers owned by the non-utility affiliate whose cost landed on a regulated company, and accounts the affiliate owns (ref_cloud_account) whose spend was tagged to a regulated cost center and spread to regulated companies.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'cross subsidy'
+- 'cross-subsidization'
+- 'affiliate'
+- 'non-utility'
+- 'affiliate rules'
+- 'competitive'
+products: Any provider
+sql: |-
+  WITH own AS (
+    SELECT a.Application, MIN(a.OwningEntity) AS OwningEntity, MIN(a.SubAccountName) AS Account
+    FROM ref_cloud_account a JOIN ref_legal_entity e ON e.LegalEntity = a.OwningEntity
+    WHERE NOT e.Regulated AND a.Application IS NOT NULL
+    GROUP BY a.Application
+  )
+  SELECT
+    'Cost center owned by the affiliate' AS Test,
+    a.CostCenter, a.Application, c.OwningEntity, a.LegalEntity AS ChargedToEntity, a.OpcoPolicy,
+    COUNT(DISTINCT a.ChargeKey) AS ChargeLines,
+    ROUND(SUM(a.AllocatedCost), 2) AS CrossSubsidy
+  FROM allocated_cost a
+  JOIN ref_cost_center c ON c.CostCenter = a.CostCenter
+  WHERE NOT c.Regulated AND a.Regulated
+    AND a.PeriodStart >= :period_start AND a.PeriodStart < :period_end
+  GROUP BY a.CostCenter, a.Application, c.OwningEntity, a.LegalEntity, a.OpcoPolicy
+  UNION ALL
+  SELECT
+    'Affiliate account tagged to a regulated cost center' AS Test,
+    a.CostCenter, a.Application, o.OwningEntity, a.LegalEntity AS ChargedToEntity, a.OpcoPolicy,
+    COUNT(DISTINCT a.ChargeKey) AS ChargeLines,
+    ROUND(SUM(a.AllocatedCost), 2) AS CrossSubsidy
+  FROM allocated_cost a
+  JOIN own o ON o.Application = a.Application
+  JOIN ref_cost_center c ON c.CostCenter = a.CostCenter
+  WHERE a.Regulated AND c.Regulated
+    AND a.PeriodStart >= :period_start AND a.PeriodStart < :period_end
+  GROUP BY a.CostCenter, a.Application, o.OwningEntity, a.LegalEntity, a.OpcoPolicy
+  ORDER BY CrossSubsidy DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'Fix by tagging the affiliate''s resources to its own cost center (or setting the account default) and restating the months through an approved rule.'
+compliance:
+  area: 'Affiliate rules'
+  reference: '18 CFR 367.25 (at cost) · state affiliate rules'
+  unit: 'allocations'
+  flag: 'CrossSubsidy > 0'
+  amount: CrossSubsidy

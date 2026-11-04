@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from costiq.config import settings
 from costiq.db import connect
 from costiq.registry import MODULES, Registry
-from costiq import dialect
+from costiq import dialect, tenant
 
 reg = Registry(settings.registry_dir)
 db = connect(settings.db_url)
@@ -21,10 +21,14 @@ def test_use_case_runs_and_returns_rows(uid):
 
 
 def test_registry_is_complete():
-    """Counts come from the registry folder itself; the 70 FinOps Foundation FOCUS 1.4 use cases are always present."""
-    assert len(reg.items) == len(glob.glob(os.path.join(settings.registry_dir, "*.yaml")))
+    """Counts come from the registry folders themselves (shared, then the tenant's); the 70 FinOps Foundation FOCUS 1.4
+    use cases are always present, and every use case belongs to a module of the tenant's access model."""
+    files = [p for d in settings.registry_dirs for p in glob.glob(os.path.join(d, "*.yaml"))]
+    assert settings.registry_dirs[-1].endswith(os.path.join("tenants", settings.tenant, "usecases"))
+    assert len(reg.items) == len(files)
     assert sum(1 for u in reg.items.values() if u["id"].startswith("F-")) == 70
     assert all(u["module"] in MODULES for u in reg.items.values())
+    assert not any("{{" in str(u) for u in reg.items.values()), "unfilled usecase_vars placeholder"
 
 
 def test_every_use_case_translates_to_postgres():
@@ -49,7 +53,7 @@ def test_scope_filters_rows():
     uc = reg.get("F-62")
     p = reg.resolve_params(uc, None)
     full = db.query(uc["sql"], p, limit=None)["rows"]
-    mkt = db.query(uc["sql"], p, scope=["Research & Discovery"], limit=None)["rows"]
+    mkt = db.query(uc["sql"], p, scope=[tenant.names().DEPTS[6]], limit=None)["rows"]  # one cost center of the sample
     assert 0 < sum(r[-1] for r in mkt) < sum(r[-1] for r in full)
 
 
@@ -96,6 +100,7 @@ def test_ask_answers_from_registry(client):
     assert db.query("SELECT COUNT(*) FROM CostAndUsage")["rows"][0][0] > 0
 
 
+@pytest.mark.tenant("pharma")  # nine pharma additions, pipeline phases
 def test_board_pack_sections_and_access(client):
     d = client.get("/api/board", headers=H("investor_relations")).json()
     assert [s["n"] for s in d["sections"]] == list(range(1, 14))
@@ -109,6 +114,7 @@ def test_board_pack_sections_and_access(client):
     assert client.get("/api/board", headers=H("pl_exec")).status_code == 403
 
 
+@pytest.mark.tenant("pharma")  # pharma personas and section keys
 def test_ai_summary_cites_facts_and_respects_role(client):
     import re
     from costiq.auth import access
@@ -161,13 +167,14 @@ def test_saved_summary_is_used_per_section_while_its_facts_hold():
     assert S.apply_saved(d, dict(saved, sections={"spend": ["So far $2M."]})) == [] and d["writer"] == "costiq"
 
 
+@pytest.mark.tenant("pharma")  # saved prose exists for pharma only
 def test_saved_summaries_apply_to_the_built_sample(tmp_path):
     """Every saved response applies in full to the sample as built, which is what a fresh deployment serves.
     If this fails after a sample change, re-save the responses (tools/summary_responses.py)."""
     import shutil, subprocess
     root = os.path.join(os.path.dirname(__file__), "..")
     fresh = tmp_path / "fresh.duckdb"
-    shutil.copyfile(os.path.join(root, "sample", "costiq.duckdb"), fresh)
+    shutil.copyfile(os.path.join(root, "sample", settings.tenant, "costiq.duckdb"), fresh)
     env = {**os.environ, "COSTIQ_DB_URL": "duckdb:///" + str(fresh).replace("\\", "/"), "PYTHONIOENCODING": "utf-8"}
     r = subprocess.run([sys.executable, os.path.join(root, "tools", "summary_responses.py"), "check"],
                        env=env, cwd=root, capture_output=True, text=True, encoding="utf-8")

@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
+import "@/app/readiness.css";
 import { BarChart, LineChart } from "@/components/charts";
+import { useCopy } from "@/components/copy";
 import { Gate, useMe, type PeriodInfo } from "@/components/shell";
 import { Formula, Head, Kpi, Loading, RecordTable, StatusBadge } from "@/components/ui";
 import { post, useApi, type Row } from "@/lib/api";
@@ -96,11 +98,85 @@ type AI = { period: PeriodInfo; by_product: { Product: string; Provider: string;
   by_month: { Month: string; Product: string; Effective: number }[];
   tokens: { Month: string; Input: number; Output: number; CacheRead: number; CacheWrite: number; CostPer1M: number }[];
   channel: Row[]; rag_components: { Application: string; Component: string; Effective: number }[]; apps: App[];
-  provisioned: Row[]; idle_endpoints: Row[]; budgets: Row[]; routing: Row[]; seats: Row[]; new_models: Row[]; formula: string };
+  provisioned: Row[]; idle_endpoints: Row[]; budgets: Row[]; routing: Row[]; seats: Row[]; new_models: Row[]; formula: string;
+  // tenants whose pack names a seat re-harvest or token-check use case (usecases.seat_reharvest / usecases.token_check)
+  reharvest?: Reharvest; token_check?: TokenRow[];
+  token_check_period?: { month: string | null; start: string; end: string; label?: string; use_case: string; months: string[] } };
+type Reharvest = { use_case: string; rule: Record<string, string>; as_of: string; idle: number; group: number; direct: number; in_grace: number;
+  monthly_avoidable: number; renewal_date: string | null; groups: { GroupId: string; IdleSeats: number }[];
+  rows: { UserPrincipal: string; Department: string; AssignedVia: string; DaysIdle: number; Status: string }[] };
+type TokenRow = { Application: string; Model: string; TotalCost: number; InputPlusOutputOnly: number; MissedIfCacheIgnored: number; CheckResult: string };
+
+/** Copilot seats idle past the threshold: counts, avoidable monthly cost, the renewal date and the seats to reassign. */
+function SeatReharvest({ r }: { r: Reharvest }) {
+  const { t } = useCopy();
+  const threshold = r.rule.threshold_days ?? "30";
+  const cols = ["UserPrincipal", "Department", "AssignedVia", "DaysIdle", "Status"] as const;
+  return (
+    <>
+      <div className="grid g4">
+        <Kpi label={t("ai.reharvest.idle")} value={r.idle.toLocaleString("en-US")} tone="bad" sub={t("ai.reharvest.idleSub", { group: r.group, direct: r.direct })} />
+        <Kpi label={t("ai.reharvest.grace")} value={r.in_grace.toLocaleString("en-US")} sub={t("ai.reharvest.graceSub", { days: r.rule.grace_days ?? "14" })} />
+        <Kpi label={t("ai.reharvest.avoidable")} value={money(r.monthly_avoidable)} tone="good" sub={t("ai.reharvest.avoidableSub")} />
+        <Kpi label={t("ai.reharvest.renewal")} value={r.renewal_date ?? "—"} sub={t("ai.reharvest.renewalSub")} />
+      </div>
+      <div className="card flush">
+        <div className="card-head"><h2>{t("ai.reharvest.title", { threshold })}</h2>
+          <span className="small muted">{t("ai.reharvest.showing", { n: r.rows.length, total: (r.idle + r.in_grace).toLocaleString("en-US") })} · {r.use_case}</span></div>
+        <p className="small muted ai-seat-rule">{t("ai.reharvest.rule", { threshold, buffer: r.rule.buffer_days ?? "2", asOf: r.as_of })}</p>
+        <div className="grid g2w">
+          <div className="table-wrap"><table>
+            <thead><tr>{cols.map((c) => <th key={c} className={c === "DaysIdle" ? "num" : ""}>{t(`ai.reharvest.${c}`)}</th>)}</tr></thead>
+            <tbody>{r.rows.map((s, i) => (
+              <tr key={`${s.UserPrincipal}-${i}`}><td className="id">{s.UserPrincipal}</td><td>{s.Department}</td><td>{s.AssignedVia}</td>
+                <td className="num">{s.DaysIdle}</td><td><StatusBadge s={s.Status} /></td></tr>))}
+            </tbody></table></div>
+          <div className="table-wrap"><table>
+            <thead><tr><th>{t("ai.reharvest.group")}</th><th className="num">{t("ai.reharvest.idle")}</th></tr></thead>
+            <tbody>{r.groups.map((g) => <tr key={g.GroupId}><td className="id">{g.GroupId}</td><td className="num">{g.IdleSeats}</td></tr>)}
+              <tr className="total"><td>{t("ai.reharvest.idleSub", { group: r.group, direct: r.direct })}</td><td className="num">{r.idle}</td></tr>
+            </tbody></table></div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Token cost by application with the cost an input-plus-output sum would miss (cache tokens). */
+function TokenCheck({ rows, period, month, setMonth }: { rows: TokenRow[]; period: NonNullable<AI["token_check_period"]>; month: string;
+  setMonth: (m: string) => void }) {
+  const { t } = useCopy();
+  const missed = rows.reduce((s, r) => s + (r.MissedIfCacheIgnored || 0), 0);
+  const top = rows.reduce<TokenRow | null>((m, r) => (!m || r.MissedIfCacheIgnored > m.MissedIfCacheIgnored ? r : m), null);
+  const cols = ["Application", "Model", "TotalCost", "InputPlusOutputOnly", "MissedIfCacheIgnored", "CheckResult"] as const;
+  return (
+    <div className="card flush">
+      <div className="card-head">
+        <h2>{t("ai.tokens.title")} <span className="small muted">· {period.use_case}</span></h2>
+        <span className="row small">
+          <span>{t("ai.tokens.missed")} <b className="ai-missed">{money(missed, 2)}</b></span>
+          <select value={month} onChange={(e) => setMonth(e.target.value)} aria-label={t("ai.tokens.selected")}>
+            <option value="">{t("ai.tokens.selected")}</option>
+            {period.months.map((m) => <option key={m} value={m}>{t("ai.tokens.month", { month: m })}</option>)}
+          </select>
+        </span>
+      </div>
+      <div className="table-wrap"><table>
+        <thead><tr>{cols.map((c) => <th key={c} className={/Cost|Only|Ignored/.test(c) ? "num" : ""}>{t(`ai.tokens.${c}`)}</th>)}</tr></thead>
+        <tbody>{rows.map((r, i) => (
+          <tr key={`${r.Application}-${r.Model}-${i}`} className={r === top && missed > 0 ? "ai-top" : undefined}>
+            <td><b>{r.Application ?? "—"}</b></td><td className="small">{r.Model}</td><td className="num">{money(r.TotalCost, 2)}</td>
+            <td className="num">{money(r.InputPlusOutputOnly, 2)}</td><td className="num"><b>{money(r.MissedIfCacheIgnored, 2)}</b></td>
+            <td><StatusBadge s={r.CheckResult} /></td></tr>))}
+        </tbody></table></div>
+    </div>
+  );
+}
 
 export function AIView() {
   const { version, period } = useMe();
-  const state = useApi<AI>(`/ai-monitor?range=${period}`, version);
+  const [month, setMonth] = useState("");  // token check: one billing month instead of the selected period
+  const state = useApi<AI>(`/ai-monitor?range=${period}${month ? `&month=${month}` : ""}`, version);
   return (
     <Gate module="ai">
       <Head title="AI & LLM Cost Monitor" />
@@ -119,6 +195,8 @@ export function AIView() {
                 <Kpi label="Batch share" value={`${a.kpis.batch_share_pct}%`} sub="of token spend at the 50% batch price" />
                 <Kpi label="Seat utilization" value={`${a.kpis.seat_utilization_pct}%`} tone={a.kpis.seat_utilization_pct < 80 ? "bad" : "good"} sub="active / assigned (UO-06)" />
               </div>
+              {a.reharvest && <SeatReharvest r={a.reharvest} />}
+              {a.token_check && a.token_check_period && <TokenCheck rows={a.token_check} period={a.token_check_period} month={month} setMonth={setMonth} />}
               <div className="card flush">
                 <h2>LLM applications: unit cost</h2>
                 <div className="table-wrap"><table>

@@ -1,12 +1,12 @@
 #!/bin/sh
 # MM CostIQ API container.
 #   serve            (default) copy the built-in sample to /data on first start, then run the API on :8080
-#   test [args]      run the pytest suite against a throwaway copy of the built-in sample
+#   test [args]      run the pytest suite against a throwaway copy of the built-in sample (the image's tenant)
 #   cli <command>    costiq.cli: refresh | allocate [--period YYYY-MM] | conformance [-v] | migrate | translate <id>
 #   saas_invoice | recommendations | llm_gateway [args]   file-drop adapters (see README, "Bringing in real data")
 # DuckDB allows one writer: run cli and adapter commands while the API container is stopped.
 set -e
-SAMPLE=/app/sample/costiq.duckdb
+SAMPLE="/app/sample/${COSTIQ_TENANT:-pharma}/costiq.duckdb"   # the image's tenant pack (Dockerfile build arg)
 cmd="${1:-serve}"
 [ $# -gt 0 ] && shift
 

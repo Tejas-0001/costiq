@@ -1,0 +1,100 @@
+# Tenant pack: what the shared engines read from the active tenant (COSTIQ_TENANT). See backend/tenants/__init__.py.
+# Paths are relative to backend/.
+name: pharma
+
+# Sample build (data/build_sample.py): the shared base generator runs first, then these add-on scripts in order,
+# each called as `python <script> <source.duckdb>` with COSTIQ_TENANT set.
+addons:
+  - tenants/pharma/sample.py
+  - data/optimization.py
+
+# Tenant schema files, loaded by `costiq migrate` after the shared core (focus, app, regulatory) and before the
+# optimization schema.
+schema:
+  - tenants/pharma/schema.sql
+
+# Tenant register tables copied from the generated sample into the served database (`costiq load-sample`), on top of
+# the shared tables listed in costiq/loader.py.
+register_tables: [ref_gxp_system, ref_vendor, ref_study_event, ref_volume, ref_ai_use, ref_program, ref_program_application]
+
+# Allocation rules seeded by `costiq seed`: [rule id, name, priority, match column, match value, cost center]
+default_rules:
+  - [R-TAX, Tax lines to shared corporate, 10, ChargeCategory, Tax, Shared Services]
+  - [R-DEFAULT-WS, Claude Default Workspace to IT until owners are assigned, 20, x_WorkspaceName, Default Workspace, Corporate IT]
+  - [R-AWS-DEV, pharma-dev account to Engineering, 30, SubAccountId, "333333333333", Clinical Operations]
+  - [R-SNOW, Snowflake account to Data Science, 30, SubAccountId, PHARMA_PROD, Data & Analytics]
+
+# Cost classes (costiq/allocation.py). Each allocated line takes the first class whose `when` holds; `when` is a SQL
+# predicate over the charge (j.*: ChargeCategory, ChargeFrequency, Impl = tags.implementation, Jurisdiction, ...) and
+# its jurisdiction policy (jp.*). A class with an account books there; the default class goes through
+# ref_gl_account_map and gets `unmapped_exception` when no map row matches.
+allocation:
+  classes:
+    - class: capital
+      when: "j.Impl = 'true'"
+      function: Capitalized software
+      account: "1750"
+      title: Capitalized software (ASC 350-40)
+    - class: qre
+      when: "j.ChargeCategory = 'Purchase' AND j.ChargeFrequency = 'Recurring' AND jp.CreditClaimed"
+      function: Research & Development
+      account: "6150"
+      title: "Qualified research: cloud & software (credit claimed)"
+  default_class: opex
+  unmapped_exception: no_gl_account
+  expense_classes: [opex, qre]   # classes the risk evidence tests and the unlock read
+
+# Use cases the shared routes and engines call by role.
+usecases:
+  bridge: PH-05            # /api/tax/filing/{filing}/bridge(.csv) and the audit file's forecast_bridge.csv
+  recharge: PH-02          # /api/tax/recharge-schedule
+  filing_exhibits: [PH-05, PH-06]   # data-request attachments that take ?filing=
+
+# {{name}} placeholders in registry YAML (shared and tenant use cases).
+usecase_vars:
+  residency_data_class: genomic          # GV-02: data_class tag whose inference must stay in the US
+  residency_data_label: genomic data
+  extension_source: MM CostIQ Pharma extension   # `source` of the shared optimization use cases (CO-*, UO-09..14, BF-04)
+  idle_risk_note: Recharged spend on resources that serve no one fails the transfer-pricing benefit test, so idle resources are both waste and tax risk.   # CO-02
+  default_application: web-store   # F-60 default application (an application tag in the sample)
+  storage_tier_note: Clinical trial data has GxP retention rules (often 25 years after the trial); check them before moving tiers.   # CO-05
+
+# Data requests on a filing: ids <id_prefix>-<filing>-<nnn>; ledger entries <ledger_target>:<id>
+data_requests:
+  id_prefix: IDR
+  ledger_target: examiner_request
+
+# Ask CostIQ synonyms added to the shared list (costiq/ask.py): word -> words it stands for.
+ask_synonyms:
+  gl: gl account
+  filing: tax filing
+  filings: tax filing
+  idr: examiner request filing
+  examiner: examiner tax filing
+  entity: entity affiliate
+  entities: entity affiliate
+  affiliate: affiliate entity recharge
+  affiliates: affiliate entity recharge
+  recharge: recharge transfer pricing
+  recharges: recharge transfer pricing
+  intercompany: recharge transfer pricing
+  tp: transfer pricing
+  credit: credit qualifying research
+  credits: credit qualifying research
+  qre: qualifying research credit
+  phi: patient data
+  hipaa: patient data
+  gdpr: patient data
+  gxp: gxp validation
+  part11: gxp quality agreement
+  genomic: genomic residency
+  study: study event
+  lock: database lock study event
+  trial: trial clinical
+  trials: trial clinical
+  patients: patient
+  sites: site trial
+  tax: tax
+  escalator: escalator renewal
+  escalators: escalator renewal
+  renewals: renewal

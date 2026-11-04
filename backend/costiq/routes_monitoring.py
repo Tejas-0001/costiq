@@ -1,8 +1,10 @@
 """Monitoring and optimization API: Cloud Cost Monitor, AI & LLM Cost Monitor, Optimization Center, alerts."""
 from __future__ import annotations
 import datetime as dt
+import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
+from . import tenant
 from .alerts import Alerts
 from .auth import Principal, current_principal
 from .context import audit, db, eng, ledger
@@ -69,11 +71,21 @@ def cloud_monitor(provider: str | None = None, cost_center: str | None = None, r
 
 
 @router.get("/ai-monitor")
-def ai_monitor(range: str = "mtd", p: Principal = Depends(current_principal)):
+def ai_monitor(range: str = "mtd", month: str | None = None, p: Principal = Depends(current_principal)):
+    """AI & LLM Cost Monitor. A tenant whose pack names `usecases.seat_reharvest` also gets `reharvest` (idle Copilot
+    seats); `usecases.token_check` adds `token_check` rows for the window, or for one billing month (`month=YYYY-MM`)."""
     p.require("ai")
     w = window(range, eng.as_of())
     audit(p, "view", module="ai", period=w.range)
-    return monitor.ai(p.scope, w)
+    out = monitor.ai(p.scope, w)
+    roles = tenant.pack().get("usecases") or {}
+    if roles.get("seat_reharvest"):
+        out["reharvest"] = monitor.reharvest(p.scope, roles["seat_reharvest"], p.pii)
+    if roles.get("token_check"):
+        if month and not re.fullmatch(r"\d{4}-\d{2}", month):
+            raise HTTPException(400, "month must be YYYY-MM")
+        out.update(monitor.token_check(p.scope, roles["token_check"], w, month))
+    return out
 
 
 @router.get("/optimization")

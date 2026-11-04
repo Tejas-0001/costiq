@@ -1,0 +1,87 @@
+id: UT-17
+source: MM CostIQ Utility extension
+title: 'Exception queue by code'
+category: 'Utility · Tag enforcement'
+module: allocation
+business_question: 'What is waiting in the exception queue, by exception code, and who owns each?'
+personas:
+- finance_controller
+- finops_analyst
+- regulatory_analyst
+- auditor
+catalog_persona: 'Controller, Cloud CoE'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Every exception code with the lines and dollars it holds in the period: unresolved operating company or function, capital without a work order or threshold date, deferral without an order, multi-function default, unmapped account, the 920 guard and masked names awaiting CIP review.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'exception queue'
+- 'exceptions'
+- 'suspense'
+- 'no_opco'
+- 'no_work_order'
+- 'readiness'
+products: Any provider
+sql: |-
+  WITH alloc AS (
+    SELECT * FROM allocated_cost WHERE PeriodStart >= :period_start AND PeriodStart < :period_end
+  ),
+  cu AS (
+    SELECT EffectiveCost, SubAccountId, ServiceName,
+           CASE WHEN ChargeCategory IN ('Tax', 'Credit', 'Adjustment') OR ResourceId IS NULL THEN 1 ELSE 0 END AS NotTaggable,
+           COALESCE(json_extract_string(AllocatedTags, '$.cost_center'), json_extract_string(Tags, '$.cost_center')) AS cost_center,
+           json_extract_string(Tags, '$.ferc_function') AS ferc_function,
+           json_extract_string(Tags, '$.capex') AS capex,
+           json_extract_string(Tags, '$.work_order') AS work_order,
+           json_extract_string(Tags, '$.implementation') AS implementation
+    FROM CostAndUsage
+    WHERE BillingPeriodStart >= :period_start AND BillingPeriodStart < :period_end
+  ),
+  q AS (
+    SELECT Exception AS ExceptionCode, COUNT(*) AS Lines, SUM(AllocatedCost) AS Amount
+    FROM alloc WHERE Exception IS NOT NULL AND Exception NOT IN ('no_ferc_function', 'cip_review_pending')
+    GROUP BY Exception
+    UNION ALL
+    SELECT 'no_ferc_function', COUNT(*), SUM(cu.EffectiveCost)
+    FROM cu LEFT JOIN ref_cost_center c ON c.CostCenter = cu.cost_center
+    WHERE cu.NotTaggable = 0 AND cu.ferc_function IS NULL AND c.FercFunction IS NULL
+    UNION ALL
+    SELECT 'labor_account_on_non_labor', COUNT(*), 0 FROM ref_rule_change WHERE ExceptionCode = 'labor_account_on_non_labor'
+    UNION ALL
+    SELECT 'cip_review_pending', COUNT(*), SUM(cu.EffectiveCost)
+    FROM cu
+    JOIN ref_cloud_account ca ON ca.SubAccountId = cu.SubAccountId
+    JOIN (SELECT DISTINCT SubAccountId FROM ref_cip_review WHERE ReviewStatus = 'pending') r ON r.SubAccountId = cu.SubAccountId
+    WHERE ca.NamesMasked AND cu.NotTaggable = 0
+  ),
+  qq AS (SELECT ExceptionCode, SUM(Lines) AS Lines, SUM(Amount) AS Amount FROM q GROUP BY ExceptionCode)
+  SELECT
+    e.ExceptionCode,
+    e.Meaning,
+    COALESCE(q.Lines, 0) AS Lines,
+    ROUND(COALESCE(q.Amount, 0), 2) AS Amount,
+    e.Owner,
+    e.Resolution,
+    CASE WHEN COALESCE(q.Lines, 0) = 0 THEN 'Clear'
+         WHEN e.ExceptionCode = 'labor_account_on_non_labor' THEN 'Blocked by the 920 guard'
+         ELSE 'Open' END AS Status
+  FROM ref_exception_code e
+  LEFT JOIN qq q ON q.ExceptionCode = e.ExceptionCode
+  ORDER BY Amount DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'The ledger stamps one code per line (first match: no_opco, the 920 guard, unmapped account, no work order, no threshold date, no order, no function, multi-function default, CIP review). no_ferc_function and cip_review_pending are also read from the tags and the CIP review register, so a line can appear under two codes here and the amounts are not added together.'
+compliance:
+  area: 'Tag enforcement'
+  reference: 'Exception codes (ref_exception_code)'
+  unit: 'exception codes'
+  flag: 'Status = ''Open'''
+  amount: Amount

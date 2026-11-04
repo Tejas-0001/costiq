@@ -1,0 +1,82 @@
+id: UT-18
+source: MM CostIQ Utility extension
+title: 'Invoice tie-out with labeled reconciling items'
+category: 'Utility · Invoice tie-out'
+module: reconciliation
+business_question: 'Does each invoice tie to its cost rows, and is every difference labeled?'
+personas:
+- finance_controller
+- finops_analyst
+- auditor
+- affiliate_accounting
+catalog_persona: 'Controller, Cloud CoE'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Each invoice against the sum of BilledCost of the cost rows carrying its InvoiceId. Differences are labeled from the reconciling-item register: tax that is not in the cost data by design, a late charge expected in the provider''s re-run, or a vendor overbilling raised as an exception.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'invoice'
+- 'tie out'
+- 'reconciliation'
+- 'late charge'
+- 'tax not in cost data'
+- 'overbilling'
+- 'invoice to ledger'
+products: Any provider
+sql: |-
+  WITH inv AS (
+    SELECT InvoiceId, MIN(InvoiceIssuerName) AS Issuer, MIN(BillingAccountId) AS BillingAccountId,
+           MIN(BillingPeriodStart) AS BillingPeriodStart, MIN(InvoiceIssueStatus) AS IssueStatus, SUM(BilledCost) AS Invoiced
+    FROM InvoiceDetail
+    WHERE BillingPeriodStart >= :period_start AND BillingPeriodStart < :period_end
+    GROUP BY InvoiceId
+  ),
+  chg AS (SELECT InvoiceId, SUM(BilledCost) AS CostRows, COUNT(*) AS Lines FROM CostAndUsage GROUP BY InvoiceId),
+  items AS (
+    SELECT InvoiceId,
+           SUM(CASE WHEN Explained THEN Amount ELSE 0 END) AS Labeled,
+           SUM(CASE WHEN Explained THEN 0 ELSE Amount END) AS Pending
+    FROM ref_invoice_reconciling_item
+    WHERE Category NOT IN ('rounding', 'correction_next_period')
+    GROUP BY InvoiceId
+  )
+  SELECT
+    i.Issuer,
+    i.InvoiceId,
+    i.BillingAccountId,
+    CAST(i.BillingPeriodStart AS DATE) AS Period,
+    i.IssueStatus,
+    ROUND(i.Invoiced, 2) AS Invoiced,
+    ROUND(COALESCE(c.CostRows, 0), 2) AS CostRows,
+    COALESCE(c.Lines, 0) AS CostLines,
+    ROUND(i.Invoiced - COALESCE(c.CostRows, 0), 2) AS Difference,
+    ROUND(COALESCE(t.Labeled, 0), 2) AS Labeled,
+    ROUND(COALESCE(t.Pending, 0), 2) AS AwaitingRerun,
+    ROUND(i.Invoiced - COALESCE(c.CostRows, 0) - COALESCE(t.Labeled, 0) - COALESCE(t.Pending, 0), 2) AS Unlabeled,
+    CASE WHEN ABS(i.Invoiced - COALESCE(c.CostRows, 0)) < 0.005 THEN 'Ties to the cent'
+         WHEN ABS(i.Invoiced - COALESCE(c.CostRows, 0) - COALESCE(t.Labeled, 0) - COALESCE(t.Pending, 0)) < 0.005
+              AND COALESCE(t.Pending, 0) = 0 THEN 'Difference labeled'
+         WHEN ABS(i.Invoiced - COALESCE(c.CostRows, 0) - COALESCE(t.Labeled, 0) - COALESCE(t.Pending, 0)) < 0.005
+              THEN 'Labeled; part awaiting the re-run'
+         ELSE 'Unlabeled difference' END AS Status
+  FROM inv i
+  LEFT JOIN chg c ON c.InvoiceId = i.InvoiceId
+  LEFT JOIN items t ON t.InvoiceId = i.InvoiceId
+  ORDER BY Period, Issuer, InvoiceId
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'A credit that arrives after a period closes is posted in the next open period (R13) and is listed on that period''s invoice.'
+compliance:
+  area: 'Invoice tie-out'
+  reference: 'Invoice to cost rows (BilledCost per InvoiceId)'
+  unit: 'invoices'
+  flag: 'Status IN (''Unlabeled difference'', ''Labeled; part awaiting the re-run'')'
+  amount: ABS(Difference)

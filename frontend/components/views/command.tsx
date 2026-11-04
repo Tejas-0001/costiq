@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { BarChart } from "@/components/charts";
+import { useCopy } from "@/components/copy";
 import { homeFor, PERIODS, useMe } from "@/components/shell";
 import { Findings, type Finding } from "@/components/usecases";
 import { Loading, RecordTable } from "@/components/ui";
@@ -62,19 +63,22 @@ function PeriodPanel() {
 }
 
 function ThreeNumbers({ h }: { h: Headline }) {
+  const { t } = useCopy();
+  // the tenant names the risk and unlock figures (command.risk, command.unlock) and the jurisdiction statuses
+  const status = (s: string) => t(`command.status.${s}`, undefined, s);
   return (
     <div className="grid g3">
       <div className="card kpi bad">
-        <div className="label">Deduction at risk</div>
+        <div className="label">{t("command.risk.label")}</div>
         <div className="value">{money(h.deduction_at_risk)}</div>
-        <div className="sub">{h.evidence_score}% evidenced · {h.filings.length} open filings</div>
-        <div className="foot">{h.by_reason.map((r) => `${r.Label}: ${compact(r.Risk)}`).join(" · ")} · <Link href="/risk">Tax Risk Radar</Link></div>
+        <div className="sub">{t("command.risk.sub", { score: h.evidence_score, filings: h.filings.length })}</div>
+        <div className="foot">{h.by_reason.map((r) => `${r.Label}: ${compact(r.Risk)}`).join(" · ")} · <Link href="/risk">{t("nav.items.risk")}</Link></div>
       </div>
       <div className="card kpi good">
-        <div className="label">R&amp;D credit unlock</div>
+        <div className="label">{t("command.unlock.label")}</div>
         <div className="value">{compact(h.credit_unlock)}/yr</div>
-        <div className="sub">{compact(h.credit_claimed)}/yr claimed today</div>
-        <div className="foot">{(h.jurisdictions ?? []).map((j) => `${j.Jurisdiction} ${compact(j.Credit)} (${j.CreditStatus})`).join(" · ")} · <Link href="/tax?tab=credit">By jurisdiction</Link></div>
+        <div className="sub">{t("command.unlock.sub", { amount: compact(h.credit_claimed) })}</div>
+        <div className="foot">{(h.jurisdictions ?? []).map((j) => `${j.Jurisdiction} ${compact(j.Credit)} (${status(j.CreditStatus)})`).join(" · ")} · <Link href="/tax?tab=credit">By jurisdiction</Link></div>
       </div>
       <div className="card kpi good">
         <div className="label">Verified savings</div>

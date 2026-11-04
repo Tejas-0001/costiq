@@ -1,0 +1,69 @@
+id: UT-07
+source: MM CostIQ Utility extension
+title: 'Cloud workloads awaiting the client''s CIP review'
+category: 'Utility · NERC CIP & data'
+module: compliance
+business_question: 'Which cloud accounts carry names or data the CIP program has been asked to classify, and what do they cost?'
+personas:
+- cip_compliance
+- auditor
+- tech_exec
+- finance_controller
+catalog_persona: 'NERC CIP Compliance'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Accounts flagged ceii, cip_related_workload or potential_bcsi_context, with the review status the client''s CIP program records. Resource names on accounts awaiting review are pseudonymized at ingest. CostIQ flags and masks; the client''s CIP-011 R1.1 method decides what is BES Cyber System Information.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'cip'
+- 'bcsi'
+- 'ceii'
+- 'cip-011'
+- 'masking'
+- 'pseudonymized'
+- 'review pending'
+products: Any provider
+sql: |-
+  WITH spend AS (
+    SELECT SubAccountId, COUNT(DISTINCT ResourceName) AS Resources, SUM(EffectiveCost) AS EffectiveCost
+    FROM CostAndUsage
+    WHERE ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+    GROUP BY SubAccountId
+  )
+  SELECT
+    r.SystemName,
+    r.Application,
+    ca.SubAccountName AS Account,
+    r.SensitivityFlag,
+    CASE WHEN ca.NamesMasked THEN 'Masked' ELSE 'Shown' END AS ResourceNames,
+    CASE WHEN r.HoldsBcsi IS NULL THEN 'Not yet classified' WHEN r.HoldsBcsi THEN 'Yes' ELSE 'No' END AS HoldsBcsi,
+    r.KeyOwnership,
+    r.ReviewStatus,
+    CAST(r.ReviewRequestedOn AS DATE) AS ReviewRequestedOn,
+    r.Owner,
+    COALESCE(s.Resources, 0) AS Resources,
+    ROUND(COALESCE(s.EffectiveCost, 0), 2) AS EffectiveCost,
+    CASE WHEN r.ReviewStatus = 'pending' AND ca.NamesMasked THEN 'Names masked; awaiting CIP review'
+         WHEN r.ReviewStatus = 'pending' THEN 'Awaiting CIP review'
+         ELSE 'Classified by the CIP program' END AS Status
+  FROM ref_cip_review r
+  LEFT JOIN ref_cloud_account ca ON ca.SubAccountId = r.SubAccountId
+  LEFT JOIN spend s ON s.SubAccountId = r.SubAccountId
+  ORDER BY CASE WHEN r.ReviewStatus = 'pending' THEN 0 ELSE 1 END, EffectiveCost DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'The review register is maintained by the client''s CIP program. Exception code cip_review_pending.'
+compliance:
+  area: 'NERC CIP & data'
+  reference: 'CIP-011 R1.1 (client classification) · CIP-004 access program'
+  unit: 'workloads'
+  flag: 'ReviewStatus = ''pending'''
+  amount: EffectiveCost

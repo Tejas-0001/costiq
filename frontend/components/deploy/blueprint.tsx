@@ -7,10 +7,8 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { EASE } from "@/components/motion";
 import { Diagram, gb, Num, ReuseBar } from "./canvas";
-import { FRAMEWORKS, QUESTIONS, type Answers, type Plan } from "./model";
-import {
-  CUSTODY, CUTOVERS, DB_STEPS, DEFENSE_SOURCES, RELEASE_SOURCES, ROUTES, STAGES, STANDARDS, TESTDATA, THREATS,
-} from "./release";
+import { profile, type Answers, type Plan, type Question, type Tenant } from "./model";
+import { CUSTODY, CUTOVERS, DB_STEPS, RELEASE_SOURCES, TESTDATA } from "./release";
 import { DefenseSim, DevPlan, Lanes, Pipeline, RouteFlow, TrafficSplit } from "./release-viz";
 
 /** "Try a risky change" plants a critical CVE; the scan stage's first gate stops it. */
@@ -50,8 +48,23 @@ export const BP_SOURCES: [string, string][] = [
   ["CISA data backup options (3-2-1)", "https://www.cisa.gov/sites/default/files/publications/data_backup_options.pdf"],
 ];
 
+/** The utility tenant's sources: the NERC CIP texts in place of the GxP, HIPAA and GDPR ones. */
+const UTILITY_BP_SOURCES: [string, string][] = [
+  ["NERC CIP-004-7 (BCSI access management, R6)", "https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-004-7.pdf"],
+  ["NERC CIP-011-3 (BCSI protection)", "https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-011-3.pdf"],
+  ["NERC CIP-013-2 (supply chain risk management)", "https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-013-2.pdf"],
+  ["NERC CIP-007-6 (security event monitoring, R4)", "https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-007-6.pdf"],
+  ["FERC Order No. 919, virtualization Reliability Standards (Federal Register)", "https://www.govinfo.gov/content/pkg/FR-2026-03-24/html/2026-05716.htm"],
+  ["ERO-endorsed guidance: usage of cloud solutions for BCSI (RSTC)", "https://www.nerc.com/pa/comp/guidance/EROEndorsedImplementationGuidance/CIP-004-7%20R6%20and%20CIP-011-3%20R1%20-%20Cloud%20Solutions%20for%20BCSI%20%28RSTC%29.pdf"],
+  ...BP_SOURCES.slice(6),
+  ["NATF supply chain criteria and questionnaire", "https://www.natf.net/industry-initiatives/supply-chain-industry-coordination"],
+  ["EEI model procurement contract language", "https://www.eei.org/-/media/Project/EEI/Documents/Issues-and-Policy/Model-Procurement-Contract.pdf"],
+];
+export const bpSources = (t: Tenant = "pharma"): [string, string][] => (t === "utility" ? UTILITY_BP_SOURCES : BP_SOURCES);
+
 /** Where each framework's control text comes from; linked from its card. */
 const FRAMEWORK_URL: Record<string, string> = {
+  "nerc-cip": "https://www.nerc.com/globalassets/standards/reliability-standards/cip/cip-011-3.pdf",
   gxp: "https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-11",
   "hipaa-gdpr": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-C",
   sox: "https://pcaobus.org/oversight/standards/auditing-standards/details/AS2201",
@@ -69,7 +82,7 @@ export function decodeAnswers(s: string): Partial<Answers> | null {
   try { return JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, "+").replace(/_/g, "/"))))); } catch { return null; }
 }
 
-const answerText = (a: Answers) => QUESTIONS.map((q) => {
+const answerText = (a: Answers, questions: Question[]) => questions.map((q) => {
   const v = a[q.key];
   const labels = (Array.isArray(v) ? v : [v]).map((x) => q.options.find((o) => o.value === x)?.label ?? x);
   return { q: q.ask, a: labels.length ? labels.join(", ") : "None" };
@@ -78,8 +91,10 @@ const answerText = (a: Answers) => QUESTIONS.map((q) => {
 /** The environments the answers ask for, in promotion order. */
 const lanesFor = (a: Answers) => (a.environments === "prod" ? ["prod"] : a.environments === "prod-test" ? ["qa", "prod"] : ["dev", "qa", "prod"]) as ("dev" | "qa" | "prod")[];
 
-export function toMarkdown(p: Plan): string {
+export function toMarkdown(p: Plan, tenant: Tenant = "pharma"): string {
   const a = p.answers;
+  const P = profile(tenant);
+  const { stages: STAGES, standards: STANDARDS, routes: ROUTES, threats: THREATS, defenseSources: DEFENSE_SOURCES } = P.release;
   const L: string[] = [];
   const t = (head: string[], rows: (string | number)[][]) => {
     L.push(`| ${head.join(" | ")} |`, `| ${head.map(() => "---").join(" | ")} |`);
@@ -90,7 +105,7 @@ export function toMarkdown(p: Plan): string {
   L.push(`Totals: ${p.totals.vcpu} vCPU, ${p.totals.ram} GB memory, ${gb(p.totals.storage)} storage, ${p.totals.servers} new servers. About ${p.weeks} weeks to production. You already own ${p.reuse.have} of ${p.reuse.total} building blocks.`, "");
   L.push("Sizing is a starting point, confirmed in a load test on your data before production.", "");
   if (p.notes.length) { L.push("## Notes", ""); p.notes.forEach((n) => L.push(`- ${n}`)); L.push(""); }
-  L.push("## Your answers", ""); t(["Question", "Answer"], answerText(a).map((x) => [x.q, x.a]));
+  L.push("## Your answers", ""); t(["Question", "Answer"], answerText(a, P.questions).map((x) => [x.q, x.a]));
   L.push("## Hardware and compute", "");
   p.envs.forEach((e) => { L.push(`### ${e.name}`, ""); t(["Role", "Count", "vCPU", "Memory (GB)", "Disk (GB)", "Notes"], e.servers.map((s) => [s.role, s.count || "-", s.vcpu, s.ram, s.disk, s.note ?? ""])); });
   L.push(`Database: ${p.db.engine}, ${p.db.layout}; ${p.db.vcpu} vCPU, ${p.db.ram} GB, ${p.db.storage} GB for 36 months (about ${p.db.rowsPerMonth}M rows a month).`, "");
@@ -128,7 +143,7 @@ export function toMarkdown(p: Plan): string {
   L.push("## Team and effort", ""); t(["Role", "Side", "Days", "Does"], p.team.map((m) => [m.role, m.side, m.days, m.does]));
   L.push("## Prerequisites checklist", ""); t(["ID", "Item", "Owner", "Status", "Needed by week"], p.prerequisites.map((x) => [x.id, x.item, x.owner, x.status === "reuse" ? "Use existing" : "To do", x.week]));
   L.push("## Sources", "", "Checked against these primary sources (Nov 2026):", "");
-  [...BP_SOURCES, ...RELEASE_SOURCES, ...DEFENSE_SOURCES].forEach(([s, u]) => L.push(`- [${s}](${u})`));
+  [...bpSources(tenant), ...RELEASE_SOURCES, ...DEFENSE_SOURCES].forEach(([s, u]) => L.push(`- [${s}](${u})`));
   return L.join("\n");
 }
 
@@ -147,8 +162,12 @@ const Dots = ({ n, label }: { n: number; label: string }) => (
   <span className="dl-dots" role="img" aria-label={`${label}: ${n} of 5`}>{[1, 2, 3, 4, 5].map((i) => <i key={i} className={i <= n ? "on" : ""} />)}</span>
 );
 
-export function Blueprint({ plan, onEdit }: { plan: Plan; onEdit: () => void }) {
+export function Blueprint({ plan, onEdit, tenant = "pharma" }: { plan: Plan; onEdit: () => void; tenant?: Tenant }) {
   const [copied, setCopied] = useState(false);
+  const P = profile(tenant);
+  const u = P.tenant === "utility";
+  const { stages: STAGES, standards: STANDARDS, routes: ROUTES, threats: THREATS } = P.release;
+  const FRAMEWORKS = P.frameworks;
   const share = async () => {
     const url = `${location.origin}/deploy#plan=${encodeAnswers(plan.answers)}`;
     try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { window.prompt("Copy this link", url); }
@@ -162,7 +181,7 @@ export function Blueprint({ plan, onEdit }: { plan: Plan; onEdit: () => void }) 
       <nav className="dp-bp-nav" aria-label="Blueprint sections">
         {SECTIONS.map(([id, label]) => <a key={id} href={`#bp-${id}`}>{label}</a>)}
         <div className="dp-bp-actions">
-          <button type="button" onClick={() => download("costiq-deployment-blueprint.md", toMarkdown(plan), "text/markdown")}>Download Markdown</button>
+          <button type="button" onClick={() => download("costiq-deployment-blueprint.md", toMarkdown(plan, tenant), "text/markdown")}>Download Markdown</button>
           <button type="button" onClick={() => download("costiq-deployment-blueprint.json", JSON.stringify(plan, null, 2), "application/json")}>Download JSON</button>
           <button type="button" onClick={() => window.print()}>Print or save PDF</button>
           <button type="button" onClick={share}>{copied ? "Link copied" : "Copy share link"}</button>
@@ -273,7 +292,7 @@ export function Blueprint({ plan, onEdit }: { plan: Plan; onEdit: () => void }) 
             ))}
           </div>
           <h4 className="dl-sub">Pick an attack and watch where it stops</h4>
-          <DefenseSim layers={plan.defense.layers} />
+          <DefenseSim layers={plan.defense.layers} threats={THREATS} />
           <div className="dp-two dl-def2">
             <motion.div {...rise(0)} className="dp-card flush">
               <table><thead><tr><th>Detection rule sent to {a.have.includes("siem") ? "your SIEM" : "Loki"}</th><th>Source</th><th>Severity</th></tr></thead>
@@ -282,11 +301,13 @@ export function Blueprint({ plan, onEdit }: { plan: Plan; onEdit: () => void }) 
             <motion.div {...rise(1)} className="dp-card">
               <div className="dl-device-hd"><h4>NIST CSF 2.0, function by function</h4><Src href="https://nvlpubs.nist.gov/nistpubs/CSWP/NIST.CSWP.29.pdf" /></div>
               <dl className="dl-csf">
-                <dt>Govern</dt><dd>Supplier risk through SBOMs, signed releases, your supplier quality questionnaire and the quality agreement.</dd>
+                <dt>Govern</dt><dd>{u ? "Supplier risk through SBOMs, signed releases, the NATF questionnaire and contract terms."
+                  : "Supplier risk through SBOMs, signed releases, your supplier quality questionnaire and the quality agreement."}</dd>
                 <dt>Identify</dt><dd>This blueprint is the asset and data-flow inventory; the threat model stays current.</dd>
                 <dt>Protect</dt><dd>{plan.defense.layers.filter((l) => ["firewall", "waf", "identity", "access", "pam", "supply", "segment", "secrets"].includes(l.id)).length} protective layers above.</dd>
                 <dt>Detect</dt><dd>{plan.defense.detections.length} detection rules, watched by {plan.defense.soc}.</dd>
-                <dt>Respond</dt><dd>A joint incident playbook; we notify your security contact and coordinate the response, as the quality agreement&apos;s incident-notice terms require.</dd>
+                <dt>Respond</dt><dd>{u ? "A joint incident playbook; we notify your security contact and coordinate the response, matching the vendor incident notification and coordination processes in CIP-013-2 R1.2.1 and R1.2.2."
+                  : "A joint incident playbook; we notify your security contact and coordinate the response, as the quality agreement's incident-notice terms require."}</dd>
                 <dt>Recover</dt><dd>Immutable offsite backups with quarterly restore tests (CISA #StopRansomware guidance).</dd>
               </dl>
             </motion.div>

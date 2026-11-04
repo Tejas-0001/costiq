@@ -1,0 +1,43 @@
+/* Data Readiness page and the AI page's seat and token panels (WP-4). Colors and type come from globals.css tokens;
+   text inherits Times New Roman. */
+
+/* score meters in tables */
+.rd-score-col { min-width: 170px; }
+td.rd-score { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rd-meter { display: inline-block; width: 110px; height: 8px; margin-right: 10px; border-radius: 99px; background: var(--panel-2);
+  overflow: hidden; vertical-align: middle; }
+.rd-meter i { display: block; height: 100%; border-radius: 99px; background: var(--brand); }
+.rd-meter i.ready { background: var(--good); }
+.rd-meter i.partial { background: var(--warn); }
+.rd-meter i.gaps { background: var(--bad); }
+.rd-meter i.na { background: var(--line); }
+
+/* section anchors stay clear of the sticky top bar */
+.rd > [id^="rd-"] { scroll-margin-top: 72px; }
+
+/* ledger dollars by rule basis */
+.rd-hrow { grid-template-columns: 200px minmax(0, 1fr) 56px 120px; }
+.rd-hrow .rd-amt { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hrow .track i.rd-warn { background: var(--warn); }
+.hrow .track i.rd-bad { background: var(--bad); }
+
+.rd-kpis { align-content: start; }
+
+/* Discovery plan */
+.rd-week { width: 64px; font-weight: 700; color: var(--brand); }
+.rd-lists ul { margin: 0; padding-left: 18px; }
+.rd-lists li { margin: 0 0 4px; }
+.rd-lists h3 { margin-bottom: 6px; }
+.rd-inputs-title { margin-top: 16px; }
+
+/* AI page: idle seats and token check */
+.ai-seat-rule { padding: 0 16px 10px; }
+.ai-missed { font-variant-numeric: tabular-nums; }
+tr.ai-top td { background: var(--warn-bg); }
+
+@media (max-width: 760px) {
+  .rd-hrow { grid-template-columns: 120px minmax(0, 1fr) 52px; }
+  .rd-hrow .rd-amt { display: none; }
+  .rd-meter { width: 64px; }
+  .rd-score-col { min-width: 110px; }
+}

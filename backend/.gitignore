@@ -4,3 +4,6 @@ __pycache__/
 sample/*.duckdb
 sample/*.duckdb.wal
 sample/csv/
+sample/*/*.duckdb
+sample/*/*.duckdb.wal
+sample/*/csv/

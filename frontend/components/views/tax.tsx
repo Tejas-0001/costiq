@@ -1,39 +1,44 @@
 "use client";
+// The tax module page (its nav label comes from the tenant copy, nav.items.tax). Tabs, the default tab and
+// every tenant-specific word come from the tenant copy (tax.*). The regulatory ledger tabs live in rates.tsx.
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { useCopy } from "@/components/copy";
 import { Gate, useMe } from "@/components/shell";
 import { DataTable, Formula, Head, Kpi, Loading, RecordTable, StatusBadge } from "@/components/ui";
+import { BillingView, CapitalTab, ChainExtras, LedgerTab, ListingExport, RulesTab } from "@/components/views/rates";
 import { download, post, upload, useApi, type Row } from "@/lib/api";
 import { compact, label, money } from "@/lib/format";
 
-const TABS: [string, string][] = [
-  ["credit", "Credit unlock"], ["requests", "Examiner requests"], ["audit", "Audit files"], ["chain", "Allocation chain"],
-  ["bridge", "Forecast bridge"], ["recharge", "Recharge schedule"], ["schedule", "Credit schedule"],
-];
 type Filing = { FilingId: string; LegalEntity: string; Jurisdiction: string; Status: string; FilingDate: string; CreditRate: number; Authority: string;
   ReviewPeriodStart: string; ReviewPeriodEnd: string; ForecastYearStart: string; ForecastYearEnd: string };
 
 export function TaxView() {
   const params = useSearchParams();
   const router = useRouter();
-  const tab = params.get("tab") ?? "credit";
+  const { t, get } = useCopy();
+  const tabs = get<[string, string][]>("tax.tabs") ?? [];
+  const tab = params.get("tab") ?? t("tax.defaultTab");
   const filings = useApi<Filing[]>("/tax/filings");
   return (
     <Gate module="tax">
-      <Head title="Tax & Transfer Pricing" />
+      <Head title={t("nav.items.tax")} />
       <div className="tabs">
-        {TABS.map(([k, l]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => router.replace(`/tax?tab=${k}`)}>{l}</button>)}
+        {tabs.map(([k, l]) => <button key={k} className={tab === k ? "on" : ""} onClick={() => router.replace(`/tax?tab=${k}`)}>{l}</button>)}
       </div>
       <Loading state={filings}>
         {(fs) => (
           <>
             {tab === "credit" && <CreditUnlock />}
-            {tab === "requests" && <ExaminerRequests filings={fs} />}
+            {tab === "requests" && <DataRequests filings={fs} />}
             {tab === "audit" && <AuditFiles filings={fs} />}
             {tab === "chain" && <Chain />}
             {tab === "bridge" && <Bridge filings={fs} />}
-            {tab === "recharge" && <Sections path="/tax/recharge-schedule?year=2026" />}
+            {tab === "recharge" && <Recharge />}
             {tab === "schedule" && <Sections path="/tax/credit-schedule" />}
+            {tab === "ledger" && <LedgerTab />}
+            {tab === "rules" && <RulesTab />}
+            {tab === "capital" && <CapitalTab />}
           </>
         )}
       </Loading>
@@ -44,16 +49,28 @@ export function TaxView() {
 /** Any response of { name: rows[], formula }: one table per array, formula as a footnote. */
 function Sections({ path }: { path: string }) {
   const state = useApi<Record<string, unknown>>(path);
+  return <Loading state={state}>{(d) => <SectionTables d={d} />}</Loading>;
+}
+
+function SectionTables({ d }: { d: Record<string, unknown> }) {
+  return (
+    <div className="stack">
+      {Object.entries(d).filter(([, v]) => Array.isArray(v) && v.length > 0 && typeof v[0] === "object").map(([k, v]) => (
+        <div key={k} className="card flush"><h2>{label(k).replace(/^\w/, (c) => c.toUpperCase())}</h2><RecordTable rows={v as Row[]} max={200} /></div>
+      ))}
+      {typeof d.formula === "string" && <Formula>{d.formula}</Formula>}
+    </div>
+  );
+}
+
+/** The year's recharge schedule; when its lines carry a billing class (457.1 / 457.2), the billing view by period. */
+function Recharge() {
+  const state = useApi<Record<string, unknown>>("/tax/recharge-schedule?year=2026");
   return (
     <Loading state={state}>
-      {(d) => (
-        <div className="stack">
-          {Object.entries(d).filter(([, v]) => Array.isArray(v) && v.length > 0 && typeof v[0] === "object").map(([k, v]) => (
-            <div key={k} className="card flush"><h2>{label(k).replace(/^\w/, (c) => c.toUpperCase())}</h2><RecordTable rows={v as Row[]} max={200} /></div>
-          ))}
-          {typeof d.formula === "string" && <Formula>{d.formula}</Formula>}
-        </div>
-      )}
+      {(d) => Array.isArray(d.factors)
+        ? <BillingView periods={(d.periods as string[]) ?? []} initial={String(d.closed_period ?? "")} />
+        : <SectionTables d={d} />}
     </Loading>
   );
 }
@@ -66,6 +83,8 @@ function CreditUnlock() {
   const state = useApi<{ jurisdictions: Juris[]; credit_unlock: number; credit_claimed: number; formula: string; disclaimer: string }>("/tax/credit-unlock");
   const [off, setOff] = useState<Record<string, boolean>>({});
   const [open, setOpen] = useState<string | null>(null);
+  const { t } = useCopy();
+  const yr = t("tax.credit.perYear");
   return (
     <Loading state={state}>
       {(e) => {
@@ -74,13 +93,13 @@ function CreditUnlock() {
         return (
           <div className="stack">
             <div className="grid g3">
-              <Kpi label="Credit unlock (selected)" value={`${compact(what)}/yr`} tone="good" />
-              <Kpi label="Claimed today" value={`${compact(e.credit_claimed)}/yr`} />
-              <Kpi label="Total" value={`${compact(what + e.credit_claimed)}/yr`} />
+              <Kpi label={t("tax.credit.selected")} value={`${compact(what)}${yr}`} tone="good" />
+              <Kpi label={t("tax.credit.claimed")} value={`${compact(e.credit_claimed)}${yr}`} />
+              <Kpi label={t("tax.credit.total")} value={`${compact(what + e.credit_claimed)}${yr}`} />
             </div>
             <table>
-              <thead><tr><th>Jurisdiction</th><th>Status</th><th>Filing</th><th className="num">Qualifying fees /yr</th><th className="num">Credit rate</th>
-                <th className="num">Credit /yr</th><th>Include</th></tr></thead>
+              <thead><tr><th>{t("tax.credit.jurisdiction")}</th><th>{t("tax.credit.status")}</th><th>{t("tax.filing")}</th><th className="num">{t("tax.credit.fees")}</th>
+                <th className="num">{t("tax.credit.rate")}</th><th className="num">{t("tax.credit.amount")}</th><th>{t("tax.credit.include")}</th></tr></thead>
               <tbody>
                 {e.jurisdictions.map((j) => (
                   <tr key={j.Jurisdiction} className={open === j.Jurisdiction ? "focus" : ""}>
@@ -88,18 +107,18 @@ function CreditUnlock() {
                     <td><StatusBadge s={j.CreditStatus} /></td>
                     <td className="id">{j.FilingId ?? "—"}</td>
                     <td className="num">{money(j.AnnualQualifyingFees)}</td>
-                    <td className="num">{j.CreditRate}%{j.RateBasis && j.RateBasis !== "filing" ? " (assumed)" : ""}</td>
+                    <td className="num">{j.CreditRate}%{/average/i.test(j.RateBasis ?? "") ? t("tax.credit.assumed") : ""}</td>
                     <td className="num"><b>{money(j.Credit)}</b></td>
                     <td>{j.CreditStatus === "eligible"
                       ? <input type="checkbox" checked={!off[j.Jurisdiction]} onChange={() => setOff({ ...off, [j.Jurisdiction]: !off[j.Jurisdiction] })} />
-                      : <span className="small muted">{j.CreditStatus === "claimed" ? "claimed" : "n/a"}</span>}</td>
+                      : <span className="small muted">{j.CreditStatus === "claimed" ? t("tax.credit.claimedNote") : t("tax.credit.notApplicable")}</span>}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             {sel && (
               <div className="card flush" id="contracts">
-                <h2>{sel.Jurisdiction}: contracts <span className="small muted">({sel.Reference})</span></h2>
+                <h2>{t("tax.credit.contracts", { jurisdiction: sel.Jurisdiction })} <span className="small muted">({sel.Reference})</span></h2>
                 <RecordTable rows={sel.Contracts} />
               </div>
             )}
@@ -111,39 +130,34 @@ function CreditUnlock() {
   );
 }
 
-// ------------------------------------------------------------------------------------------------ examiner requests
-type ER = { RequestId: string; FilingId: string; Requester: string; RequestText: string; MatchedUseCases: string; Status: string;
+// ------------------------------------------------------------------------------------------------ data requests
+type DR = { RequestId: string; FilingId: string; Requester: string; RequestText: string; MatchedUseCases: string; Status: string;
   PreparedBy: string; PreparedAt: string; ApprovedBy: string | null;
   Draft: { status: string; headline?: string; narrative?: string; message?: string; confidence?: string; interpreted?: string[];
     use_case?: { id: string; title: string }; result?: { columns: string[]; rows: unknown[][] }; attachments?: { label: string; href: string }[] } };
 
-const SAMPLES = [
-  "Provide cloud subscription costs for the review period by vendor, with any invoice differences.",
-  "Explain how shared-services technology costs are recharged to the Company and on what basis.",
-  "Identify any technology assets that were idle or unused during the review period.",
-  "Provide the AI and machine learning costs deducted in the period.",
-];
-
-function ExaminerRequests({ filings }: { filings: Filing[] }) {
+function DataRequests({ filings }: { filings: Filing[] }) {
   const { me, version, refresh } = useMe();
+  const { t, get } = useCopy();
+  const samples = get<string[]>("tax.requests.samples") ?? [];
   const [filing, setFiling] = useState(filings[0]?.FilingId ?? "");
-  const [requester, setRequester] = useState("Tax examiner");
+  const [requester, setRequester] = useState(t("tax.requests.requester"));
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const list = useApi<ER[]>("/tax/examiner-requests", version);
+  const list = useApi<DR[]>("/tax/data-requests", version);
   const canPrepare = me.actions.includes("datarequest.prepare"), canApprove = me.actions.includes("datarequest.approve");
   async function draft() {
     setBusy(true); setMsg(null);
     try {
-      const r = await post<ER>("/tax/examiner-requests", { filing, requester, text });
+      const r = await post<DR>("/tax/data-requests", { filing, requester, text });
       setOpenId(r.RequestId); setText(""); refresh();
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   }
   async function decide(id: string, action: string) {
     setMsg(null);
-    try { await post(`/tax/examiner-requests/${id}/decision`, { action }); setMsg(`${id}: ${action} recorded in the ledger.`); refresh(); }
+    try { await post(`/tax/data-requests/${id}/decision`, { action }); setMsg(`${id}: ${action} recorded in the ledger.`); refresh(); }
     catch (e) { setMsg((e as Error).message); }
   }
   return (
@@ -157,7 +171,7 @@ function ExaminerRequests({ filings }: { filings: Filing[] }) {
           </div>
           <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Request text" maxLength={2000} />
           <div className="small">Samples:{" "}
-            {SAMPLES.map((s, i) => <span key={s}>{i > 0 && " · "}<a href="#" onClick={(e) => { e.preventDefault(); setText(s); }}>{s.slice(0, 40)}…</a></span>)}
+            {samples.map((s, i) => <span key={s}>{i > 0 && " · "}<a href="#" onClick={(e) => { e.preventDefault(); setText(s); }}>{s.slice(0, 40)}…</a></span>)}
           </div>
           <p><button className="btn primary" disabled={busy || !text.trim()} onClick={draft}>{busy ? "Drafting…" : "Draft response"}</button></p>
         </div>
@@ -166,10 +180,10 @@ function ExaminerRequests({ filings }: { filings: Filing[] }) {
       <Loading state={list}>
         {(rs) => rs.length === 0 ? <p className="muted">No requests.</p> : (
           <table>
-            <thead><tr><th>ID</th><th>Filing</th><th>Requester</th><th>Request</th><th>Prepared by</th><th>Status</th></tr></thead>
+            <thead><tr><th>ID</th><th>{t("tax.filing")}</th><th>Requester</th><th>Request</th><th>Prepared by</th><th>Status</th></tr></thead>
             <tbody>
               {rs.map((r) => (
-                <ExaminerRow key={r.RequestId} r={r} open={openId === r.RequestId} canApprove={canApprove}
+                <RequestRow key={r.RequestId} r={r} open={openId === r.RequestId} canApprove={canApprove}
                   onToggle={() => setOpenId(openId === r.RequestId ? null : r.RequestId)} onDecide={decide} />
               ))}
             </tbody>
@@ -180,7 +194,7 @@ function ExaminerRequests({ filings }: { filings: Filing[] }) {
   );
 }
 
-function ExaminerRow({ r, open, canApprove, onToggle, onDecide }: { r: ER; open: boolean; canApprove: boolean; onToggle: () => void;
+function RequestRow({ r, open, canApprove, onToggle, onDecide }: { r: DR; open: boolean; canApprove: boolean; onToggle: () => void;
   onDecide: (id: string, action: string) => void }) {
   return (
     <>
@@ -219,6 +233,7 @@ type Pack = { Seq: number; EntryAt: string; Actor: string; FilingId: string; Sha
 
 function AuditFiles({ filings }: { filings: Filing[] }) {
   const { me, version, refresh } = useMe();
+  const { t } = useCopy();
   const packs = useApi<Pack[]>("/tax/audit-files", version);
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -243,6 +258,7 @@ function AuditFiles({ filings }: { filings: Filing[] }) {
         </div>
         {msg && <div className="notice" style={{ marginTop: 8 }}>{msg}</div>}
       </div>
+      <ListingExport />
       <div className="card">
         <h2>Verify an audit file</h2>
         <input type="file" accept=".zip" onChange={async (e) => {
@@ -257,7 +273,7 @@ function AuditFiles({ filings }: { filings: Filing[] }) {
         <h2>Sealed in the ledger</h2>
         <Loading state={packs}>{(ps) => ps.length === 0 ? <p className="muted" style={{ padding: "0 8px" }}>None yet.</p> : (
           <table>
-            <thead><tr><th className="num">Seq</th><th>Filing</th><th>Sealed</th><th>By</th><th>SHA-256</th></tr></thead>
+            <thead><tr><th className="num">Seq</th><th>{t("tax.filing")}</th><th>Sealed</th><th>By</th><th>SHA-256</th></tr></thead>
             <tbody>
               {ps.map((p) => (
                 <tr key={p.Seq}>
@@ -276,12 +292,13 @@ function AuditFiles({ filings }: { filings: Filing[] }) {
 
 // ------------------------------------------------------------------------------------------------ allocation chain
 type Chain = { source_total: number; pool: Row[]; opco: Row[]; policies: Row[]; jurisdiction: Row[]; gl: Row[]; exceptions: Row[];
-  formula: string; periods: string[]; pending_policies: Row[] };
+  formula: string; periods: string[]; pending_policies: Row[]; rules?: Row[]; billing?: Row[] };
 type Policy = { PolicyId: string; Version: number; Name: string; MatchColumn: string; MatchValue: string; DriverName: string | null;
   FixedEntity: string | null; Priority: number; Status: string; SubmittedBy: string; ApprovedBy: string | null; EffectiveFrom: string; EffectiveTo: string | null };
 
 function Chain() {
   const { me, version, refresh } = useMe();
+  const { t } = useCopy();
   const [period, setPeriod] = useState("");
   const state = useApi<Chain>(`/tax/allocation-chain${period ? `?period=${period}` : ""}`, version);
   const pol = useApi<{ policies: Policy[]; drivers: string[] }>("/tax/policies", version);
@@ -307,20 +324,21 @@ function Chain() {
             <table>
               <thead><tr><th>Step</th><th className="num">Amount</th><th>Detail</th></tr></thead>
               <tbody>
-                <tr><td>1. Provider charges</td><td className="num">{money(c.source_total)}</td><td>FOCUS rows and invoices</td></tr>
-                <tr><td>2. Shared-services pool</td><td className="num">{money(sum(c.pool))}</td><td>{c.pool.length} pooling methods</td></tr>
-                <tr><td>3. Split to entities</td><td className="num">{money(sum(c.opco))}</td><td>{c.policies.length} policies</td></tr>
-                <tr><td>4. Jurisdictions</td><td className="num">{money(sum(c.jurisdiction))}</td><td>{c.jurisdiction.length} jurisdictions</td></tr>
-                <tr><td>5. GL account + class</td><td className="num">{money(sum(c.gl))}</td>
-                  <td>{c.exceptions.length ? `${money(sum(c.exceptions))} exceptions` : "no exceptions"}</td></tr>
+                <tr><td>{t("tax.chain.provider")}</td><td className="num">{money(c.source_total)}</td><td>{t("tax.chain.providerDetail")}</td></tr>
+                <tr><td>{t("tax.chain.pool")}</td><td className="num">{money(sum(c.pool))}</td><td>{t("tax.chain.poolDetail", { n: c.pool.length })}</td></tr>
+                <tr><td>{t("tax.chain.split")}</td><td className="num">{money(sum(c.opco))}</td><td>{t("tax.chain.splitDetail", { n: c.policies.length })}</td></tr>
+                <tr><td>{t("tax.chain.jurisdictions")}</td><td className="num">{money(sum(c.jurisdiction))}</td><td>{t("tax.chain.jurisdictionsDetail", { n: c.jurisdiction.length })}</td></tr>
+                <tr><td>{t("tax.chain.account")}</td><td className="num">{money(sum(c.gl))}</td>
+                  <td>{c.exceptions.length ? t("tax.chain.exceptions", { amount: money(sum(c.exceptions)) }) : t("tax.chain.noExceptions")}</td></tr>
               </tbody>
             </table>
             <div className="grid g2">
-              <div className="card flush"><h2>By entity</h2><RecordTable rows={c.opco} /></div>
-              <div className="card flush"><h2>By jurisdiction</h2><RecordTable rows={c.jurisdiction} /></div>
+              <div className="card flush"><h2>{t("tax.chain.byEntity")}</h2><RecordTable rows={c.opco} /></div>
+              <div className="card flush"><h2>{t("tax.chain.byJurisdiction")}</h2><RecordTable rows={c.jurisdiction} /></div>
             </div>
-            <div className="card flush"><h2>By GL account</h2><RecordTable rows={c.gl ?? []} /></div>
-            {c.exceptions.length > 0 && <div className="card flush"><h2>Exceptions</h2><RecordTable rows={c.exceptions} /></div>}
+            <div className="card flush"><h2>{t("tax.chain.byAccount")}</h2><RecordTable rows={c.gl ?? []} /></div>
+            <ChainExtras rules={c.rules} billing={c.billing} />
+            {c.exceptions.length > 0 && <div className="card flush"><h2>{t("tax.chain.exceptionsTitle")}</h2><RecordTable rows={c.exceptions} /></div>}
             <Formula>{c.formula}</Formula>
           </>
         )}
@@ -329,7 +347,7 @@ function Chain() {
       <Loading state={pol}>
         {(p) => (
           <div className="card flush">
-            <h2>Allocation policies</h2>
+            <h2>{t("tax.chain.policies")}</h2>
             <div className="table-wrap">
               <table>
                 <thead><tr><th>Policy</th><th>v</th><th>Matches</th><th>Basis</th><th>Priority</th><th>Effective</th><th>Status</th><th>Actions</th></tr></thead>
@@ -339,7 +357,7 @@ function Chain() {
                       <td><b>{x.PolicyId}</b><div className="small">{x.Name}</div></td>
                       <td>{x.Version}</td>
                       <td className="small">{x.MatchColumn} = {x.MatchValue}</td>
-                      <td>{x.DriverName ?? `100% to ${x.FixedEntity}`}</td>
+                      <td>{x.DriverName ?? t("tax.chain.fixed", { entity: String(x.FixedEntity) })}</td>
                       <td>{x.Priority}</td>
                       <td className="small id">{String(x.EffectiveFrom).slice(0, 10)}{x.EffectiveTo ? ` to ${String(x.EffectiveTo).slice(0, 10)}` : ""}</td>
                       <td><StatusBadge s={x.Status} /><div className="small muted">{x.Status === "submitted" ? `by ${x.SubmittedBy}` : x.ApprovedBy ? `by ${x.ApprovedBy}` : ""}</div></td>
@@ -371,6 +389,7 @@ type Bridge = { filing: Filing; lines: Row[]; totals: Record<string, number>; ve
 
 function Bridge({ filings }: { filings: Filing[] }) {
   const { me } = useMe();
+  const { t } = useCopy();
   const [filing, setFiling] = useState(filings[0]?.FilingId ?? "");
   const state = useApi<Bridge>(filing ? `/tax/filing/${filing}/bridge` : null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -378,7 +397,7 @@ function Bridge({ filings }: { filings: Filing[] }) {
     <div className="stack">
       <div className="row">
         <select value={filing} onChange={(e) => setFiling(e.target.value)}>{filings.map((c) => <option key={c.FilingId} value={c.FilingId}>{c.FilingId} · {c.LegalEntity}</option>)}</select>
-        {me.actions.includes("exhibit.export") && <button className="btn primary" onClick={() => download(`/tax/filing/${filing}/bridge.csv`, `${filing}-technology-bridge.csv`)
+        {me.actions.includes("exhibit.export") && <button className="btn primary" onClick={() => download(`/tax/filing/${filing}/bridge.csv`, t("tax.bridgeFile", { filing }))
           .then(() => setMsg("Exported and recorded in the ledger.")).catch((e: Error) => setMsg(e.message))}>Export CSV</button>}
         {msg && <span className="small">{msg}</span>}
       </div>
@@ -390,8 +409,8 @@ function Bridge({ filings }: { filings: Filing[] }) {
           const extra = Object.entries(b.totals).filter(([k]) => !cols.includes(k));
           return (
             <>
-              <p className="small">{b.filing?.LegalEntity} ({b.filing?.Jurisdiction}) · review period {String(b.filing?.ReviewPeriodStart ?? "").slice(0, 10)} to{" "}
-                {String(b.filing?.ReviewPeriodEnd ?? "").slice(0, 10)} · forecast year {String(b.filing?.ForecastYearStart ?? "").slice(0, 10)} to{" "}
+              <p className="small">{b.filing?.LegalEntity} ({b.filing?.Jurisdiction}) · {t("tax.review")} {String(b.filing?.ReviewPeriodStart ?? "").slice(0, 10)} to{" "}
+                {String(b.filing?.ReviewPeriodEnd ?? "").slice(0, 10)} · {t("tax.forecast")} {String(b.filing?.ForecastYearStart ?? "").slice(0, 10)} to{" "}
                 {String(b.filing?.ForecastYearEnd ?? "").slice(0, 10)}</p>
               <div className="card flush"><RecordTable rows={b.lines} total={total} /></div>
               {extra.length > 0 && (

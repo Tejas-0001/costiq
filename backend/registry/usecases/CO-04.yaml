@@ -1,5 +1,5 @@
 id: CO-04
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'Previous-generation and ARM migration candidates'
 category: 'Optimization · Cloud'
 module: optimization

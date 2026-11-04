@@ -1,8 +1,10 @@
-"""Tax-risk API: deduction at risk, credit unlock, the filing audit file and the Examiner Request Responder."""
+"""Risk API: amount at risk by filing, the unlock figure, the filing audit file and the data request responder
+(pharma: deduction at risk, R&D credit unlock, Examiner Request Responder). Wording comes from the tenant's copy."""
 from __future__ import annotations
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
+from . import tenant
 from .auth import Principal, current_principal
 from .context import asker, audit, db, eng, ledger, reg, run_use_case
 from .data_requests import DataRequests
@@ -79,23 +81,27 @@ async def verify_audit_file(file: UploadFile = File(...), p: Principal = Depends
 
 class NewRequest(BaseModel):
     filing: str
-    requester: str = "Tax examiner"
+    requester: str | None = None   # default: the tenant's requester label (copy.json backend.requests.requester)
     text: str
 
 
+# The same routes answer at /api/tax/data-requests (the page uses that path for every tenant); /api/tax/examiner-requests
+# stays for existing clients.
 @router.get("/tax/examiner-requests")
+@router.get("/tax/data-requests")
 def list_requests(filing: str | None = None, p: Principal = Depends(current_principal)):
     p.require("tax")
     return requests.list(filing)
 
 
 @router.post("/tax/examiner-requests")
+@router.post("/tax/data-requests")
 def new_request(body: NewRequest, p: Principal = Depends(current_principal)):
     p.require("tax")
     p.require_action("datarequest.prepare")
     if not body.text.strip() or len(body.text) > 2000:
         raise HTTPException(400, "Request text must be 1-2000 characters")
-    r = requests.draft(p, run_use_case, body.filing, body.requester, body.text)
+    r = requests.draft(p, run_use_case, body.filing, body.requester or tenant.text("requests.requester"), body.text)
     audit(p, "data_request_draft", request=r["RequestId"], matched=r["MatchedUseCases"])
     return r
 
@@ -106,6 +112,7 @@ class RequestDecision(BaseModel):
 
 
 @router.post("/tax/examiner-requests/{rid}/decision")
+@router.post("/tax/data-requests/{rid}/decision")
 def decide_request(rid: str, body: RequestDecision, p: Principal = Depends(current_principal)):
     p.require("tax")
     r, entry = requests.decide(rid, body.action, p, body.note)

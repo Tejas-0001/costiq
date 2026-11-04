@@ -1,5 +1,5 @@
 id: CO-06
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'Data transfer and egress hotspots'
 category: 'Optimization · Cloud'
 module: optimization

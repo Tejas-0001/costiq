@@ -1,0 +1,73 @@
+id: UT-24
+source: MM CostIQ Utility extension
+title: 'Ledger accounts against the FERC account reference'
+category: 'Utility · FERC accounting'
+module: tax
+business_question: 'Is every account the ledger used a valid FERC account for the period, under the right Part?'
+personas:
+- finance_controller
+- regulatory_analyst
+- auditor
+catalog_persona: 'Controller, Regulatory Accounting'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Each account in the allocated ledger checked against ref_ferc_account: present, effective for the period (Order No. 898 accounts from 2025-01-01; 303/404 software placement before), and not a labor-only account.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'ferc account'
+- 'order 898'
+- 'effective date'
+- '303'
+- '404'
+- 'account validity'
+- 'chart of accounts'
+products: Any provider
+sql: |-
+  WITH a AS (
+    SELECT GlAccount, MAX(GlTitle) AS LedgerTitle, MIN(PeriodStart) AS FirstPeriod, MAX(PeriodStart) AS LastPeriod,
+           COUNT(*) AS Lines, SUM(AllocatedCost) AS Amount, COUNT(DISTINCT RuleId) AS RulesUsed,
+           MAX(CASE WHEN FunctionCode = 'NONUTIL' THEN 1 ELSE 0 END) AS NonUtility
+    FROM allocated_cost
+    WHERE PeriodStart >= :period_start AND PeriodStart < :period_end
+    GROUP BY GlAccount
+  ),
+  f AS (
+    SELECT FercAccount, MIN(Title) AS Title, MIN(Part) AS Part, MIN(AccountType) AS AccountType,
+           MIN(EffectiveFrom) AS EffectiveFrom, MAX(EffectiveTo) AS EffectiveTo,
+           SUM(CASE WHEN EffectiveTo IS NULL THEN 1 ELSE 0 END) AS OpenRows,
+           MAX(CASE WHEN LaborOnly THEN 1 ELSE 0 END) AS LaborOnly
+    FROM ref_ferc_account
+    GROUP BY FercAccount
+  )
+  SELECT
+    COALESCE(a.GlAccount, '(unmapped)') AS Account,
+    COALESCE(f.Title, a.LedgerTitle) AS Title,
+    f.Part, f.AccountType, f.EffectiveFrom,
+    a.Lines, a.RulesUsed, ROUND(a.Amount, 2) AS Amount,
+    CASE WHEN a.GlAccount IS NULL THEN 'Unmapped'
+         WHEN a.GlAccount = 'NONUTIL' OR (f.FercAccount IS NULL AND a.NonUtility = 1) THEN 'Non-utility affiliate (outside Part 101)'
+         WHEN f.FercAccount IS NULL THEN 'Not in the FERC account reference'
+         WHEN f.LaborOnly = 1 THEN 'Labor-only account'
+         WHEN f.EffectiveFrom IS NOT NULL AND f.EffectiveFrom > CAST(a.FirstPeriod AS DATE) THEN 'Not yet effective'
+         WHEN f.OpenRows = 0 AND f.EffectiveTo < CAST(a.LastPeriod AS DATE) THEN 'No longer effective'
+         ELSE 'Valid' END AS Status
+  FROM a
+  LEFT JOIN f ON f.FercAccount = a.GlAccount
+  ORDER BY Amount DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-07-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-11-01'
+  label: 'End of the period (exclusive)'
+notes: 'The affiliate''s share is billed at cost and recorded in its own books, outside the Uniform System of Accounts.'
+compliance:
+  area: 'FERC accounting'
+  reference: 'ref_ferc_account · Order No. 898 effective 2025-01-01'
+  unit: 'accounts'
+  flag: 'Status NOT IN (''Valid'', ''Non-utility affiliate (outside Part 101)'')'
+  amount: Amount

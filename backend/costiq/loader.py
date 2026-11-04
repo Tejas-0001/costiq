@@ -10,19 +10,33 @@ import sqlglot
 from .db import Database
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))  # mvp/backend
-SCHEMA_FILES = [os.path.join(ROOT, "schema", "focus_1_4_ai_schema.sql"),
-                os.path.join(ROOT, "schema", "costiq_app_schema.sql"),
-                os.path.join(ROOT, "schema", "costiq_pharma_schema.sql"),
-                os.path.join(ROOT, "schema", "costiq_optimization_schema.sql")]
-TABLES = ["CostAndUsage", "BillingPeriod", "ContractCommitment", "InvoiceDetail", "ai_seat_assignment",
-          "ai_user_activity", "ai_model_catalog", "ai_user_directory", "ai_budget", "cost_budget",
-          # pharma registers (allocated_cost is computed by `costiq allocate`, never loaded)
-          "ref_legal_entity", "ref_cost_center", "ref_allocation_driver", "ref_allocation_policy", "ref_jurisdiction_factor",
-          "ref_gl_account_map", "ref_jurisdiction_policy", "ref_tax_filing", "ref_gxp_system", "ref_vendor", "ref_study_event",
-          "ref_volume", "ref_ai_use", "ref_program", "ref_program_application",
-          # monitoring and optimization (cost_alert_event is computed by `costiq alerts`)
-          "optimization_recommendation", "resource_utilization_daily", "ai_app_telemetry_daily", "ai_provisioned_capacity",
-          "optimization_action", "cost_alert_rule"]
+
+
+def _schema_files() -> list[str]:
+    """Shared core, then the tenant pack's registers, then optimization."""
+    from .tenant import pack, path
+    return ([os.path.join(ROOT, "schema", f) for f in ("focus_1_4_ai_schema.sql", "costiq_app_schema.sql",
+                                                         "costiq_regulatory_schema.sql")]
+            + [path(f) for f in pack().get("schema", [])]
+            + [os.path.join(ROOT, "schema", "costiq_optimization_schema.sql")])
+
+
+def _tables() -> list[str]:
+    from .tenant import pack
+    return (["CostAndUsage", "BillingPeriod", "ContractCommitment", "InvoiceDetail", "ai_seat_assignment",
+             "ai_user_activity", "ai_model_catalog", "ai_user_directory", "ai_budget", "cost_budget",
+             # regulatory core registers (allocated_cost is computed by `costiq allocate`, never loaded)
+             "ref_legal_entity", "ref_cost_center", "ref_allocation_driver", "ref_allocation_policy", "ref_jurisdiction_factor",
+             "ref_gl_account_map", "ref_jurisdiction_policy", "ref_tax_filing"]
+            # the tenant's own registers
+            + list(pack().get("register_tables", []))
+            # monitoring and optimization (cost_alert_event is computed by `costiq alerts`)
+            + ["optimization_recommendation", "resource_utilization_daily", "ai_app_telemetry_daily", "ai_provisioned_capacity",
+               "optimization_action", "cost_alert_rule"])
+
+
+SCHEMA_FILES = _schema_files()
+TABLES = _tables()
 
 
 def ddl_statements(target: str) -> list[str]:
@@ -66,22 +80,25 @@ def load_from_duckdb(db: Database, path: str):
         print(f"{t}: {len(rows)} rows")
 
 
-DEFAULT_RULES = [
-    # (rule id, name, priority, column, value, cost center)
-    ("R-TAX", "Tax lines to shared corporate", 10, "ChargeCategory", "Tax", "Shared Services"),
-    ("R-DEFAULT-WS", "Claude Default Workspace to IT until owners are assigned", 20, "x_WorkspaceName", "Default Workspace", "Corporate IT"),
-    ("R-AWS-DEV", "pharma-dev account to Engineering", 30, "SubAccountId", "333333333333", "Clinical Operations"),
-    ("R-SNOW", "Snowflake account to Data Science", 30, "SubAccountId", "PHARMA_PROD", "Data & Analytics"),
-]
+def _default_rules() -> list[tuple]:
+    """(rule id, name, priority, column, value, cost center) from the tenant pack."""
+    from .tenant import pack
+    return [tuple(r) for r in pack().get("default_rules", [])]
+
+
+DEFAULT_RULES = _default_rules()
 
 
 def seed(db: Database, actor="system"):
+    from .auth import access
     now = dt.datetime(2026, 10, 23, 6, 0)
+    # default rules were approved by the tenant's controller (the role's own title, e.g. "Internal Controller")
+    approver = access().get("personas", {}).get("finance_controller", {}).get("label", "Controller")
     db.query("DELETE FROM allocation_rule", limit=None)
     for rid, name, prio, col, val, cc in DEFAULT_RULES:
         db.query("INSERT INTO allocation_rule VALUES (:r, 1, :n, :p, :c, :v, :cc, :f, NULL, :a, :at)",
                  dict(r=rid, n=name, p=prio, c=col, v=val, cc=cc, f=dt.datetime(2026, 1, 1),
-                      a="Internal Controller (demo)", at=dt.datetime(2025, 12, 15)), limit=None)
+                      a=approver, at=dt.datetime(2025, 12, 15)), limit=None)
     # Ingestion manifests: one per source system and billing period, with a digest of the rows.
     db.query("DELETE FROM ingest_manifest", limit=None)
     res = db.query("""

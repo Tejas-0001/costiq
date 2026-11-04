@@ -1,0 +1,78 @@
+id: UT-02
+source: MM CostIQ Utility extension
+title: 'Service company billing by receiving company: 457.1 direct and 457.2 by factor'
+category: 'Utility · Service company billing'
+module: tax
+business_question: 'What did the service company bill each receiving company, direct or by allocation factor, and to which account?'
+personas:
+- affiliate_accounting
+- finance_controller
+- regulatory_analyst
+- auditor
+catalog_persona: 'Service Company Accounting, Controller'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'The monthly bill in the shape of Form 60 Schedule XXI: amounts charged directly to one company or by work-order benefiting location (457.1) and amounts spread by an approved factor (457.2), with the receiving company''s own Part 101 account on every line (18 CFR 367.27). Amounts with no approved policy stay at the service company in the exception queue.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'service company'
+- '457.1'
+- '457.2'
+- 'form 60'
+- 'schedule xxi'
+- 'allocation factor'
+- 'affiliate billing'
+- 'unbundle'
+products: Any provider
+sql: |-
+  WITH a AS (
+    SELECT x.*,
+           CASE WHEN x.OpcoPolicy IS NOT NULL THEN 'Approved policy'
+                WHEN x.CostClass = 'prepayment' THEN 'Retained: prepayment (R9)'
+                ELSE 'No approved policy' END AS PolicyStatus
+    FROM allocated_cost x
+    WHERE x.PeriodStart >= :period_start AND x.PeriodStart < :period_end
+  ),
+  t AS (
+    SELECT LegalEntity,
+           SUM(CASE WHEN BillingClass = '457.1' THEN AllocatedCost ELSE 0 END) AS Direct,
+           SUM(CASE WHEN BillingClass IS NOT NULL THEN AllocatedCost ELSE 0 END) AS Billed
+    FROM a GROUP BY LegalEntity
+  )
+  SELECT
+    a.LegalEntity AS RecipientEntity,
+    MAX(e.EntityCode) AS EntityCode,
+    CASE WHEN a.BillingClass = '457.1' THEN '457.1 Direct'
+         WHEN a.BillingClass = '457.2' THEN '457.2 Indirect'
+         ELSE 'Held at the service company' END AS BillingClass,
+    COALESCE(f.FactorCode, CASE WHEN a.BillingClass = '457.1' AND a.DriverName IS NULL THEN 'F-DIR' END) AS Factor,
+    COALESCE(a.DriverName, CASE WHEN a.BillingClass IS NULL THEN '(none)' ELSE '100% to one company' END) AS BasisOfAllocation,
+    COALESCE(a.OpcoPolicy, '(none)') AS Policy,
+    COALESCE(a.GlAccount, '(unmapped)') AS ReceivingAccount,
+    COUNT(DISTINCT a.ChargeKey) AS ChargeLines,
+    ROUND(SUM(a.AllocatedCost), 2) AS AmountRecharged,
+    ROUND(100 * MAX(t.Direct) / NULLIF(MAX(t.Billed), 0), 1) AS EntityDirectSharePct,
+    a.PolicyStatus AS Status
+  FROM a
+  LEFT JOIN t ON t.LegalEntity = a.LegalEntity
+  LEFT JOIN ref_legal_entity e ON e.LegalEntity = a.LegalEntity
+  LEFT JOIN ref_allocation_factor f ON f.DriverName = a.DriverName
+  GROUP BY a.LegalEntity, a.BillingClass, a.OpcoPolicy, a.DriverName, f.FactorCode, a.GlAccount, a.PolicyStatus
+  ORDER BY RecipientEntity, AmountRecharged DESC
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'BillingClass is stamped on every ledger line: an opco tag naming one company (approved policy AP-DIRECT, F-DIR), a fixed-entity policy or a work order''s benefiting companies bill 457.1; an approved factor bills 457.2. EntityDirectSharePct is the company''s 457.1 share of what it was billed. 457.3 (compensation for use of capital) is billed from the service company''s capital base and is not part of cloud cost.'
+compliance:
+  area: 'Service company billing'
+  reference: '18 CFR 367.25-367.28 · Form No. 60 Schedule XXI'
+  unit: 'billing lines'
+  flag: 'Status = ''No approved policy'''
+  amount: AmountRecharged

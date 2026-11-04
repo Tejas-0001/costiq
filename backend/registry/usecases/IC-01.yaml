@@ -33,7 +33,7 @@ sql: |-
     i.InvoiceIssueStatus,
     ROUND(i.BilledCost, 2)              AS InvoicedAmount,
     ROUND(cu.ChargeDetailTotal, 2)      AS ChargeDetailTotal,
-    ROUND(i.BilledCost - cu.ChargeDetailTotal, 2) AS Variance
+    ROUND(i.BilledCost - COALESCE(cu.ChargeDetailTotal, 0), 2) AS Variance
   FROM InvoiceDetail i
   LEFT JOIN cu USING (InvoiceId, InvoiceDetailId)
   WHERE ABS(i.BilledCost - COALESCE(cu.ChargeDetailTotal, 0)) > 1

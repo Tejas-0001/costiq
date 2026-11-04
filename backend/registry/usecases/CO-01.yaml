@@ -1,5 +1,5 @@
 id: CO-01
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'Rightsizing opportunities by cost center'
 category: 'Optimization · Cloud'
 module: optimization

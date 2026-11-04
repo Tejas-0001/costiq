@@ -2,13 +2,14 @@
 // The browser never talks to FastAPI directly and never sets the persona header itself.
 // COSTIQ_API_URL is the backend's base URL: on Vercel the service binding in vercel.json injects it (the backend has no
 // public route); Docker Compose and start.ps1 set it; it defaults to the local API on :8080.
+// With several tenants (COSTIQ_API_URL_<TENANT>), the costiq_tenant cookie picks the API; see lib/tenants.ts.
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { apiBase, resolveTenant, TENANT_COOKIE } from "@/lib/tenants";
 
 const PASS_HEADERS = ["content-type", "content-disposition", "x-costiq-sha256", "x-costiq-ledger-seq"];
 
-function backendUrl(path: string[], search: string) {
-  const base = process.env.COSTIQ_API_URL ?? "http://127.0.0.1:8080";
+function backendUrl(base: string, path: string[], search: string) {
   const url = new URL(`api/${path.map(encodeURIComponent).join("/")}`, base.endsWith("/") ? base : `${base}/`);
   url.search = search;
   return url;
@@ -16,8 +17,9 @@ function backendUrl(path: string[], search: string) {
 
 async function forward(request: NextRequest, ctx: RouteContext<"/api/[...path]">) {
   const { path } = await ctx.params;
-  const persona = (await cookies()).get("costiq_persona")?.value;
-  const url = backendUrl(path, request.nextUrl.search);
+  const jar = await cookies();
+  const persona = jar.get("costiq_persona")?.value;
+  const url = backendUrl(apiBase(resolveTenant(jar.get(TENANT_COOKIE)?.value)), path, request.nextUrl.search);
   const headers = new Headers();
   const type = request.headers.get("content-type");
   if (type) headers.set("content-type", type);

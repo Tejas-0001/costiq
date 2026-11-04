@@ -1,5 +1,6 @@
 """Cloud and AI/LLM monitoring and optimization: seeded findings, lifecycle, verified savings, alerts, permissions."""
 import datetime as dt
+import pytest
 from fastapi.testclient import TestClient
 from costiq.main import app
 from costiq.context import db, eng
@@ -7,6 +8,7 @@ from costiq.optimization import Optimizer
 from costiq.alerts import Alerts
 
 client = TestClient(app)
+pytestmark = pytest.mark.tenant("pharma")  # asserts on the pharma sample's resource, application and cost-center names
 
 
 def h(persona):

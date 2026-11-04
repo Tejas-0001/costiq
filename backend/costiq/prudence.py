@@ -1,7 +1,8 @@
-"""Tax-risk engine: examiner-ready evidence for every recharged technology dollar.
+"""Risk engine: reviewer-ready evidence for every allocated technology dollar (pharma: a tax examiner testing
+intercompany charges; a utility: a commission testing prudence in a rate case). Labels come from the tenant's copy.
 
-A tax examiner can disallow an intercompany charge the entity cannot show a benefit from or cannot evidence. For each
-filing, every allocated operating-cost line of the review period is tested:
+A reviewer can disallow a charge the entity cannot show a benefit from or cannot evidence. For each filing, every
+allocated operating-cost line (the pack's allocation.expense_classes) of the review period is tested:
 
   Reconciled        the charge ties to its invoice line (within $1)
   PolicyApproved    it was allocated under an approved, effective-dated policy (allocation key)
@@ -10,27 +11,24 @@ filing, every allocated operating-cost line of the review period is tested:
   Remediated        an implemented or verified optimization covers it (documented corrective action)
   SavingsActioned   no known savings opportunity on it has sat untouched for more than 60 days
 
-Deduction at risk is the spend an examiner could challenge: the whole line when a hard test fails, the unused share of
+Amount at risk is the spend a reviewer could challenge: the whole line when a hard test fails, the unused share of
 a seat purchase, or the share of a line equal to an unactioned savings estimate. Decision support, not a prediction of
-any tax authority's ruling.
+any authority's ruling.
 
-Credit unlock is the R&D credit on recurring cloud and SaaS fees in jurisdictions where they qualify but are not yet
-claimed: annualized review-period fees x the jurisdiction's credit rate.
+The unlock (credit_unlock) is the tenant's hook (tenants/<t>/hooks.py unlock): for pharma, the R&D credit on recurring
+cloud and SaaS fees in jurisdictions where they qualify but are not yet claimed.
 """
 from __future__ import annotations
 import datetime as dt
-from collections import defaultdict
-from fastapi import HTTPException
+from . import tenant
 from .engines import CHARGE_KEY
-from .regulatory import credit_rate
 
-REASONS = {
-    "no_benefit": "No benefit shown (idle, unused seats or commitments)",
-    "unreconciled": "Not reconciled to an invoice",
-    "no_approved_policy": "Allocated without an approved policy",
-    "unmapped_gl": "No GL account",
-    "unactioned_savings": "Known savings left unactioned for 60+ days",
-}
+
+def reason_label(code: str) -> str:
+    """A risk reason's label, from the tenant's copy (backend.risk.reasons)."""
+    return tenant.lookup("risk.reasons").get(code, code)
+
+
 WEIGHTS = {"Reconciled": 0.25, "PolicyApproved": 0.15, "GlMapped": 0.15, "BenefitShown": 0.30, "SavingsActioned": 0.15}
 SEAT_PRODUCTS = ("m365_copilot", "github_copilot", "claude_enterprise")
 OPEN_FILINGS = ("In preparation", "Planned", "Filed")
@@ -43,6 +41,12 @@ COLUMNS = ["FilingId", "ChargeKey", "PeriodStart", "ChargeDay", "LegalEntity", "
 
 def rows(res):
     return [dict(zip(res["columns"], r)) for r in res["rows"]]
+
+
+def expense_classes_sql() -> str:
+    """The cost classes the evidence tests read, as a SQL list (pack.yaml allocation.expense_classes)."""
+    from .allocation import classes
+    return ", ".join("'" + str(c).replace("'", "''") + "'" for c in classes()["expense_classes"])
 
 
 class PrudenceEngine:
@@ -70,7 +74,7 @@ INSERT INTO filing_evidence ({', '.join(COLUMNS)})
 WITH rc AS (SELECT * FROM ref_tax_filing WHERE FilingId = :filing),
 a AS (
   SELECT u.* FROM allocated_cost u JOIN rc ON u.LegalEntity = rc.LegalEntity AND u.Jurisdiction = rc.Jurisdiction
-  WHERE u.PeriodStart >= rc.ReviewPeriodStart AND u.PeriodStart < rc.ReviewPeriodEnd AND u.CostClass IN ('opex', 'qre')
+  WHERE u.PeriodStart >= rc.ReviewPeriodStart AND u.PeriodStart < rc.ReviewPeriodEnd AND u.CostClass IN ({expense_classes_sql()})
 ),
 c AS (
   SELECT {CHARGE_KEY} AS ChargeKey, ResourceName, InvoiceDetailId, x_RequestCount, ConsumedUnit, x_AIProduct,
@@ -164,7 +168,7 @@ FROM y
         by_reason = q(f"""SELECT RiskReason, COUNT(*) AS Lines, ROUND(SUM(RiskAmount), 2) AS Risk
                           FROM filing_evidence {w} AND RiskAmount > 0 GROUP BY 1 ORDER BY 3 DESC""")
         for r in by_reason:
-            r["Label"] = REASONS.get(r["RiskReason"], r["RiskReason"])
+            r["Label"] = reason_label(r["RiskReason"])
         by_filing = q(f"""SELECT e.FilingId, MAX(r.LegalEntity) AS LegalEntity, MAX(r.Jurisdiction) AS Jurisdiction, MAX(r.Status) AS Status,
                                  ROUND(SUM(e.RiskAmount), 2) AS Risk, ROUND(SUM(e.AllocatedCost), 2) AS Spend,
                                  ROUND(SUM(e.AllocatedCost * e.EvidenceScore) / NULLIF(SUM(e.AllocatedCost), 0) * 100, 1) AS Score
@@ -180,17 +184,13 @@ FROM y
                     FROM filing_evidence {w} AND RiskAmount > 0
                     GROUP BY 1, 2, 3, 4, 5, 6, 7 ORDER BY 11 DESC LIMIT 15""")
         for r in top:
-            r["Label"] = REASONS.get(r["RiskReason"], r["RiskReason"])
+            r["Label"] = reason_label(r["RiskReason"])
             r["Fix"] = self.fix_for(r)
         return {"filing": filing, "deduction_at_risk": tot["Risk"] or 0, "review_period_spend": tot["Spend"] or 0,
                 "evidence_score": tot["Score"], "lines": tot["Lines"], "lines_at_risk": tot["LinesAtRisk"],
                 "by_reason": by_reason, "by_filing": by_filing, "heatmap": heat, "top": top,
                 "filings": self.filings(),
-                "formula": "Deduction at risk = review-period spend an examiner could challenge: whole lines failing the "
-                           "reconciliation, approved-policy, GL-account or benefit tests (unless remediated), the unused share "
-                           "of seat purchases, and the share of a line equal to a savings estimate left unactioned for 60+ "
-                           "days. Evidence score = cost-weighted share of evidence present.",
-                "disclaimer": "Decision support for the tax team; not a prediction of any tax authority's ruling."}
+                "formula": tenant.text("risk.formula"), "disclaimer": tenant.text("risk.disclaimer")}
 
     def fix_for(self, r):
         """The screen or action that removes a risk line."""
@@ -208,7 +208,7 @@ FROM y
             return {"kind": "reconciliation", "target": r.get("Vendor"), "label": "Resolve invoice exception"}
         if reason == "no_approved_policy":
             return {"kind": "policy", "target": None, "label": "Approve allocation policy"}
-        return {"kind": "gl_map", "target": r.get("Item"), "label": "Map to a GL account"}
+        return {"kind": "gl_map", "target": r.get("Item"), "label": tenant.text("risk.fix_gl")}
 
     def lines(self, scope, filing=None, reason=None, entity=None, vendor=None, limit=500):
         extra, p = "", {}
@@ -225,55 +225,12 @@ FROM y
                                              Reconciled, PolicyApproved, GlMapped, BenefitShown, Remediated, SavingsActioned
                                       FROM filing_evidence {w} ORDER BY RiskAmount DESC""", {**wp, **p}, scope, limit=limit))
 
-    # ------------------------------------------------------------------ credit unlock
+    # ------------------------------------------------------------------ unlock (tenant hook)
     def credit_unlock(self, scope, filing=None):
-        """R&D credit on recurring cloud and SaaS fees by jurisdiction: what is claimed today, and what would be claimed
-        where the fees qualify but are not yet claimed."""
-        pol = {r["Jurisdiction"]: r for r in rows(self.db.query("SELECT * FROM ref_jurisdiction_policy", {}, None, limit=None))}
-        filings = self.filings()
-        b0 = min((f["ReviewPeriodStart"] for f in filings), default=None)
-        b1 = max((f["ReviewPeriodEnd"] for f in filings), default=None)
-        if b0 is None:
-            return {"jurisdictions": [], "credit_unlock": 0, "credit_claimed": 0}
-        ts = lambda v: v if isinstance(v, dt.datetime) else dt.datetime.fromisoformat(str(v))
-        base = rows(self.db.query("""
-            SELECT Jurisdiction, LegalEntity, ServiceProviderName AS Vendor, COUNT(DISTINCT PeriodStart) AS Months,
-                   SUM(AllocatedCost) AS Fees
-            FROM allocated_cost
-            WHERE ChargeCategory = 'Purchase' AND ChargeFrequency = 'Recurring' AND CostClass IN ('opex', 'qre')
-              AND PeriodStart >= :b0 AND PeriodStart < :b1
-            GROUP BY 1, 2, 3""", {"b0": ts(b0), "b1": ts(b1)}, scope, limit=None))
-        out = defaultdict(lambda: {"AnnualFees": 0.0, "Contracts": [], "Entity": None})
-        for b in base:
-            j = b["Jurisdiction"]
-            if pol.get(j, {}).get("CreditStatus", "not_applicable") == "not_applicable":
-                continue
-            annual = float(b["Fees"] or 0) * 12 / max(1, int(b["Months"]))
-            o = out[j]
-            o["Entity"] = b["LegalEntity"]
-            o["AnnualFees"] += annual
-            o["Contracts"].append({"Vendor": b["Vendor"], "LegalEntity": b["LegalEntity"], "AnnualFees": round(annual, 2)})
-        result = []
-        for j, o in sorted(out.items()):
-            rate, basis, f = credit_rate(j, o["Entity"], filings)  # e.g. Puerto Rico uses its entity's US filing rate
-            status = pol[j]["CreditStatus"]
-            result.append({"Jurisdiction": j, "CreditStatus": status, "Reference": pol[j]["Reference"],
-                           "FilingId": f["FilingId"] if f else None, "CreditRate": round(rate, 2), "RateBasis": basis,
-                           "AnnualQualifyingFees": round(o["AnnualFees"], 2),
-                           "Credit": round(o["AnnualFees"] * rate / 100, 2),
-                           "Claimed": status == "claimed",
-                           "Contracts": sorted(o["Contracts"], key=lambda c: -c["AnnualFees"])})
-        if filing:
-            d = next((f for f in filings if f["FilingId"] == filing), None)
-            if not d:
-                raise HTTPException(404, f"Unknown filing {filing}")
-            result = [r for r in result if r["Jurisdiction"] == d["Jurisdiction"]]
-        unlock = sum(r["Credit"] for r in result if r["CreditStatus"] == "eligible")
-        claimed = sum(r["Credit"] for r in result if r["Claimed"])
-        return {"jurisdictions": result, "credit_unlock": round(unlock, 2), "credit_claimed": round(claimed, 2),
-                "formula": "Credit = annualized review-period recurring cloud and SaaS fees x the jurisdiction's credit rate. "
-                           "Unlock = jurisdictions where the fees qualify but are not yet claimed.",
-                "disclaimer": "Illustrative: depends on each jurisdiction's qualifying rules and on substantiation."}
+        """The tenant's unlock figure by jurisdiction (tenants/<t>/hooks.py unlock): {"jurisdictions": [...],
+        "credit_unlock", "credit_claimed", "formula", "disclaimer"}. Pharma: the R&D credit on recurring cloud and SaaS
+        fees, claimed today and eligible but not yet claimed."""
+        return tenant.hooks().unlock(self, scope, filing)
 
     # ------------------------------------------------------------------ headline
     def headline(self, scope, optimizer):

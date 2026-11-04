@@ -2,13 +2,15 @@
 
   python data/optimization.py sample/costiq_sample.duckdb
 
-Run after data/pharma.py. Idempotent. Everything is synthetic and illustrative.
+Run after the tenant's add-on (tenants/<tenant>/pack.yaml `addons`). Idempotent. Everything is generated and
+illustrative. Accounts, applications, resources and cost centers are named by the tenant (tenants/<tenant>/names.py,
+OPT_*); the scenarios are shared.
 
 Adds
   * FOCUS charges (with matching invoice lines) for AI applications the telemetry describes:
-      - csr-drafting-agent on an Azure OpenAI PTU deployment that runs at ~25-40% utilization
-      - doc-search-rag: Bedrock inference + embeddings + an OpenSearch Serverless vector store
-      - ae-intake-bot on a frontier model for short summaries (a model-routing candidate)
+      - the PTU application (OPT_PTU) on an Azure OpenAI PTU deployment that runs at ~25-40% utilization
+      - the RAG application (OPT_RAG): Bedrock inference + embeddings + an OpenSearch Serverless vector store
+      - a frontier model used for short summaries (OPT_BEDROCK_APPS, a model-routing candidate)
     plus shared-EKS idle capacity and three unattached EBS volumes.
   * resource_utilization_daily, ai_app_telemetry_daily, ai_provisioned_capacity, optimization_recommendation
     (AWS Cost Optimization Hub, Azure Advisor), optimization_action (a backlog at every lifecycle stage) and
@@ -19,15 +21,21 @@ import datetime as dt, hashlib, json, os, re, sys
 import duckdb
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from sample_common import names, refresh_budgets  # noqa: E402
+
+N = names()
 START, AS_OF = dt.date(2026, 7, 1), dt.date(2026, 10, 22)
-AI_ACCOUNT = ("aws-ai-8009", "AI Platform AWS")
-AI_SUB = ("888800008009", "pharma-ai-platform")
-RD_ACCOUNT, RD_SUB = ("aws-rd-8008", "R&D AWS"), ("888800008008", "pharma-rd-platform")
+AI_ACCOUNT = N.OPT_AI_ACCOUNT
+AI_SUB = N.OPT_AI_SUB
+RD_ACCOUNT, RD_SUB = N.OPT_RD_ACCOUNT, N.OPT_RD_SUB
+RD_SOURCE = getattr(N, "OPT_RD_SOURCE", "aws_rd_focus_export")   # source system of the workload account rows
+PTU_SUB = N.OPT_PTU_SUB
 MS_ACCOUNT = ("ms-mca-1001", "MCA")
 SOURCE_AI, SOURCE_PTU = "aws_ai_focus_export", "azure_ptu_focus_export"
 PRICES = {"claude-opus-5-5": (5.0, 25.0), "claude-sonnet-5-5": (3.0, 15.0), "claude-haiku-5-5": (1.0, 5.0),
           "gpt-5.4": (2.5, 15.0)}  # illustrative list $ per 1M input / output tokens
-PTU = {"deployment": "aoai-ptu-discovery", "app": "csr-drafting-agent", "model": "gpt-5.4", "units": 50, "daily": 1200.0}
+PTU = N.OPT_PTU
 
 
 def ts(d):
@@ -53,13 +61,7 @@ def days():
 # ------------------------------------------------------------------------------------------- LLM app telemetry
 # app, model, cost center, requests/day (weekday), avg input, avg output, max_tokens, failed %, retried %, accepted %,
 # input growth over the window (context bloat), truncation %
-APPS = [
-    ("patient-support-assistant", "claude-sonnet-5-5", "Patient Data", 2000, 9000, 400, 1024, 0.03, 0.14, 0.70, 0.0, 0.01),
-    ("protocol-assistant", "claude-sonnet-5-5", "Research & Discovery", 300, 25000, 900, 2048, 0.01, 0.02, 0.60, 0.0, 0.02),
-    (PTU["app"], PTU["model"], "Research & Discovery", 420, 40000, 2500, 4096, 0.02, 0.04, 0.35, 3.0, 0.12),
-    ("doc-search-rag", "claude-sonnet-5-5", "Corporate IT", 3000, 12000, 600, 1024, 0.01, 0.02, 0.80, 0.0, 0.01),
-    ("ae-intake-bot", "claude-opus-5-5", "Clinical Operations", 2400, 6000, 350, 1024, 0.005, 0.01, 0.95, 0.0, 0.0),
-]
+APPS = N.OPT_APPS
 
 
 def telemetry():
@@ -100,7 +102,7 @@ def ai_charges(tel):
         # Azure OpenAI PTU: a fixed daily cost whatever the traffic
         t = by[(d, PTU["app"])]
         tok_in, tok_out = int(t["Requests"] * t["AvgInputTokens"]), int(t["Requests"] * t["AvgOutputTokens"])
-        out.append(charge(d, PTU["daily"], MS_ACCOUNT, ("sub-ms-ai-ptu", "pharma-ai-ptu"), "Microsoft", SOURCE_PTU, "PTU",
+        out.append(charge(d, PTU["daily"], MS_ACCOUNT, PTU_SUB, "Microsoft", SOURCE_PTU, "PTU",
                           ServiceName="Azure OpenAI", ServiceCategory="AI and Machine Learning", ServiceSubcategory="Generative AI",
                           ChargeDescription=f"Azure OpenAI provisioned throughput {PTU['units']} PTU ({PTU['model']})",
                           RegionId="eastus2", RegionName="eastus2", ResourceId=f"/subscriptions/ai/{PTU['deployment']}",
@@ -110,10 +112,10 @@ def ai_charges(tel):
                           x_ModelName=PTU["model"], x_ModelVendor="OpenAI", x_ServiceTier="provisioned", x_TokenType="mixed",
                           x_InputTokens=tok_in, x_OutputTokens=tok_out, x_CacheReadTokens=0, x_CacheWriteTokens=0,
                           x_RequestCount=t["Requests"], x_InferenceGeo="us",
-                          Tags=json.dumps({"cost_center": "Research & Discovery", "application": PTU["app"],
+                          Tags=json.dumps({"cost_center": PTU["cost_center"], "application": PTU["app"],
                                            "environment": "prod", "ai_component": "inference"})))
         # Bedrock token workloads priced from telemetry
-        for app, cc in (("doc-search-rag", "Corporate IT"), ("ae-intake-bot", "Clinical Operations")):
+        for app, cc in N.OPT_BEDROCK_APPS:
             t = by[(d, app)]
             pin, pout = PRICES[t["ModelName"]]
             tin, tout = t["Requests"] * t["AvgInputTokens"], t["Requests"] * t["AvgOutputTokens"]
@@ -137,18 +139,19 @@ def ai_charges(tel):
                               ResourceId=f"arn:aws:{comp}:us-east-2:{AI_SUB[0]}:{res}", ResourceName=res, ResourceType=svc,
                               SkuId=f"{res}-sku", SkuMeter="Units", ConsumedQuantity=24, ConsumedUnit="Hours", PricingQuantity=24,
                               PricingUnit="Hours", x_AIProduct="claude_bedrock" if comp == "embedding" else None,
-                              Tags=json.dumps({"cost_center": "Corporate IT", "application": "doc-search-rag",
+                              Tags=json.dumps({"cost_center": N.OPT_RAG["cost_center"], "application": N.OPT_RAG["app"],
                                                "environment": "prod", "ai_component": comp})))
-        # Unattached EBS volumes left behind by the EDC test rebuild (R&D account)
+        # Unattached EBS volumes left behind in the tenant's workload account (OPT_ORPHANS)
         for i, daily in enumerate((14, 11, 9), 1):
-            res = f"vol-edc-test-orphan-0{i}"
-            out.append(charge(d, daily, RD_ACCOUNT, RD_SUB, "AWS", "aws_rd_focus_export", "Orphans",
+            res = f"{N.OPT_ORPHANS['prefix']}{i}"
+            out.append(charge(d, daily, RD_ACCOUNT, RD_SUB, "AWS", RD_SOURCE, "Orphans",
                               ServiceName="Amazon EBS", ServiceCategory="Storage", ServiceSubcategory="Block Storage",
                               ChargeDescription=f"Amazon EBS gp3 volume {res} (unattached)", RegionId="us-east-2", RegionName="us-east-2",
                               ResourceId=f"arn:aws:ec2:us-east-2:{RD_SUB[0]}:volume/{res}", ResourceName=res, ResourceType="Amazon EBS",
                               SkuId="EBS-gp3", SkuMeter="GB-Month", ConsumedQuantity=500, ConsumedUnit="GB-Month", PricingQuantity=500,
                               PricingUnit="GB-Month",
-                              Tags=json.dumps({"cost_center": "Clinical Operations", "application": "edc-test", "environment": "nonprod"})))
+                              Tags=json.dumps({"cost_center": N.OPT_ORPHANS["cost_center"], "application": N.OPT_ORPHANS["app"],
+                                               "environment": "nonprod"})))
     return out
 
 
@@ -167,7 +170,7 @@ def eks_idle(con, cols):
                  BillingPeriodStart=ts(dt.date(d.year, d.month, 1)), BillingPeriodEnd=ts(next_month(d)),
                  BilledCost=cost, EffectiveCost=cost, ListCost=cost, ContractedCost=cost, PricingCurrencyEffectiveCost=cost,
                  AllocatedResourceId="idle", AllocatedResourceName="(idle capacity)",
-                 AllocatedTags=json.dumps({"cost_center": "Corporate IT"}),
+                 AllocatedTags=json.dumps({"cost_center": N.IT_CC}),
                  AllocatedMethodDetails=json.dumps({"Elements": [{"AllocatedRatio": 0.18, "UsageUnit": "vCPU-Hours", "Basis": "unrequested"}]}),
                  ChargeDescription="Amazon EKS shared-eks idle capacity (unrequested vCPU and memory)",
                  InvoiceDetailId=f"IND-{base['BillingAccountId']}-{d:%Y%m}-EKSIdle", InvoiceId=f"INV-{base['BillingAccountId']}-{d:%Y%m}-EKS",
@@ -177,11 +180,8 @@ def eks_idle(con, cols):
 
 
 # ------------------------------------------------------------------------------------------- utilization
-# resource name, id prefix, profile (busy | idle | nonprod | rightsize | gpu)
-UTIL = [("edc-dev-ec2", "nonprod"), ("edc-test-ec2", "idle"), ("insights-ec2", "rightsize"),
-        ("molgen-gpu-endpoint", "gpu"), ("trial-analytics-emr", "busy"), ("registry-aurora", "busy"), ("edc-app-asg", "busy"),
-        ("portal-eks", "busy"), ("vol-edc-test-orphan-01", "detached"), ("vol-edc-test-orphan-02", "detached"),
-        ("vol-edc-test-orphan-03", "detached")]
+# resource name, profile (busy | idle | nonprod | rightsize | gpu | detached)
+UTIL = N.OPT_UTIL
 GPU_IDLE_FROM = dt.date(2026, 9, 20)
 
 
@@ -223,44 +223,18 @@ def ptu_capacity(tel):
 
 
 T = dt.datetime
-RECS = [  # id, source, provider, sub, resource, action, current, recommended, monthly cost, savings, effort, restart
-    ("coh-0001", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "edc-test-ec2", "stop_idle", "m6i.4xlarge, CPU p95 2%",
-     "Stop or terminate", 4800, 4800, "low", True),
-    ("coh-0002", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "edc-dev-ec2", "schedule_offhours", "m6i.8xlarge running 24x7",
-     "Run 07:00-19:00 weekdays", 9300, 5980, "low", True),
-    ("coh-0003", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "trial-analytics-emr", "rightsize", "r6g.8xlarge x 6 core nodes",
-     "r6g.4xlarge x 6 core nodes", 24600, 4900, "medium", True),
-    ("coh-0004", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "registry-aurora", "upgrade_generation", "db.r6i.8xlarge",
-     "db.r7g.8xlarge (Graviton)", 28800, 3460, "medium", True),
-    ("coh-0005", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "trial-data-lake", "storage_tier", "S3 Standard, 62% objects not read in 90 days",
-     "S3 Intelligent-Tiering", 7200, 2160, "low", False),
-    ("coh-0006", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "vol-edc-test-orphan-01", "delete_unattached",
-     "gp3 500 GiB, unattached 110 days", "Snapshot and delete", 420, 420, "low", False),
-    ("coh-0007", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "vol-edc-test-orphan-02", "delete_unattached",
-     "gp3 500 GiB, unattached 110 days", "Snapshot and delete", 330, 330, "low", False),
-    ("coh-0008", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "vol-edc-test-orphan-03", "delete_unattached",
-     "gp3 500 GiB, unattached 110 days", "Snapshot and delete", 270, 270, "low", False),
-    ("coh-0009", "aws_cost_optimization_hub", "AWS", RD_SUB[0], "account:888800008008", "purchase_commitment",
-     "On-demand compute $64K/month", "1-year Compute Savings Plan, $28/hour", 64000, 11800, "low", False),
-    ("adv-0001", "azure_advisor", "Microsoft", "sub-ms-ai-ptu", PTU["deployment"], "rightsize", "50 PTU, average utilization 31%",
-     "Pay-as-you-go or 15 PTU", 36000, 29500, "medium", False),
-]
-ACTIONS = [  # id, origin, lever, domain, title, scope type, scope key, cost center, owner, confidence, status, est, dates
-    ("OPT-001", "coh-0001", "idle", "cloud", "Stop idle EDC test instance", "resource", "edc-test-ec2", "Clinical Operations",
-     "Clinical Operations IT", "provider_recommended", "identified", 4800, (T(2026, 7, 28), None, None, None)),
-    ("OPT-002", "coh-0002", "scheduling", "cloud", "Schedule EDC dev to business hours", "resource", "edc-dev-ec2", "Clinical Operations",
-     "Clinical Operations IT", "provider_recommended", "approved", 5980, (T(2026, 8, 20), T(2026, 9, 2), None, None)),
-    ("OPT-003", "manual", "rightsizing", "cloud", "Rightsize consumer insights server", "resource", "insights-ec2",
-     "Consumer Health", "Consumer Health IT", "costiq_estimated", "verified", 7300, (T(2026, 8, 10), T(2026, 8, 20), T(2026, 9, 1), None)),
-    ("OPT-004", "manual", "rightsizing", "cloud", "Reduce ePRO ingest Kinesis shards", "resource", "epro-ingest-kinesis",
-     "Patient Data", "Patient Data IT", "costiq_estimated", "implemented", 3700, (T(2026, 8, 25), T(2026, 9, 5), T(2026, 9, 15), None)),
-    ("OPT-005", "UO-09", "gpu_idle", "ai", "Scale discovery GPU endpoint to zero when idle", "resource", "molgen-gpu-endpoint",
-     "Research & Discovery", "Research & Discovery", "costiq_estimated", "identified", 49000, (T(2026, 9, 24), None, None, None)),
-    ("OPT-006", "adv-0001", "ptu", "ai", "Move CSR drafting agent off 50 PTU", "resource", PTU["deployment"], "Research & Discovery",
-     "AI Program Office", "provider_recommended", "identified", 29500, (T(2026, 8, 1), None, None, None)),
-    ("OPT-007", "UO-05", "seats", "ai", "Reclaim unused Copilot and Claude seats", "seat_pool", "unused_seats", "Corporate IT",
-     "Corporate IT", "costiq_estimated", "approved", 1190, (T(2026, 10, 1), T(2026, 10, 6), None, None)),
-]
+
+
+def _fill(v):
+    """names.py writes the add-on's own accounts as {rd_sub}, {ptu_sub} and {ptu}."""
+    if isinstance(v, str):
+        return v.replace("{rd_sub}", RD_SUB[0]).replace("{ptu_sub}", PTU_SUB[0]).replace("{ptu}", PTU["deployment"])
+    return v
+
+
+RECS = [tuple(_fill(v) for v in r) for r in N.OPT_RECS]  # id, source, provider, sub, resource, action, current, recommended, ...
+ACTIONS = [tuple(_fill(v) for v in a[:-1]) + (tuple(T(*d) if d else None for d in a[-1]),)
+           for a in N.OPT_ACTIONS]  # id, origin, lever, domain, title, scope type, scope key, cost center, owner, ..., dates
 RULES = [
     ("AR-01", "Cost center forecast over budget", "budget_threshold", "*", 100, "in_app"),
     ("AR-02", "AI budget will run out before month end", "token_budget", "*", 50, "in_app"),
@@ -285,7 +259,7 @@ def apply(path):
 
     # remove what a previous run added
     con.execute(f"DELETE FROM CostAndUsage WHERE x_SourceSystem IN ('{SOURCE_AI}', '{SOURCE_PTU}')")
-    con.execute("DELETE FROM CostAndUsage WHERE ResourceName LIKE 'vol-edc-test-orphan-%'")
+    con.execute("DELETE FROM CostAndUsage WHERE ResourceName LIKE ?", [N.OPT_ORPHANS["prefix"] + "%"])
     con.execute("DELETE FROM CostAndUsage WHERE ResourceName = 'shared-eks' AND AllocatedResourceId = 'idle'")
     con.execute("DELETE FROM InvoiceDetail WHERE InvoiceDetailId LIKE '%-PTU' OR InvoiceDetailId LIKE '%-Orphans' "
                 "OR InvoiceDetailId LIKE '%-EKSIdle' OR BillingAccountId = ?", [AI_ACCOUNT[0]])
@@ -329,13 +303,11 @@ def apply(path):
          "ImplementedBy": "demo.cloud_ops@company.example" if dates[2] else None}
         for i, o, lv, dm, tt, st, sk, cc, ow, cf, status, est, dates in ACTIONS])
     # AI budgets sized for the group's AI stack (the base sample's budgets predate it)
-    for cc, amt in (("Research & Discovery", 95000), ("Corporate IT", 16000), ("Clinical Operations", 16000),
-                    ("Patient Data", 9000)):
+    for cc, amt in N.OPT_AI_BUDGETS:
         con.execute("UPDATE ai_budget SET BudgetAmount = ? WHERE CostCenter = ?", [amt, cc])
     insert_dicts(con, "cost_alert_rule", [
         {"RuleId": r, "Name": n, "Kind": k, "Target": t, "ThresholdPct": th, "Channel": ch, "Enabled": True}
         for r, n, k, t, th, ch in RULES])
-    from pharma import refresh_budgets  # data/ is on sys.path when run as a script
     refresh_budgets(con)
     con.execute("CHECKPOINT")
     con.close()
@@ -344,5 +316,5 @@ def apply(path):
 
 
 if __name__ == "__main__":
-    for p in sys.argv[1:] or [os.path.join(ROOT, "sample", "costiq_sample.duckdb")]:
+    for p in sys.argv[1:] or [os.path.join(ROOT, "sample", "pharma", "costiq_sample.duckdb")]:
         apply(p)

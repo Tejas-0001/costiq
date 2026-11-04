@@ -1,0 +1,52 @@
+id: UT-06
+source: MM CostIQ Utility extension
+title: 'Renewals and price escalators landing in the rate year'
+category: 'Utility · Rate cases'
+module: tax
+business_question: 'Which contract renewals and escalators fall inside the rate year and belong in the filing as known-and-measurable changes?'
+personas:
+- regulatory_analyst
+- finops_analyst
+- cfo
+catalog_persona: 'Rates & Regulatory, Cloud CoE'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Vendors whose renewal date falls inside the docket''s rate year, with the escalator and its annual effect.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'renewal'
+- 'escalator'
+- 'price increase'
+- 'known and measurable'
+- 'rate year'
+- 'contract'
+- 'true-down'
+products: Any provider
+sql: |-
+  SELECT
+    rc.FilingId AS Docket,
+    v.Vendor,
+    CAST(v.RenewalDate AS DATE) AS RenewalDate,
+    v.EscalatorPct,
+    ROUND(v.AnnualContractValue, 2) AS AnnualContractValue,
+    ROUND(v.AnnualContractValue * v.EscalatorPct / 100, 2) AS AnnualEscalation,
+    CASE WHEN v.RenewalDate >= rc.ForecastYearStart AND v.RenewalDate < rc.ForecastYearEnd THEN 'In rate year'
+         WHEN v.RenewalDate < rc.ForecastYearStart THEN 'Before rate year'
+         ELSE 'After rate year' END AS Timing
+  FROM ref_vendor v
+  CROSS JOIN ref_tax_filing rc
+  WHERE rc.FilingId = :filing AND v.EscalatorPct > 0
+  ORDER BY v.RenewalDate
+params:
+- name: filing
+  type: string
+  default: 'SA-26-0418-EL'
+  label: 'Rate case docket'
+notes: 'Annual contract values come from vendor management; escalators apply from the renewal date.'
+compliance:
+  area: 'Rates'
+  reference: 'Known-and-measurable rate-year adjustments'
+  unit: 'contracts'
+  flag: 'Timing = ''In rate year'''
+  amount: AnnualEscalation

@@ -1,5 +1,5 @@
 id: CO-03
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'Non-production running 24x7: off-hours scheduling candidates'
 category: 'Optimization · Cloud'
 module: optimization

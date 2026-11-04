@@ -1,5 +1,5 @@
 id: UO-13
-source: MM CostIQ Pharma extension
+source: '{{extension_source}}'
 title: 'Cost per accepted outcome by LLM application'
 category: 'Optimization · AI'
 module: optimization

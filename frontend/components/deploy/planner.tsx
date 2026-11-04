@@ -1,15 +1,15 @@
 "use client";
 // Guided on-prem deployment planner: one question at a time. Every option previews what it would change before you pick
 // it, the live plan on the right redraws as you answer, and the last step produces the blueprint. Mounted by the
-// /deploy page.
+// /deploy page, which passes the tenant from /api/config (pharma: GxP, HIPAA and GDPR; utility: NERC CIP).
 import { AnimatePresence, motion, MotionConfig } from "motion/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MMMark } from "@/components/brand";
 import { EASE, EASE_IN } from "@/components/motion";
 import { Blueprint, decodeAnswers } from "./blueprint";
 import { Diagram, gb, Meters, ReuseBar, Weeks, type Delta } from "./canvas";
-import { BLOCKS, CHAPTERS, DEFAULTS, normalize, plan as makePlan, QUESTIONS, type Answers, type Key, type Plan } from "./model";
-import { CUSTODY, CUTOVERS, ROUTES } from "./release";
+import { BLOCKS, CHAPTERS, normalize, plan as makePlan, profile, type Answers, type Key, type Plan, type Profile, type Question, type Tenant } from "./model";
+import { CUSTODY, CUTOVERS, type Route } from "./release";
 import { RouteFlow, TrafficSplit } from "./release-viz";
 
 /** The MM CostIQ mark, sized for the planner's guide tiles and headers. */
@@ -36,11 +36,14 @@ const CARD: Record<string, { yours: string; missing: string }> = {
 };
 
 type Phase = "intro" | "ask" | "build" | "blueprint";
-const TYPICAL: Answers = { ...DEFAULTS, have: BLOCKS.map((b) => b.id) };
+const typical = (P: Profile): Answers => ({ ...P.defaults, have: BLOCKS.map((b) => b.id) });
 
 // Unanswered questions fall back to this baseline for the internal calculation only; the UI never shows it as an answer.
-const BASE: Answers = { ...DEFAULTS, have: [], compliance: [], sources: [] };
-const full = (a: Partial<Answers>) => normalize({ ...BASE, ...a });
+const base = (P: Profile): Answers => ({ ...P.defaults, have: [], compliance: [], sources: [] });
+const fullFor = (P: Profile) => (a: Partial<Answers>) => normalize({ ...base(P), ...a }, P.tenant);
+/** A question counts as known once answered, or once a skip rule decides it. */
+const knownIn = (questions: Question[], a: Partial<Answers>, eff: Answers) => (k: Key) =>
+  a[k] !== undefined || !!questions.find((x) => x.key === k)?.skip?.(eff);
 
 /** Which parts of the plan the answers so far actually determine (the live panel shows only those). */
 function reveal(known: (k: Key) => boolean) {
@@ -116,24 +119,27 @@ function loadSaved(): Saved | null {
 function saveState(v: Saved | null) {
   try { if (v) sessionStorage.setItem(STORE, JSON.stringify(v)); else sessionStorage.removeItem(STORE); } catch { /* storage unavailable */ }
 }
-function fromUrl(): { phase: Phase; step: number } {
+function fromUrl(questions: Question[]): { phase: Phase; step: number } {
   const sp = new URLSearchParams(location.search);
   if (sp.get("view") === "blueprint") return { phase: "blueprint", step: 0 };
-  const i = QUESTIONS.findIndex((x) => x.key === sp.get("q"));
+  const i = questions.findIndex((x) => x.key === sp.get("q"));
   return i >= 0 ? { phase: "ask", step: i } : { phase: "intro", step: 0 };
 }
-const urlFor = (phase: Phase, step: number) => (phase === "ask" ? `?q=${QUESTIONS[step].key}` : phase === "blueprint" ? "?view=blueprint" : "");
+const urlFor = (questions: Question[], phase: Phase, step: number) => (phase === "ask" ? `?q=${questions[step].key}` : phase === "blueprint" ? "?view=blueprint" : "");
 
-export function Planner({ onClose, initial }: { onClose?: () => void; initial?: Partial<Answers> | null }) {
+export function Planner({ onClose, initial, tenant = "pharma" }: { onClose?: () => void; initial?: Partial<Answers> | null; tenant?: Tenant }) {
+  const P = profile(tenant);
+  const QUESTIONS = P.questions;
+  const full = useMemo(() => fullFor(P), [P]);
   // client-only (the /deploy page mounts it after reading the URL), so the initializers may read location and storage
   const boot = useMemo(() => {
     if (initial) return { answers: full(initial) as Partial<Answers>, done: QUESTIONS.map((q) => q.key), phase: "blueprint" as Phase, step: 0 };
     const saved = loadSaved();
-    const at = fromUrl();
+    const at = fromUrl(QUESTIONS);
     // a blueprint URL with nothing answered has nothing to show; start at the beginning instead
     const phase = at.phase === "blueprint" && !saved ? "intro" : at.phase;
     return { answers: saved?.answers ?? {}, done: saved?.done ?? [], phase, step: at.step };
-  }, [initial]);
+  }, [initial, full, QUESTIONS]);
   // only what the person has actually answered; the planner starts empty
   const [answers, setAnswers] = useState<Partial<Answers>>(boot.answers);
   const [phase, setPhase] = useState<Phase>(boot.phase);
@@ -142,14 +148,12 @@ export function Planner({ onClose, initial }: { onClose?: () => void; initial?: 
   const [deltas, setDeltas] = useState<Delta[]>([]);
   const [changed, setChanged] = useState<string[]>([]);
   const seq = useRef(0);
-  const effective = useMemo(() => full(answers), [answers]);
-  const plan = useMemo(() => makePlan(effective), [effective]);
+  const effective = useMemo(() => full(answers), [answers, full]);
+  const plan = useMemo(() => makePlan(effective, P.tenant), [effective, P.tenant]);
   const finish = useCallback(() => setPhase("blueprint"), []);
 
   const skipped = (i: number) => QUESTIONS[i].skip?.(effective) ?? null;
-  const knownIn = (a: Partial<Answers>, eff: Answers) => (k: Key) =>
-    a[k] !== undefined || !!QUESTIONS.find((x) => x.key === k)?.skip?.(eff);
-  const known = knownIn(answers, effective);
+  const known = knownIn(QUESTIONS, answers, effective);
   const shown = reveal(known);
 
   const apply = useCallback((next: Partial<Answers>) => {
@@ -157,16 +161,16 @@ export function Planner({ onClose, initial }: { onClose?: () => void; initial?: 
     // keep the person's answers in step with normalization (e.g. a choice a later answer has ruled out)
     const synced: Partial<Answers> = {};
     for (const k of Object.keys(next) as Key[]) (synced as Record<Key, unknown>)[k] = eff[k];
-    const before = plan, after = makePlan(eff);
+    const before = plan, after = makePlan(eff, P.tenant);
     seq.current += 1;
     // deltas only for meters that were already showing numbers
-    const wasShown = reveal(knownIn(answers, effective));
+    const wasShown = reveal(knownIn(QUESTIONS, answers, effective));
     setDeltas(deltasBetween(before, after, seq.current).filter((d) => (d.key === "servers" ? wasShown.servers : wasShown.size)));
     setChanged(changedNodes(before, after));
     setAnswers(synced);
     const s = seq.current;
     window.setTimeout(() => { if (seq.current === s) { setDeltas([]); setChanged([]); } }, 2400);
-  }, [answers, effective, plan]);
+  }, [answers, effective, plan, full, P.tenant, QUESTIONS]);
 
   const q = QUESTIONS[step];
   const nextIndex = (from: number) => { let i = from + 1; while (i < QUESTIONS.length && skipped(i)) i++; return i; };
@@ -217,17 +221,17 @@ export function Planner({ onClose, initial }: { onClose?: () => void; initial?: 
   // state -> URL (a new history entry per step; the build animation has no URL of its own)
   useEffect(() => {
     if (phase === "build") return;
-    const search = urlFor(phase, step);
+    const search = urlFor(QUESTIONS, phase, step);
     if (location.search !== search) {
       history.pushState(null, "", `${location.pathname}${search}${phase === "blueprint" ? location.hash : ""}`);
     }
-  }, [phase, step]);
+  }, [phase, step, QUESTIONS]);
   // URL -> state (Back / Forward)
   useEffect(() => {
-    const onPop = () => { const at = fromUrl(); setPhase(at.phase); setStep(at.step); };
+    const onPop = () => { const at = fromUrl(QUESTIONS); setPhase(at.phase); setStep(at.step); };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
-  }, []);
+  }, [QUESTIONS]);
   // keep answers across a refresh
   useEffect(() => { saveState({ answers, done: [...done] }); }, [answers, done]);
 
@@ -269,7 +273,7 @@ export function Planner({ onClose, initial }: { onClose?: () => void; initial?: 
         <AnimatePresence mode="wait" initial={false}>
           {phase === "blueprint" ? (
             <motion.div key="bp" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.6, ease: EASE }}>
-              <Blueprint plan={plan} onEdit={() => editAt(0)} />
+              <Blueprint plan={plan} onEdit={() => editAt(0)} tenant={P.tenant} />
             </motion.div>
           ) : phase === "build" ? (
             <Build key="build" plan={plan} onDone={finish} />
@@ -277,19 +281,19 @@ export function Planner({ onClose, initial }: { onClose?: () => void; initial?: 
             <motion.div key="ask" className="dp-main" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0, transition: { duration: 0.2 } }}>
               <div className="dp-stage">
                 {phase === "intro" ? (
-                  <Intro onStart={() => { setPhase("ask"); setStep(0); }}
-                    onTypical={() => { apply({ ...TYPICAL }); setDone(new Set(QUESTIONS.map((x) => x.key))); setPhase("build"); }} />
+                  <Intro tenant={P.tenant} onStart={() => { setPhase("ask"); setStep(0); }}
+                    onTypical={() => { apply({ ...typical(P) }); setDone(new Set(QUESTIONS.map((x) => x.key))); setPhase("build"); }} />
                 ) : (
                   <>
                     <AnimatePresence mode="wait">
-                      <QuestionCard key={q.key} index={step} pos={visible.indexOf(step) + 1} total={visible.length} answers={answers} effective={effective}
-                        plan={plan} answered={answered} canContinue={canContinue}
+                      <QuestionCard key={q.key} q={q} pos={visible.indexOf(step) + 1} total={visible.length} answers={answers} effective={effective}
+                        plan={plan} answered={answered} canContinue={canContinue} routes={P.release.routes}
                         metrics={{ size: shown.size, servers: shown.servers, weeks: shown.weeks, reuse: shown.reuse || q.key === "have" }}
                         notes={QUESTIONS.map((_, i) => i).filter((i) => i > prior && i < step).map((i) => skipped(i)?.note).filter((x): x is string => !!x)}
-                        preview={(v) => makePlan(full(toggled(v)))} onChoose={choose} onNext={advance} onBack={back}
+                        preview={(v) => makePlan(full(toggled(v)), P.tenant)} onChoose={choose} onNext={advance} onBack={back}
                         isLast={nextIndex(step) >= QUESTIONS.length} setAll={(vals) => apply({ ...answers, [q.key]: vals })} />
                     </AnimatePresence>
-                    <Trail answers={effective} upTo={step} visible={visible} onEdit={editAt} />
+                    <Trail questions={QUESTIONS} answers={effective} upTo={step} visible={visible} onEdit={editAt} />
                   </>
                 )}
               </div>
@@ -319,7 +323,8 @@ export function Planner({ onClose, initial }: { onClose?: () => void; initial?: 
   );
 }
 
-function Intro({ onStart, onTypical }: { onStart: () => void; onTypical: () => void }) {
+function Intro({ tenant, onStart, onTypical }: { tenant: Tenant; onStart: () => void; onTypical: () => void }) {
+  const u = tenant === "utility";
   const rise = (d: number) => ({ initial: { opacity: 0, y: 20, filter: "blur(8px)" }, animate: { opacity: 1, y: 0, filter: "blur(0px)" }, transition: { duration: 0.7, ease: EASE, delay: d } });
   return (
     <div className="dp-intro">
@@ -334,27 +339,26 @@ function Intro({ onStart, onTypical }: { onStart: () => void; onTypical: () => v
         <li><b>Infrastructure and software</b>, with what&apos;s yours and what we bring</li>
         <li><b>Firewall rules, F5 and Cisco configuration, identity and data connections</b></li>
         <li><b>Cyber defense</b> layer by layer, tested against real attack techniques</li>
-        <li><b>Compliance controls</b> checked against 21 CFR Part 11, EU GMP Annex 11, HIPAA, GDPR, NIST and ISO texts</li>
+        <li><b>Compliance controls</b> checked against {u ? "NERC, NIST, CISA and ISO texts" : "21 CFR Part 11, EU GMP Annex 11, HIPAA, GDPR, NIST and ISO texts"}</li>
         <li><b>Quality gates, code custody and the release route</b> from first commit to production</li>
         <li><b>Development plan, team and a prerequisites checklist</b> you can hand to IT</li>
       </motion.ul>
       <motion.div {...rise(0.36)} className="dp-intro-cta">
         <motion.button type="button" className="dp-btn primary" whileTap={{ scale: 0.97 }} onClick={onStart}>Start planning<span className="enter">↵</span></motion.button>
-        <button type="button" className="dp-btn" onClick={onTypical}>Skip to a typical pharma blueprint</button>
+        <button type="button" className="dp-btn" onClick={onTypical}>{u ? "Skip to a typical utility blueprint" : "Skip to a typical pharma blueprint"}</button>
       </motion.div>
     </div>
   );
 }
 
-function shortAnswer(i: number, a: Answers): string {
-  const q = QUESTIONS[i];
+function shortAnswer(q: Question, a: Answers): string {
   const v = a[q.key];
   if (Array.isArray(v)) return v.length ? `${v.length} selected` : "None";
   return q.options.find((o) => o.value === v)?.label ?? String(v);
 }
 
 /** Earlier answers as small chips; click one to change it. */
-function Trail({ answers, upTo, visible, onEdit }: { answers: Answers; upTo: number; visible: number[]; onEdit: (i: number) => void }) {
+function Trail({ questions, answers, upTo, visible, onEdit }: { questions: Question[]; answers: Answers; upTo: number; visible: number[]; onEdit: (i: number) => void }) {
   const prior = visible.filter((i) => i < upTo);
   if (!prior.length) return null;
   return (
@@ -362,8 +366,8 @@ function Trail({ answers, upTo, visible, onEdit }: { answers: Answers; upTo: num
       <span className="lbl">Your answers</span>
       <div className="chips">
         {prior.map((i) => (
-          <button key={QUESTIONS[i].key} type="button" title={`${QUESTIONS[i].ask} (click to change)`} onClick={() => onEdit(i)}>
-            {shortAnswer(i, answers)}
+          <button key={questions[i].key} type="button" title={`${questions[i].ask} (click to change)`} onClick={() => onEdit(i)}>
+            {shortAnswer(questions[i], answers)}
           </button>
         ))}
       </div>
@@ -371,12 +375,11 @@ function Trail({ answers, upTo, visible, onEdit }: { answers: Answers; upTo: num
   );
 }
 
-function QuestionCard({ index, pos, total, answers, effective, plan, answered, canContinue, metrics, notes, preview, onChoose, onNext, onBack, isLast, setAll }: {
-  index: number; pos: number; total: number; answers: Partial<Answers>; effective: Answers; plan: Plan; answered: boolean; canContinue: boolean; metrics: Shown;
-  notes: string[]; preview: (v: string) => Plan;
+function QuestionCard({ q, pos, total, answers, effective, plan, answered, canContinue, routes, metrics, notes, preview, onChoose, onNext, onBack, isLast, setAll }: {
+  q: Question; pos: number; total: number; answers: Partial<Answers>; effective: Answers; plan: Plan; answered: boolean; canContinue: boolean;
+  routes: Record<string, Route>; metrics: Shown; notes: string[]; preview: (v: string) => Plan;
   onChoose: (v: string) => void; onNext: () => void; onBack: () => void; isLast: boolean; setAll: (v: string[]) => void;
 }) {
-  const q = QUESTIONS[index];
   const v = answers[q.key] ?? (q.multi ? [] : undefined);
   const selected = (x: string) => (Array.isArray(v) ? v.includes(x) : v === x);
   const blockedWhy = (x: string) => q.blocked?.(x, effective) ?? null;
@@ -444,7 +447,7 @@ function QuestionCard({ index, pos, total, answers, effective, plan, answered, c
                   {on && !q.multi ? <span className="cur">Your choice</span>
                     : chips.length ? <>{q.multi && <em className="lbl">{on ? "With it" : isHave ? "If you have it" : "If added"}</em>}
                       {chips.map((c) => <span key={c.text} className={c.tone}>{c.text}</span>)}</>
-                    : q.multi ? null : traits(q.key, o.value) ?? <span className="none">No change to the footprint</span>}
+                    : q.multi ? null : traits(q.key, o.value, routes) ?? <span className="none">No change to the footprint</span>}
                 </span>
               )}
             </motion.button>
@@ -454,7 +457,7 @@ function QuestionCard({ index, pos, total, answers, effective, plan, answered, c
       <AnimatePresence mode="wait" initial={false}>
         {typeof v === "string" && PREVIEW.includes(q.key) && (
           <motion.div key={v} className="dl dp-preview" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.3, ease: EASE }}>
-            <Preview k={q.key} v={v} plan={plan} />
+            <Preview k={q.key} v={v} plan={plan} routes={routes} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -472,10 +475,10 @@ function QuestionCard({ index, pos, total, answers, effective, plan, answered, c
 const PREVIEW: Key[] = ["custody", "route", "cutover"];
 
 /** For delivery choices the footprint doesn't move, so the chips say what does differ between the options. */
-function traits(k: Key, v: string) {
+function traits(k: Key, v: string, routes: Record<string, Route>) {
   const chips: { text: string; tone: "good" | "cur" | "up" }[] = [];
-  if (k === "route" && ROUTES[v]) {
-    const r = ROUTES[v];
+  if (k === "route" && routes[v]) {
+    const r = routes[v];
     chips.push(r.airgap === "yes" ? { text: "Air-gap ready", tone: "good" } : r.airgap === "partial" ? { text: "One outbound rule", tone: "cur" } : { text: "Needs remote access", tone: "up" });
     chips.push({ text: r.flow.includes("|") ? "Built on our side" : "Built inside your boundary", tone: r.flow.includes("|") ? "cur" : "good" });
   }
@@ -485,8 +488,8 @@ function traits(k: Key, v: string) {
 }
 
 /** What the chosen option looks like in practice, under the delivery questions. */
-function Preview({ k, v, plan }: { k: Key; v: string; plan: Plan }) {
-  if (k === "route" && ROUTES[v]) return <><span className="dp-preview-k">How a release travels</span><RouteFlow r={ROUTES[v]} /></>;
+function Preview({ k, v, plan, routes }: { k: Key; v: string; plan: Plan; routes: Record<string, Route> }) {
+  if (k === "route" && routes[v]) return <><span className="dp-preview-k">How a release travels</span><RouteFlow r={routes[v]} /></>;
   if (k === "custody" && CUSTODY[v]) return (
     <><span className="dp-preview-k">How it works</span><ol className="dl-steps-h">{CUSTODY[v].flow.map((s, i) => <li key={s}><i>{i + 1}</i>{s}</li>)}</ol></>
   );

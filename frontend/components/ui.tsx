@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, type ReactNode } from "react";
+import { useCopy } from "@/components/copy";
 import type { ApiState } from "@/lib/api";
-import { isMoneyCol, label, money, num } from "@/lib/format";
+import { columnLabel, isMoneyCol, money, num } from "@/lib/format";
 
 export function Head({ title, children }: { title: string; children?: ReactNode }) {
   return (
@@ -49,12 +50,15 @@ export function StatusBadge({ s }: { s: unknown }) {
 }
 
 const BADGE_COL = /status|finding|finality|readiness|tieout|reason|timing|opportunity|guidance/i;
-// Identifiers and dates read badly when broken at hyphens.
-const ID_COL = /filing|day$|date$|period|^seq$/i;
+// Identifiers and dates read badly when broken at hyphens. The tenant adds its own id columns (format.idColumns).
+const ID_COL = "day$|date$|period|^seq$";
 
 export function DataTable({ columns, rows, max = 500, onRow, total }: {
   columns: string[]; rows: unknown[][]; max?: number; onRow?: (r: unknown[]) => void; total?: unknown[];
 }) {
+  const { t } = useCopy();
+  const ids = t("format.idColumns");
+  const idCol = useMemo(() => new RegExp(ids ? `${ids}|${ID_COL}` : ID_COL, "i"), [ids]);
   const numeric = useMemo(
     () => columns.map((_, i) => rows.length > 0 && rows.every((r) => r[i] == null || typeof r[i] === "number")),
     [columns, rows],
@@ -70,12 +74,12 @@ export function DataTable({ columns, rows, max = 500, onRow, total }: {
     <div className="table-wrap">
       <table>
         <thead>
-          <tr>{columns.map((c, i) => <th key={c + i} className={numeric[i] ? "num" : ""}>{label(c)}</th>)}</tr>
+          <tr>{columns.map((c, i) => <th key={c + i} className={numeric[i] ? "num" : ""}>{columnLabel(c)}</th>)}</tr>
         </thead>
         <tbody>
           {rows.slice(0, max).map((r, ri) => (
             <tr key={ri} onClick={onRow ? () => onRow(r) : undefined} style={onRow ? { cursor: "pointer" } : undefined}>
-              {r.map((v, i) => <td key={i} className={numeric[i] ? "num" : ID_COL.test(columns[i]) ? "id" : ""}>{cell(v, i)}</td>)}
+              {r.map((v, i) => <td key={i} className={numeric[i] ? "num" : idCol.test(columns[i]) ? "id" : ""}>{cell(v, i)}</td>)}
             </tr>
           ))}
           {total && (

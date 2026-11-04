@@ -163,3 +163,66 @@ class Monitor:
                        "app's AI cost / outcomes users accepted). Cache hit rate: UO-01. Provisioned capacity: UO-10. "
                        "Routing what-if: UO-14. Budgets: BF-04.",
         }
+
+    # ------------------------------------------------------------------ seat re-harvest and token check (tenant use cases)
+    def reharvest(self, scope, uid, pii=False, limit=100):
+        """Copilot seats idle past the threshold, from the tenant's seat re-harvest use case at its default parameters
+        (threshold, data-latency buffer, grace period). Names are pseudonymized unless the caller holds pii.view."""
+        from .auth import pseudonym
+        uc = self.eng.reg.get(uid)
+        rule = {p["name"]: p.get("default") for p in uc.get("params", [])}
+        seats = self._uc(uid, scope)
+        idle = [r for r in seats if r.get("Status") == "Idle"]
+        groups: dict = {}
+        for r in idle:
+            if r.get("AssignedByGroupId"):
+                groups[r["AssignedByGroupId"]] = groups.get(r["AssignedByGroupId"], 0) + 1
+        try:
+            snap = self.q("SELECT MAX(SnapshotDate) AS d FROM ai_seat_assignment", {}, scope)[0]["d"]
+        except Exception:  # noqa: BLE001 - no seat snapshot table on this tenant
+            snap = None
+        hide = (lambda v: v) if pii else (lambda v: pseudonym(v) if isinstance(v, str) and "@" in v else v)
+        return {
+            "use_case": uid, "rule": rule, "as_of": str(snap)[:10] if snap else self.eng.as_of().isoformat(),
+            "idle": len(idle), "group": sum(1 for r in idle if r.get("AssignedVia") == "Group"),
+            "direct": sum(1 for r in idle if r.get("AssignedVia") == "Direct"),
+            "in_grace": sum(1 for r in seats if r.get("Status") == "Grace period"),
+            "monthly_avoidable": round(sum(float(r.get("MonthlySeatCost") or 0) for r in idle), 2),
+            "renewal_date": self._seat_renewal(),
+            "groups": [{"GroupId": g, "IdleSeats": n} for g, n in sorted(groups.items(), key=lambda x: -x[1])],
+            "rows": [{"UserPrincipal": hide(r.get("UserPrincipal")), "Department": r.get("Department"),
+                      "AssignedVia": r.get("AssignedVia"), "DaysIdle": r.get("DaysIdle"), "Status": r.get("Status")}
+                     for r in seats[:limit]],
+        }
+
+    def _seat_renewal(self):
+        """Renewal (true-down) date of the annual Copilot seat purchase: prepayment start + term (ref_prepayment)."""
+        try:
+            r = self.q("""SELECT AmortizationStart AS s, Months AS m FROM ref_prepayment WHERE lower(Description) LIKE :pat
+                          ORDER BY AmortizationStart DESC LIMIT 1""", {"pat": "%copilot%"})
+        except Exception:  # noqa: BLE001 - no prepayment register on this tenant
+            return None
+        if not r or not r[0]["s"]:
+            return None
+        s, m = dt.date.fromisoformat(str(r[0]["s"])[:10]), int(r[0]["m"] or 12)
+        y, mo = divmod(s.month - 1 + m, 12)
+        return dt.date(s.year + y, mo + 1, min(s.day, 28)).isoformat()
+
+    def token_check(self, scope, uid, win, month=None):
+        """The tenant's token cost check (cache tokens counted) for the selected window, or one billing month
+        (`month` = YYYY-MM overrides the window)."""
+        from .window import use_case_params
+        uc = self.eng.reg.get(uid)
+        if month:
+            s = dt.datetime.strptime(month, "%Y-%m").date()
+            e = dt.date(s.year + (s.month == 12), s.month % 12 + 1, 1)
+            params = {"period_start": s.isoformat(), "period_end": e.isoformat()}
+            period = {"month": month, "start": s.isoformat(), "end": (e - dt.timedelta(days=1)).isoformat()}
+        else:
+            wp, _ = use_case_params(uc, win)
+            params = {k: v.isoformat()[:10] for k, v in wp.items()}
+            period = {"month": None, "start": win.start.isoformat(), "end": win.end.isoformat(), "label": win.label}
+        months = [r["m"] for r in self.q("""SELECT DISTINCT strftime(BillingPeriodStart, '%Y-%m') AS m FROM CostAndUsage
+                                            WHERE x_TokenType IS NOT NULL ORDER BY 1""", {}, scope)]
+        return {"token_check": self._uc(uid, scope, params),
+                "token_check_period": {**period, "use_case": uid, "months": months}}

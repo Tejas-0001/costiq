@@ -6,7 +6,7 @@ import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useEffect, useState } from "react";
 import { EASE } from "@/components/motion";
 import type { DefenseLayer, Plan } from "./model";
-import { LANES, OUTCOME_LABEL, THREATS, type Cutover, type Lane, type Route, type Stage } from "./release";
+import { LANES, OUTCOME_LABEL, THREATS, type Cutover, type Lane, type Route, type Stage, type Threat } from "./release";
 
 const Tick = () => <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden><path d="M2.5 6.2 5 8.6l4.5-5" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 const Cross = () => <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden><path d="M3 3l6 6M9 3 3 9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" /></svg>;
@@ -269,10 +269,10 @@ export function DevPlan({ timeline }: { timeline: Plan["timeline"] }) {
 /* ------------------------------------------------------------------ attacks against the defense layers */
 
 /** Pick an attack and watch it meet each layer in turn: blocked, contained, detected or recovered, and by whose tool. */
-export function DefenseSim({ layers }: { layers: DefenseLayer[] }) {
-  const [id, setId] = useState(THREATS[0].id);
+export function DefenseSim({ layers, threats = THREATS }: { layers: DefenseLayer[]; threats?: Threat[] }) {
+  const [id, setId] = useState(threats[0].id);
   const [at, setAt] = useState(-2); // -2: waiting to be scrolled into view
-  const threat = THREATS.find((t) => t.id === id)!;
+  const threat = threats.find((t) => t.id === id)!;
   useEffect(() => {
     if (at < -1 || at >= threat.steps.length) return;
     const t = setTimeout(() => setAt((x) => x + 1), at < 0 ? 350 : 900);
@@ -287,7 +287,7 @@ export function DefenseSim({ layers }: { layers: DefenseLayer[] }) {
   return (
     <motion.div className="dp-card dl-sim" onViewportEnter={() => { if (at === -2) setAt(-1); }} viewport={{ once: true, amount: 0.4 }}>
       <div className="dl-sim-tabs" role="tablist" aria-label="Attacks">
-        {THREATS.map((t) => (
+        {threats.map((t) => (
           <button key={t.id} type="button" role="tab" aria-selected={t.id === id} className={t.id === id ? "on" : ""} onClick={() => pick(t.id)}>
             {t.id === id && <motion.span layoutId="dl-sim-hl" className="hl" transition={{ type: "spring", stiffness: 420, damping: 34 }} />}
             <span>{t.name}</span>

@@ -5,14 +5,21 @@
       "root": "frontend",
       "framework": "nextjs",
       "bindings": [
-        { "type": "service", "service": "backend", "format": "url", "env": "COSTIQ_API_URL" }
+        { "type": "service", "service": "backend", "format": "url", "env": "COSTIQ_API_URL_PHARMA" },
+        { "type": "service", "service": "backend_utility", "format": "url", "env": "COSTIQ_API_URL_UTILITY" }
       ]
     },
     "backend": {
       "root": "backend",
       "framework": "fastapi",
-      "entrypoint": "costiq.main:app",
-      "buildCommand": "python data/vercel_build.py"
+      "entrypoint": "costiq.app_pharma:app",
+      "buildCommand": "python data/vercel_build.py --tenant pharma"
+    },
+    "backend_utility": {
+      "root": "backend",
+      "framework": "fastapi",
+      "entrypoint": "costiq.app_utility:app",
+      "buildCommand": "python data/vercel_build.py --tenant utility"
     }
   },
   "rewrites": [

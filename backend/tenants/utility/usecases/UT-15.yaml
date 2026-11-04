@@ -1,0 +1,103 @@
+id: UT-15
+source: MM CostIQ Utility extension
+title: 'Tag compliance weighted by cost, by required tag'
+category: 'Utility · Tag enforcement'
+module: allocation
+business_question: 'What share of taggable spend carries each required tag with a valid value, and how much sits in suspense?'
+personas:
+- finops_analyst
+- finance_controller
+- regulatory_analyst
+- auditor
+catalog_persona: 'Cloud CoE, Controller'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'For each required tag (ref_required_tag), taggable spend with a valid value, with no value (suspense) and with an invalid value, checked against the reference registers. Tax, credits, adjustments, support and Marketplace purchases cannot be tagged and are reported apart, never as violations.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'tag compliance'
+- 'tagging'
+- 'untagged'
+- 'suspense'
+- 'required tags'
+- 'invalid tags'
+- 'tag enforcement'
+products: Any provider
+sql: |-
+  WITH c AS (
+    SELECT EffectiveCost AS Cost,
+           CASE WHEN ChargeCategory IN ('Tax', 'Credit', 'Adjustment') OR ResourceId IS NULL
+                     OR (ChargeCategory = 'Purchase' AND ServiceProviderName <> InvoiceIssuerName) THEN 1 ELSE 0 END AS NotTaggable,
+           json_extract_string(Tags, '$.opco') AS opco,
+           json_extract_string(Tags, '$.business_unit') AS business_unit,
+           COALESCE(json_extract_string(AllocatedTags, '$.cost_center'), json_extract_string(Tags, '$.cost_center')) AS cost_center,
+           json_extract_string(Tags, '$.ferc_function') AS ferc_function,
+           json_extract_string(Tags, '$.application') AS application,
+           json_extract_string(Tags, '$.environment') AS environment,
+           json_extract_string(Tags, '$.capex') AS capex,
+           json_extract_string(Tags, '$.work_order') AS work_order
+    FROM CostAndUsage
+    WHERE ChargePeriodStart >= :period_start AND ChargePeriodStart < :period_end
+  ),
+  t AS (SELECT * FROM c WHERE NotTaggable = 0),
+  k AS (
+    SELECT 'opco' AS TagKey, t.Cost, t.opco AS Val,
+           CASE WHEN t.opco IS NULL THEN NULL WHEN e.EntityCode IS NOT NULL OR t.opco = 'SHARED' THEN 1 ELSE 0 END AS Valid
+    FROM t LEFT JOIN ref_legal_entity e ON e.EntityCode = t.opco
+    UNION ALL
+    SELECT 'business_unit', t.Cost, t.business_unit,
+           CASE WHEN t.business_unit IS NULL THEN NULL WHEN b.BusinessUnit IS NOT NULL THEN 1 ELSE 0 END
+    FROM t LEFT JOIN (SELECT DISTINCT BusinessUnit FROM ref_cost_center WHERE BusinessUnit IS NOT NULL) b ON b.BusinessUnit = t.business_unit
+    UNION ALL
+    SELECT 'cost_center', t.Cost, t.cost_center,
+           CASE WHEN t.cost_center IS NULL THEN NULL WHEN cc.CostCenter IS NOT NULL THEN 1 ELSE 0 END
+    FROM t LEFT JOIN ref_cost_center cc ON cc.CostCenter = t.cost_center AND cc.BusinessUnit IS NOT NULL
+    UNION ALL
+    SELECT 'ferc_function', t.Cost, t.ferc_function,
+           CASE WHEN t.ferc_function IS NULL THEN NULL WHEN f.FercFunction IS NOT NULL THEN 1 ELSE 0 END
+    FROM t LEFT JOIN (SELECT DISTINCT FercFunction FROM ref_cost_center WHERE FercFunction IS NOT NULL) f ON f.FercFunction = t.ferc_function
+    UNION ALL
+    SELECT 'application', t.Cost, t.application, CASE WHEN t.application IS NULL THEN NULL ELSE 1 END FROM t
+    UNION ALL
+    SELECT 'environment', t.Cost, t.environment,
+           CASE WHEN t.environment IS NULL THEN NULL WHEN t.environment IN ('prod', 'nonprod', 'sandbox') THEN 1 ELSE 0 END
+    FROM t
+    UNION ALL
+    SELECT 'work_order', t.Cost, t.work_order,
+           CASE WHEN t.work_order IS NULL THEN NULL WHEN w.WorkOrderId IS NOT NULL THEN 1 ELSE 0 END
+    FROM t LEFT JOIN (SELECT DISTINCT WorkOrderId FROM ref_work_order) w ON w.WorkOrderId = t.work_order
+    WHERE t.capex = 'true'
+  ),
+  nt AS (SELECT SUM(Cost) AS CannotBeTagged FROM c WHERE NotTaggable = 1)
+  SELECT
+    k.TagKey,
+    MAX(r.Requirement) AS Requirement,
+    ROUND(SUM(k.Cost), 2) AS TaggableSpend,
+    ROUND(SUM(CASE WHEN k.Valid = 1 THEN k.Cost ELSE 0 END), 2) AS ValidSpend,
+    ROUND(SUM(CASE WHEN k.Val IS NULL THEN k.Cost ELSE 0 END), 2) AS UntaggedSpend,
+    ROUND(SUM(CASE WHEN k.Valid = 0 THEN k.Cost ELSE 0 END), 2) AS InvalidSpend,
+    ROUND(100 * SUM(CASE WHEN k.Valid = 1 THEN k.Cost ELSE 0 END) / NULLIF(SUM(k.Cost), 0), 1) AS CoveragePct,
+    ROUND(MAX(nt.CannotBeTagged), 2) AS CannotBeTagged,
+    CASE WHEN SUM(CASE WHEN k.Valid = 1 THEN k.Cost ELSE 0 END) >= 0.99 * SUM(k.Cost) THEN 'Meets 99%' ELSE 'Below 99%' END AS Status
+  FROM k
+  CROSS JOIN nt
+  LEFT JOIN ref_required_tag r ON r.TagKey = k.TagKey
+  GROUP BY k.TagKey
+  ORDER BY CoveragePct
+params:
+- name: period_start
+  type: date
+  default: '2026-09-01'
+  label: 'Start of the period (inclusive)'
+- name: period_end
+  type: date
+  default: '2026-10-01'
+  label: 'End of the period (exclusive)'
+notes: 'Precedence: resource tag, then account or inherited tag, then approved rule; spend with no cost center waits in suspense with an owner and is restated through an approved rule with an effective date.'
+compliance:
+  area: 'Tag enforcement'
+  reference: 'Required-tag policy (ref_required_tag)'
+  unit: 'tag keys'
+  flag: 'Status = ''Below 99%'''
+  amount: UntaggedSpend + InvalidSpend

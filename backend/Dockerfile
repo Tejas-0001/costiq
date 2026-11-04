@@ -1,19 +1,22 @@
 # MM CostIQ API: FastAPI + DuckDB.
-# The sample database is built into the image at /app/sample. On first start the entrypoint copies it
+# One tenant pack per image (backend/tenants/<tenant>): docker build --build-arg COSTIQ_TENANT=utility .
+# The tenant's sample database is built into the image at /app/sample/<tenant>. On first start the entrypoint copies it
 # to the /data volume, so demo changes (approvals, evidence packs, the ledger) survive restarts until the volume is removed.
 FROM python:3.12-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+ARG COSTIQ_TENANT=pharma
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 COSTIQ_TENANT=${COSTIQ_TENANT}
 WORKDIR /app
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install -r requirements.txt -r requirements-dev.txt && useradd --uid 10001 --create-home costiq
 COPY costiq costiq
-COPY config config
+COPY tenants tenants
 COPY schema schema
 COPY registry registry
 COPY data data
 COPY tools tools
 COPY tests tests
-RUN python data/build_sample.py && rm -rf sample/csv sample/costiq_sample.duckdb.wal sample/costiq.duckdb.wal \
+RUN python data/build_sample.py --tenant "$COSTIQ_TENANT" \
+    && rm -rf "sample/$COSTIQ_TENANT/csv" sample/*/*.duckdb.wal \
     && mkdir -p /data && chown costiq /data
 COPY --chmod=0555 docker-entrypoint.sh /usr/local/bin/costiq-entrypoint
 USER 10001

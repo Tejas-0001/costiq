@@ -1,0 +1,64 @@
+id: UT-13
+source: MM CostIQ Utility extension
+title: 'Earnings unlock: carrying return on deferrable cloud costs'
+category: 'Utility · Regulatory accounting'
+module: tax
+business_question: 'What return would deferring recurring cloud and SaaS costs earn where a commission allows it?'
+personas:
+- regulatory_analyst
+- cfo
+catalog_persona: 'Rates & Regulatory, CFO'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Annualized recurring cloud and SaaS O&M by jurisdiction, as a regulatory asset amortized over the contract (or the order''s default term), earning the docket''s pre-tax return on the average balance.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'earnings unlock'
+- 'regulatory asset'
+- 'carrying return'
+- 'rate of return'
+- 'deferral'
+products: Any provider
+sql: |-
+  WITH bp AS (SELECT MIN(ReviewPeriodStart) AS b0, MAX(ReviewPeriodEnd) AS b1 FROM ref_tax_filing),
+  fees AS (
+    SELECT a.Jurisdiction, a.ServiceProviderName AS Vendor, COUNT(DISTINCT a.PeriodStart) AS Months, SUM(a.AllocatedCost) AS Fees
+    FROM allocated_cost a CROSS JOIN bp
+    WHERE a.ChargeCategory = 'Purchase' AND a.ChargeFrequency = 'Recurring' AND a.CostClass = 'om'
+      AND a.PeriodStart >= bp.b0 AND a.PeriodStart < bp.b1
+    GROUP BY a.Jurisdiction, a.ServiceProviderName
+  ),
+  ror AS (SELECT AVG(r.PreTaxRor) AS r FROM ref_rate_case r JOIN ref_tax_filing f ON f.FilingId = r.FilingId WHERE f.Jurisdiction <> 'FERC'),
+  x AS (
+    SELECT f.*, p.CreditStatus AS DeferralStatus, v.ContractEnd,
+           COALESCE(rj.PreTaxRor, (SELECT r FROM ror)) AS PreTaxRor, tf.FilingId AS Docket,
+           COALESCE(tf.ForecastYearStart, TIMESTAMP '2027-01-01') AS RateYearStart
+    FROM fees f
+    JOIN ref_jurisdiction_policy p ON p.Jurisdiction = f.Jurisdiction
+    LEFT JOIN ref_tax_filing tf ON tf.Jurisdiction = f.Jurisdiction
+    LEFT JOIN ref_rate_case rj ON rj.FilingId = tf.FilingId
+    LEFT JOIN ref_vendor v ON v.Vendor = f.Vendor
+    WHERE p.CreditStatus <> 'not_applicable'
+  ),
+  n AS (
+    SELECT x.*, x.Fees * 12 / x.Months AS AnnualFees,
+           CASE WHEN x.ContractEnd > x.RateYearStart
+                THEN GREATEST(12, (EXTRACT(YEAR FROM x.ContractEnd) - EXTRACT(YEAR FROM x.RateYearStart)) * 12
+                                  + EXTRACT(MONTH FROM x.ContractEnd) - EXTRACT(MONTH FROM x.RateYearStart))
+                ELSE 62 END AS N
+    FROM x
+  )
+  SELECT
+    Jurisdiction, DeferralStatus, MAX(Docket) AS Docket,
+    ROUND(MAX(PreTaxRor), 2) AS PreTaxRor,
+    ROUND(SUM(AnnualFees), 2) AS AnnualRecurringFees,
+    ROUND(SUM(AnnualFees / 12 * (N + 1) / 2) * MAX(PreTaxRor) / 100, 2) AS SteadyStateReturn,
+    CASE WHEN DeferralStatus = 'claimed' THEN 'Earned under order'
+         WHEN DeferralStatus = 'eligible' THEN 'Unlock: request deferral'
+         ELSE 'Denied' END AS Status
+  FROM n
+  GROUP BY Jurisdiction, DeferralStatus
+  ORDER BY SteadyStateReturn DESC
+params: []
+notes: 'Illustrative: depends on a commission granting deferral and on the authorized return. Jurisdictions without a docket use the average pre-tax return of the open dockets; contracts without an end date use 62 months.'

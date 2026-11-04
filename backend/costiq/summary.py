@@ -1,16 +1,17 @@
 """AI summary: what matters now, in a few sentences, with every figure linked to the page and row that shows it.
 
 The facts come from the same engines as the pages they link to, filtered by the caller's role and scope: spend and
-forecast (Command Center, Budgets & Forecasts, AI & LLM Cost Monitor), tax risk and R&D credit (Tax Risk Radar, Tax &
-Transfer Pricing), GxP and patient data, the savings pipeline (Optimization Center), alerts, anomalies and invoice
-exceptions. A figure is only linked to a page the caller can open.
+forecast (Command Center, Budgets & Forecasts, AI & LLM Cost Monitor), risk and the unlock figure (the risk and tax
+pages), compliance, the savings pipeline (Optimization Center), alerts, anomalies and invoice exceptions. A figure is
+only linked to a page the caller can open. Page titles and the risk, compliance and unlock sentences come from the
+tenant (copy.json backend.summary and frontend.nav; hooks.py summary_compliance).
 
 Sentences cite facts as ⟦f12⟧. The web app replaces each citation with the fact's figure, linked to its source, so a
 figure in the summary is always the figure on the page.
 
 Writers (nothing is sent outside CostIQ; there is no model call)
     costiq  ranks the facts and writes the sentences from fixed templates: the same data gives the same text.
-    saved   prose written in advance for a set of roles and periods (data/summary_responses.json, managed with
+    saved   prose written in advance for a set of roles and periods (tenants/<t>/summary_responses.json, managed with
             tools/summary_responses.py). Saved text cites facts like the costiq text, so its figures stay live. The
             headline and each section use their saved text only while the facts behind them are the ones it was
             written for. A section whose facts changed (an approval, an acknowledged alert) shows the costiq text.
@@ -24,32 +25,25 @@ import os
 import re
 import time
 from urllib.parse import urlencode
+from . import tenant
+from .config import settings
 from .window import window as make_window
 
 log = logging.getLogger("costiq.summary")
 CITE = re.compile(r"⟦(f\d+)⟧")
 
-PAGES = {  # module -> (page title, path); "*" pages are open to every role
-    "command": ("Command Center", "/command"),
-    "board": ("Board Pack", "/board"),
-    "budgets": ("Budgets & Forecasts", "/budgets"),
-    "ai": ("AI & LLM Cost Monitor", "/ai"),
-    "risk": ("Tax Risk Radar", "/risk"),
-    "tax": ("Tax & Transfer Pricing", "/tax"),
-    "compliance": ("GxP & Patient Data", "/compliance"),
-    "optimization": ("Optimization Center", "/optimization"),
-    "anomalies": ("Anomalies", "/anomalies"),
-    "reconciliation": ("Reconciliation & Close", "/reconciliation"),
-    "governance": ("Governance & Evidence", "/governance"),
-    "alerts": ("Alerts", "/alerts"),
-    "catalog": ("Use Case Catalog", "/catalog"),
-}
+# module -> (page title, path); titles are the tenant's navigation labels (copy.json frontend.nav.items)
+PAGES = {m: (tenant.frontend_copy()["nav"]["items"][m], f"/{m}") for m in (
+    "command", "board", "budgets", "ai", "risk", "tax", "compliance", "optimization", "anomalies", "reconciliation",
+    "governance", "alerts", "catalog")}
 OPEN_TO_ALL = {"alerts"}
-REASON_SHORT = {
-    "unactioned_savings": "known savings left unactioned for 60+ days", "no_benefit": "spend with no benefit shown",
-    "unreconciled": "spend not reconciled to an invoice", "unmapped_gl": "spend with no GL account",
-    "no_approved_policy": "allocations with no approved policy",
-}
+
+
+def T(key, **values):
+    """AI Summary copy (copy.json backend.summary.<key>)."""
+    return tenant.text("summary." + key, **values)
+
+
 PART_PHRASE = {
     "month_elapsed": "only {v} of the month has elapsed",
     "implemented_adapter_coverage": "only {v} of spend arrives through live adapters",
@@ -258,38 +252,42 @@ class Summarizer:
         state = "Over budget" if var > 0 else plural(len(over), "cost center") + " over" if over else "On track"
         b.section("spend", "Spend and forecast", tone, state, s)
 
-    # ------------------------------------------------------------------ tax risk, GxP and patient data
+    # ------------------------------------------------------------------ risk and compliance (wording from the tenant)
     def risk(self, b: Brief):
         p = b.p
         s = []
+        L = lambda k, **v: T("risk.labels." + k, **v)  # noqa: E731 - fact labels
+        pg = tenant.lookup("summary.risk.page")          # section names on the risk page
         if p.scope is None and p.can("risk"):
             from .prudence import OPEN_FILINGS
             r = self.prudence.summary(None)
             open_f = [d for d in r["filings"] if d["Status"] in OPEN_FILINGS]
-            amt = b.f(money(r["deduction_at_risk"]), "Deduction at risk", "risk", "Deduction at risk")
-            nf = b.f(plural(len(open_f), "open filing"), "Open filings", "risk", "By filing")
-            ev = b.f(pct(r["evidence_score"]), "Share of review-period spend evidenced", "risk", "Deduction at risk")
-            s.append(f"An examiner could challenge {amt} of deductions across {nf}; {ev} of review-period spend is evidenced.")
-            b.lead["risk"] = f"{amt} of deductions could be challenged"
+            amt = b.f(money(r["deduction_at_risk"]), L("amount"), "risk", pg["headline"])
+            nf = b.f(plural(len(open_f), T("risk.open_filing")), L("open_filings"), "risk", pg["by_filing"])
+            ev = b.f(pct(r["evidence_score"]), L("evidenced"), "risk", pg["headline"])
+            s.append(T("risk.lead", amount=amt, filings=nf, evidenced=ev))
+            b.lead["risk"] = T("risk.headline", amount=amt)
             if r["by_reason"]:
                 top_reason = r["by_reason"][0]
-                why = b.f(REASON_SHORT.get(top_reason["RiskReason"], top_reason["Label"].lower()), "Largest cause of risk", "risk", "By reason",
-                          hl=top_reason["Label"])
-                s.append(f"The main cause is {why}, at {b.f(money(top_reason['Risk']), 'Risk from this cause', 'risk', 'By reason', hl=top_reason['Label'])}.")
+                why = b.f(tenant.lookup("summary.risk.reasons").get(top_reason["RiskReason"], top_reason["Label"].lower()),
+                          L("top_reason"), "risk", pg["by_reason"], hl=top_reason["Label"])
+                s.append(T("risk.cause", reason=why,
+                           amount=b.f(money(top_reason['Risk']), L("reason_amount"), "risk", pg["by_reason"], hl=top_reason["Label"])))
             if r["top"]:
                 t = r["top"][0]
-                item = b.f(t["Item"], "Largest single risk", "risk", "Largest risks", hl=t["Item"])
-                ramt = b.f(money(t["Risk"]), "Its deduction at risk", "risk", "Largest risks", hl=t["Item"])
-                filing = b.f(t["FilingId"], "Filing it sits in", "risk", "By filing", hl=t["FilingId"])
-                line = f"The largest single exposure is {item} ({t['Vendor']}, {t['LegalEntity']}) at {ramt} in {filing}"
+                item = b.f(t["Item"], L("top_item"), "risk", pg["largest"], hl=t["Item"])
+                ramt = b.f(money(t["Risk"]), L("top_amount"), "risk", pg["largest"], hl=t["Item"])
+                filing = b.f(t["FilingId"], L("top_filing"), "risk", pg["by_filing"], hl=t["FilingId"])
+                line = T("risk.largest", item=item, vendor=t["Vendor"], entity=t["LegalEntity"], amount=ramt, filing=filing)
                 fix = t.get("Fix") or {}
                 if fix.get("kind") == "optimization" and fix.get("status") in VERB:
                     a = next((x for x in self.optimizer.actions(None) if x["OptimizationId"] == fix["target"]), None)
                     if a:
                         oid = b.f(fix["target"], a["Title"], "optimization", "Backlog", focus=fix["target"])
                         sav = b.f(money(a["EstimatedMonthlySavings"]), "Estimated monthly saving", "optimization", "Backlog", focus=fix["target"])
-                        line += f"; {VERB[fix['status']]} {oid} removes it and saves {sav} a month"
-                        b.act("optimization", f"{NEXT[fix['status']]} {fix['target']}", f"{a['Title']}. Also clears {money(t['Risk'])} of deduction risk in {t['FilingId']}.",
+                        line += T("risk.largest_fix", verb=VERB[fix["status"]], action=oid, saving=sav)
+                        b.act("optimization", f"{NEXT[fix['status']]} {fix['target']}",
+                              T("risk.fix_detail", title=a["Title"], amount=money(t["Risk"]), filing=t["FilingId"]),
                               f"{money(a['EstimatedMonthlySavings'])}/mo", b.href("optimization", focus=fix["target"]),
                               12 * float(a["EstimatedMonthlySavings"] or 0) + float(t["Risk"]))
                 s.append(line + ".")
@@ -299,43 +297,32 @@ class Summarizer:
                 when = dt.date.fromisoformat(str(d["FilingDate"])[:10])
                 days = (when - self.eng.as_of()).days
                 fr = next((x for x in r["by_filing"] if x["FilingId"] == d["FilingId"]), None)
-                fid = b.f(d["FilingId"], f"Next filing ({d['LegalEntity']}, {d['Jurisdiction']})", "risk", "By filing", hl=d["FilingId"])
-                lab = f"Filing date of {d['FilingId']}"
-                due_in = b.f(plural(abs(days), "day"), "Days until the filing date" if days >= 0 else "Days past the filing date", "risk", "By filing", hl=d["FilingId"])
-                line = f"{fid} is due {'in ' + due_in if days >= 0 else due_in + ' late'} ({b.f(when.isoformat(), lab, 'risk', 'By filing', hl=d['FilingId'])})"
+                fid = b.f(d["FilingId"], L("next_filing", entity=d["LegalEntity"], jurisdiction=d["Jurisdiction"]), "risk",
+                          pg["by_filing"], hl=d["FilingId"])
+                lab = L("filing_date", filing=d["FilingId"])
+                due_in = b.f(plural(abs(days), "day"), L("days_until") if days >= 0 else L("days_past"), "risk", pg["by_filing"],
+                             hl=d["FilingId"])
+                date = b.f(when.isoformat(), lab, "risk", pg["by_filing"], hl=d["FilingId"])
+                line = T("risk.due" if days >= 0 else "risk.late", filing=fid, days=due_in, date=date)
                 if fr:
-                    line += f" and carries {b.f(money(fr['Risk']), 'Deduction at risk in this filing', 'risk', 'By filing', hl=d['FilingId'])} of the risk"
+                    line += T("risk.due_amount", amount=b.f(money(fr["Risk"]), L("filing_amount"), "risk", pg["by_filing"], hl=d["FilingId"]))
                 s.append(line + ".")
 
-        b.section("risk", "Tax risk", "bad", "At risk", s)
+        sec = tenant.lookup("summary.risk.section")
+        b.section(sec["key"], sec["title"], "bad", sec["state"], s)
         s = []
         if p.can("compliance") or p.can("governance"):
-            fnd = [x for x in self.eng.findings(p.scope) if x["kind"] == "compliance" and x["severity"] == "high"]
-            for x in sorted(fnd, key=lambda x: -x["exposure"])[:2]:
-                ref = self._finding(b, x, x["id"], f"{x['title']} ({x['detail']})")
-                amt = self._finding(b, x, money(x["exposure"]), "Spend affected")
-                if x["id"] == "PH-07":
-                    s.append(f"{amt} of spend runs where patient data is encrypted with provider-managed keys ({x['detail']}), flagged by {ref}.")
-                    b.lead.setdefault("compliance", f"{amt} of spend holds patient data on provider-managed keys")
-                    b.act("compliance", "Move patient-data workloads to customer-managed keys", f"{x['detail']} ({x['id']})",
-                          f"{money(x['exposure'])} of spend", b.href("compliance", hl=x["id"]) or f"/catalog/{x['id']}", float(x["exposure"]))
-                elif x["id"] == "GV-02":
-                    s.append(f"A regulated workload has been served outside the US ({x['detail']}), {amt} of spend, flagged by {ref}.")
-                else:
-                    s.append(f"{ref}: {x['title'][0].lower() + x['title'][1:]} ({x['detail']}), {amt}.")
-            overdue = self.db.query("""SELECT SystemName, NextReviewDate FROM ref_gxp_system WHERE GxpImpact <> 'None'
-                                       AND NextReviewDate < :d ORDER BY NextReviewDate""", {"d": self.eng.as_of()})["rows"]
-            if overdue and p.can("compliance"):
-                name, d = overdue[0]
-                late = (self.eng.as_of() - dt.date.fromisoformat(str(d)[:10])).days
-                mod = "board" if p.can("board") else "compliance"
-                sec = "Inspection readiness" if mod == "board" else "Checks"
-                s.append(f"The validation review for {b.f(name, 'GxP system with an overdue review', mod, sec, hl=name)} is "
-                         f"{b.f(plural(late, 'day'), 'Days past the review date', mod, sec, hl=name)} overdue.")
-        b.section("gxp", "GxP and patient data", "bad", "Needs attention", s)
+            s = tenant.hooks().summary_compliance(self, b)
+        sec = tenant.lookup("summary.compliance.section")
+        b.section(sec["key"], sec["title"], "bad", sec["state"], s)
+
+    @staticmethod
+    def finding_sentence(x, ref, amt) -> str:
+        """The default sentence for a compliance finding (hooks may word their own)."""
+        return f"{ref}: {x['title'][0].lower() + x['title'][1:]} ({x['detail']}), {amt}."
 
     def _finding(self, b: Brief, x, text, label) -> str:
-        """A compliance finding: its row on GxP & Patient Data when the role can open it, else its use case page
+        """A compliance finding: its row on the compliance page when the role can open it, else its use case page
         in the catalog (open to every role), which runs the check and shows the rows behind it."""
         if x.get("module") == "compliance" and b.p.can("compliance"):
             return b.f(text, label, "compliance", "Checks", hl=x["id"])
@@ -347,28 +334,34 @@ class Summarizer:
         b.facts[fid] = {"text": str(text), "label": label, "href": f"{path}/{x['id']}", "source": b.sources[key]["n"]}
         return f"⟦{fid}⟧"
 
-    # ------------------------------------------------------------------ R&D credit and the savings pipeline
+    # ------------------------------------------------------------------ the unlock figure and the savings pipeline
     def money_on_table(self, b: Brief):
         p = b.p
         s = []
         if p.scope is None and (p.can("tax") or (p.can("risk") and p.can("command"))):
             cu = self.prudence.credit_unlock(None)
-            mod, sec, extra = ("tax", "Credit unlock", {"tab": "credit"}) if p.can("tax") else ("command", "R&D credit unlock", {})
+            pg = tenant.lookup("summary.credit.page")
+            L = lambda k, **v: T("credit.labels." + k, **v)  # noqa: E731 - fact labels
+            mod, sec, extra = ("tax", pg["tax"], {"tab": pg["tax_tab"]}) if p.can("tax") else ("command", pg["command"], {})
             elig = sorted([j for j in cu["jurisdictions"] if j["CreditStatus"] == "eligible"], key=lambda j: -j["Credit"])
             if cu["credit_unlock"]:
-                amt = b.f(f"{money(cu['credit_unlock'])} a year", "R&D credit eligible but not claimed", mod, sec, **extra)
-                line = f"Claiming eligible cloud and SaaS fees would add {amt} of R&D credit"
+                amt = b.f(T("credit.per_year", amount=money(cu["credit_unlock"])), L("unclaimed"), mod, sec, **extra)
+                line = T("credit.line", amount=amt)
                 if elig:
                     j = elig[0]
-                    line += (f", {b.f(money(j['Credit']), j['Jurisdiction'] + ' credit', mod, sec, hl=j['Jurisdiction'], **extra)} of it in "
-                             f"{b.f(j['Jurisdiction'], 'Jurisdiction', mod, sec, hl=j['Jurisdiction'], **extra)}")
-                    b.act("credit", f"Claim the {j['Jurisdiction']} R&D credit",
-                          f"Eligible recurring cloud and SaaS fees not yet claimed{' in ' + j['FilingId'] if j.get('FilingId') else ''}.",
+                    line += T("credit.line_top",
+                              credit=b.f(money(j['Credit']), L("jurisdiction_credit", jurisdiction=j["Jurisdiction"]), mod, sec,
+                                         hl=j['Jurisdiction'], **extra),
+                              jurisdiction=b.f(j['Jurisdiction'], L("jurisdiction"), mod, sec, hl=j['Jurisdiction'], **extra))
+                    b.act("credit", T("credit.action_title", jurisdiction=j["Jurisdiction"]),
+                          T("credit.action_detail", in_filing=T("credit.action_in_filing", filing=j["FilingId"]) if j.get("FilingId") else ""),
                           f"{money(j['Credit'])}/yr", b.href(mod, hl=j["Jurisdiction"] if mod == "tax" else None, sec=None if mod == "tax" else sec, **extra),
                           float(j["Credit"]))
-                line += f", on top of {b.f(money(cu['credit_claimed']) + ' a year', 'R&D credit claimed today', mod, 'Claimed today' if mod == 'tax' else sec, **extra)} claimed today."
+                line += T("credit.line_claimed",
+                          claimed=b.f(T("credit.per_year", amount=money(cu["credit_claimed"])), L("claimed"), mod,
+                                      pg["tax_claimed"] if mod == "tax" else sec, **extra))
                 s.append(line)
-                b.lead["credit"] = f"{amt} of R&D credit is unclaimed"
+                b.lead["credit"] = T("credit.headline", amount=amt)
         if p.can("optimization"):
             sm = self.optimizer.summary(p.scope)
             st = {x["Stage"]: x for x in sm["stages"]}
@@ -486,17 +479,20 @@ class Summarizer:
 
 
 # ---------------------------------------------------------------------------------------- saved responses
-RESPONSES = os.path.join(os.path.dirname(__file__), "..", "data", "summary_responses.json")
+RESPONSES = settings.summary_responses  # tenants/<t>/summary_responses.json (COSTIQ_SUMMARY_RESPONSES overrides)
 _responses: dict | None = None
 
 
 def saved_responses() -> dict:
-    """Saved prose by response key (persona:range). Loaded once; a missing or unreadable file means none."""
+    """Saved prose by response key (persona:range). Loaded once; a missing or unreadable file means none. A tenant with
+    no saved file is normal (the costiq writer is used), so only an unreadable file is logged."""
     global _responses
     if _responses is None:
         try:
             with open(RESPONSES, encoding="utf-8") as fh:
                 _responses = json.load(fh)["responses"]
+        except FileNotFoundError:
+            _responses = {}
         except (OSError, ValueError, KeyError) as e:
             log.warning("saved summaries not loaded: %s", e)
             _responses = {}

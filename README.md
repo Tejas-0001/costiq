@@ -18,7 +18,7 @@ Cost centers: Clinical Operations, Patient Data, Research & Discovery, Data & An
 ## Board Pack and Glossary
 
 - **Board Pack** (`/board`; CFO, Technology Executive, Internal Controller, Internal Audit, Investor Relations): spend and outlook, AI investment and value, compliance and controls risk, decisions, then nine life-sciences additions (programs and phases, R&D vs SG&A, AI value in R&D, inspection readiness, patient data exposure, AI regulation readiness, cyber, vendor concentration, GMP AI). A section that needs data CostIQ does not hold says which input is missing. Printable.
-- **AI Summary** (`/summary`, every role; also the agent's "Brief me"): a headline, what matters in spend, tax risk, GxP, savings and operations, and up to four next actions, for the signed-in role and scope. Every figure links to the panel or table row it comes from (the page scrolls to it and highlights it), and numbered chips list the source pages. The wording comes from saved responses for every role (Month to date) and for the CFO in every period (`backend/data/summary_responses.json`); other combinations, and any section whose figures have changed since, use CostIQ's built-in writer. No model or API key is involved.
+- **AI Summary** (`/summary`, every role; also the agent's "Brief me"): a headline, what matters in spend, tax risk, GxP, savings and operations, and up to four next actions, for the signed-in role and scope. Every figure links to the panel or table row it comes from (the page scrolls to it and highlights it), and numbered chips list the source pages. The wording comes from saved responses for every role (Month to date) and for the CFO in every period (`backend/tenants/pharma/summary_responses.json`); other combinations, and any section whose figures have changed since, use CostIQ's built-in writer. No model or API key is involved.
 - **Glossary** (`/glossary`, every role): terms, and how forecasts, run-rates, confidence, anomalies and savings estimates are calculated.
 
 ## Headline numbers (sample data)
@@ -44,20 +44,22 @@ A line counts toward deduction at risk when any of these is true:
 
 ```powershell
 cd mvp
-docker compose up -d --build     # then open http://localhost:3000
+docker compose up -d --build     # then open http://localhost:3000 and pick the Industry on the sign-in page
 docker compose logs -f backend
-docker compose down              # stop; demo changes kept in the costiq-data volume
-docker compose down -v           # stop and reset to the built-in sample
+docker compose down              # stop; changes kept in the costiq-data and costiq-utility-data volumes
+docker compose down -v           # stop and reset both tenants to their built-in data
 ```
 
 | Service | Image | Port | Notes |
 |---|---|---|---|
-| `backend` | `mm-costiq-backend:mvp` (Python 3.12, FastAPI, DuckDB) | 8080 | Sample copied to the `costiq-data` volume on first start |
-| `frontend` | `mm-costiq-frontend:mvp` (Node 24, Next.js standalone) | 3000 | Forwards `/api/*` to the backend |
+| `backend` | `mm-costiq-backend:pharma` (Python 3.12, FastAPI, DuckDB) | 8080 | Life sciences tenant; data in the `costiq-data` volume |
+| `backend-utility` | `mm-costiq-backend:utility` | 8081 | Electric utility tenant; data in the `costiq-utility-data` volume |
+| `frontend` | `mm-costiq-frontend:mvp` (Node 24, Next.js standalone) | 3000 | One address for both: the sign-in page's Industry switch sets the `costiq_tenant` cookie, and `/api/*` goes to that tenant's API |
 
 Both ports bind to `127.0.0.1`. To change that, set these in the shell or in `.env`:
 - `COSTIQ_BIND=0.0.0.0` to expose on the network
-- `COSTIQ_WEB_PORT` / `COSTIQ_API_PORT` to change ports
+- `COSTIQ_WEB_PORT` / `COSTIQ_API_PORT` / `COSTIQ_UTILITY_API_PORT` to change ports
+- `COSTIQ_DEFAULT_TENANT=utility` to open on the electric utility tenant
 - `COSTIQ_ALERT_WEBHOOK_URL` to turn on alert webhooks
 
 Tests in the image: `docker compose run --rm --no-deps backend test`
@@ -77,18 +79,41 @@ Sign-in: choose a role (Entra ID mode exists in the backend). The signed-in app 
 
 ## Deploy on Vercel
 
-`vercel.json` deploys both apps as one Vercel project with two [services](https://vercel.com/docs/services):
+`vercel.json` deploys one Vercel project with three [services](https://vercel.com/docs/services), both tenants behind one address:
 
 | Service | Root | Public path | Notes |
 |---|---|---|---|
-| `frontend` | `frontend/` (Next.js) | `/(.*)`, everything | Binding to `backend` injects `COSTIQ_API_URL`; its `/api/*` route handler forwards calls with the persona header |
-| `backend` | `backend/` (FastAPI, `costiq.main:app`) | none, internal only | Build step `data/vercel_build.py` builds the sample database into the bundle |
+| `frontend` | `frontend/` (Next.js) | `/(.*)`, everything | Bindings inject `COSTIQ_API_URL_PHARMA` and `COSTIQ_API_URL_UTILITY`; its `/api/*` route handler forwards each call to the tenant chosen on the sign-in page, with the persona header |
+| `backend` | `backend/` (FastAPI, `costiq.app_pharma:app`) | none, internal only | `data/vercel_build.py --tenant pharma` builds the sample into the bundle |
+| `backend_utility` | `backend/` (FastAPI, `costiq.app_utility:app`) | none, internal only | `data/vercel_build.py --tenant utility` |
 
 - The backend has no public route because demo sign-in trusts the `X-CostIQ-Persona` header. Only the frontend, through the binding, can reach it.
-- No environment variables or secrets are needed: the binding provides `COSTIQ_API_URL` (don't set it yourself), and the pseudonym key keeps its built-in default, which is fine for the generated sample.
+- No environment variables or secrets are needed: the bindings provide the API URLs (don't set them yourself), each backend's entry point fixes its tenant, and the pseudonym key keeps its built-in default, which is fine for the generated sample.
 - Data: each backend instance works on its own copy of the sample in `/tmp`. Changes (approvals, acknowledgements, ledger entries) last until that instance is recycled, and instances don't share them. To keep changes, point `COSTIQ_DB_URL` at a PostgreSQL database loaded with the sample. The backend supports PostgreSQL, but these pages have only been tested on DuckDB.
 - Anyone with the URL can sign in as any role, so turn on Deployment Protection (Project Settings → Deployment Protection → Vercel Authentication) to limit who can open it.
-- Local run of both services: `vercel dev -L` from `mvp/` (needs `backend/sample/costiq.duckdb`; build it once with `backend\start.ps1 -Rebuild`).
+- Local run of both services: `vercel dev -L` from `mvp/` (needs `backend/sample/pharma/costiq.duckdb`; build it once with `backend\start.ps1 -Rebuild`).
+
+## Tenants
+
+One codebase serves several sample tenants. Each API process serves one, chosen by `COSTIQ_TENANT` (default `pharma`); the web app sits in front of all of them, and the sign-in page's Industry switch picks one (`frontend/lib/tenants.ts`: `COSTIQ_API_URL_<TENANT>` per API, `COSTIQ_DEFAULT_TENANT`; with only `COSTIQ_API_URL` set there is no switch). A tenant pack in `backend/tenants/<tenant>/` holds what differs: the access model and module labels (`access.yaml`), its own use cases (`usecases/`), the sample add-on and registers (`sample.py`, `schema.sql`), name tables for the shared generators (`names.py`), engine settings (`pack.yaml`: cost classes, default rules, use-case ids), five hooks (`hooks.py`) and the backend and web copy (`copy.json` plus the fragments in `copy/*.json`: `app.json`, `ledger.json`, `rates.json`, `readiness.json`, deep-merged in filename order, a leaf defined twice is an error; the merged `frontend` section is served to the web app by `/api/config` and `/api/me`). Both tenants define the same leaf keys and `{placeholders}` (`tests/test_tenants.py`), and neither tenant's pages, use cases, dbt export or web copy carry the other's terms (`tests/test_tenant_leak.py`, `tests/test_frontend_copy.py`). Module keys, routes and engines are shared; a feature a pack does not configure is off. The interface is documented in `backend/tenants/__init__.py`.
+
+Utility-only pages and panels: Data Readiness (`/readiness`, module `readiness`: sources, tag coverage, accounting, tie-out, controls), the FERC ledger, rule register and work orders on Regulatory Accounting & Rates (`/tax?tab=ledger|rules|capital`), invoice-to-ledger unbundling on Reconciliation (`/reconciliation?detail=<InvoiceDetailId>`), tag enforcement on Allocation (`/allocation?month=YYYY-MM`) and the NERC CIP framework in the deployment planner (`/deploy`, which reads `tenant` from `/api/config`).
+
+| Tenant | Sample | Module labels (risk / tax / compliance) |
+|---|---|---|
+| `pharma` | multi-entity life sciences group | Tax Risk Radar / Tax & Transfer Pricing / GxP & Patient Data |
+| `utility` | electric utility holding company with operating companies | Prudence Radar / Regulatory Accounting & Rates / NERC CIP & Data |
+
+```powershell
+cd backend
+.venv\Scripts\python.exe data\build_sample.py --tenant utility       # -> sample\utility\costiq.duckdb
+$env:COSTIQ_TENANT = "utility"; .venv\Scripts\python.exe -m pytest -q   # tests for other tenants are skipped
+$env:COSTIQ_TENANT = "utility"; .venv\Scripts\python.exe -m costiq.cli conformance -v   # every utility use case runs
+# Git Bash: COSTIQ_TENANT=utility .venv/Scripts/python.exe -m pytest -q -p no:cacheprovider tests
+cd ..
+.\start.ps1 -Tenant utility                                           # API + web app for that tenant
+docker build --build-arg COSTIQ_TENANT=utility backend                 # image for that tenant
+```
 
 ## Layout
 
@@ -107,10 +132,10 @@ mvp/
       board.py                Board Pack: 13 sections, each marked In CostIQ / Partial / Needs data
       summary.py              AI summary: ranked facts, linked sources, saved responses
       monitoring.py, alerts.py, adapters/
-    registry/usecases/      145 executable use cases (YAML); PH-* are the pharma ones
-    schema/                 FOCUS 1.4 + app, pharma and optimization schemas
-    config/access.yaml      modules, 14 personas, actions, scopes
-    data/                   synthetic sample generator (pharma.py), Vercel build step and file-drop templates
+    registry/usecases/      shared executable use cases (YAML): FinOps Foundation, AI, optimization
+    schema/                 FOCUS 1.4 + app, regulatory core and optimization schemas
+    tenants/<tenant>/       tenant packs (see Tenants): access.yaml, usecases/ (PH-* for pharma), sample.py, copy.json, ...
+    data/                   shared sample generator, Vercel build step and file-drop templates
     tools/summary_responses.py  dump facts, save and check the AI summary's saved responses
     tests/
   frontend/                 Next.js 16 + Tailwind v4 + Chart.js
@@ -182,7 +207,7 @@ Cloud billing loads as FOCUS 1.x exports. Afterwards, `python -m costiq.cli refr
 
 ```powershell
 cd backend
-.venv\Scripts\python.exe -m pytest -q                    # 184 tests on a temp copy of the sample DB
+.venv\Scripts\python.exe -m pytest -q                    # on a temp copy of the active tenant's sample DB
 .venv\Scripts\python.exe -m costiq.cli conformance -v    # every use case runs
 cd ..\frontend
 npx eslint . ; npx next build

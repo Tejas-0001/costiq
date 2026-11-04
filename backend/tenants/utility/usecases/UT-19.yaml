@@ -1,0 +1,60 @@
+id: UT-19
+source: MM CostIQ Utility extension
+title: 'Prepayments (165) and their monthly amortization'
+category: 'Utility · FERC accounting'
+module: tax
+business_question: 'What sits in prepayments for commitments and annual seats, and how much has been amortized to the consuming accounts?'
+personas:
+- finance_controller
+- regulatory_analyst
+- finops_analyst
+catalog_persona: 'Controller, Cloud CoE'
+datasets:
+- 'Cost and Usage'
+- 'Utility reference tables'
+description: 'Upfront commitments and annual subscriptions recorded to 165 (R9) and amortized each month to the account of the usage that consumed them: reserved-instance and reservation coverage through EffectiveCost, annual Copilot seats by the seat holder''s cost center.'
+columns: 'FOCUS columns plus ref_* utility registers and allocated_cost'
+keywords:
+- 'prepayment'
+- '165'
+- 'amortization'
+- 'reserved instance'
+- 'reservation'
+- 'annual seats'
+- 'commitment'
+products: Any provider
+sql: |-
+  WITH asof AS (SELECT MAX(CAST(ChargePeriodStart AS DATE)) AS d FROM CostAndUsage WHERE ChargeCategory = 'Usage'),
+  by_commitment AS (
+    SELECT CommitmentDiscountId, SUM(EffectiveCost) AS Amortized
+    FROM CostAndUsage WHERE CommitmentDiscountStatus = 'Used'
+    GROUP BY CommitmentDiscountId
+  ),
+  by_invoice AS (
+    SELECT InvoiceId, SUM(EffectiveCost) AS Amortized
+    FROM CostAndUsage WHERE BilledCost = 0 AND EffectiveCost > 0
+    GROUP BY InvoiceId
+  ),
+  x AS (
+    SELECT p.*,
+           CASE WHEN p.AmortizationStart < DATE '2026-07-01'
+                THEN DATE_DIFF('month', p.AmortizationStart, DATE '2026-07-01') * p.MonthlyAmortization ELSE 0 END AS BeforeWindow,
+           COALESCE(c.Amortized, i.Amortized, 0) AS InWindow,
+           asof.d AS AsOf
+    FROM ref_prepayment p
+    CROSS JOIN asof
+    LEFT JOIN by_commitment c ON c.CommitmentDiscountId = p.CommitmentDiscountId
+    LEFT JOIN by_invoice i ON i.InvoiceId = p.InvoiceId
+  )
+  SELECT
+    PrepaymentId, Vendor, Description, IssueDate, ROUND(Amount, 2) AS Amount, Account,
+    ROUND(MonthlyAmortization, 2) AS MonthlyAmortization,
+    ROUND(BeforeWindow, 2) AS AmortizedBeforeJuly,
+    ROUND(InWindow, 2) AS AmortizedJulyToDate,
+    ROUND(Amount - BeforeWindow - InWindow, 2) AS Balance165,
+    ExpenseRule,
+    CASE WHEN AmortizationStart > AsOf THEN 'Not started' ELSE 'Amortizing' END AS Status
+  FROM x
+  ORDER BY IssueDate
+params: []
+notes: 'The October amortization runs to the data date.'

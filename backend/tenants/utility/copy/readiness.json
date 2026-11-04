@@ -1,0 +1,224 @@
+{
+  "backend": {
+    "readiness": {
+      "formula": "Sources: rows per feed in the billing months the period touches, against the ingest manifest; InvoiceId share of those rows; format, FOCUS version and export mode are the feed's export settings on file; spend in the period on accounts flagged for CIP review. Tags: cost-weighted coverage per required tag, as on the Allocation page. Accounting: ledger dollars in the period by the basis of the rule that placed them (regulation, [POLICY] signed off, [POLICY] awaiting the controller's sign-off) and unmapped; capitalized dollars carrying a valid work order with a threshold date. Reconciliation: invoices in the period's billing months whose lines all tie within $1, or whose differences are labeled. Controls: C-01 to C-11 as on the Governance page. Each section scores 0 to 100; the overall score is their average.",
+      "flaggedSensitivity": ["cip_related_workload", "potential_bcsi_context"],
+      "sources": [
+        {"source": "aws_focus_export", "provider": "AWS", "format": "AWS Data Exports, FOCUS_1_2_AWS (Parquet)", "focus": "1.2", "export": "CREATE_NEW"},
+        {"source": "aws_ai_focus_export", "provider": "AWS", "format": "AWS Data Exports, FOCUS_1_0_AWS (Parquet)", "focus": "1.0", "export": "OVERWRITE"},
+        {"prefix": "aws_", "provider": "AWS", "format": "AWS Data Exports, FOCUS_1_2_AWS (Parquet)", "focus": "1.2", "export": "CREATE_NEW"},
+        {"source": "azure_focus_export", "provider": "Microsoft", "format": "Cost Management FocusCost, MCA (CSV)", "focus": "1.0r2", "export": "New run folder per export"},
+        {"prefix": "azure_", "provider": "Microsoft", "format": "Cost Management FocusCost, MCA (CSV)", "focus": "1.0r2", "export": "New run folder per export"},
+        {"prefix": "gcp_", "provider": "Google Cloud", "format": "BigQuery billing export, FOCUS view", "focus": "1.0", "export": "Daily table refresh"},
+        {"prefix": "snowflake_", "provider": "Snowflake", "format": "Account usage, FOCUS view", "focus": "1.3", "export": "Daily query"},
+        {"prefix": "anthropic_", "provider": "Anthropic", "format": "Usage and cost API, mapped by an adapter", "focus": "1.4 via adapter", "export": "Daily API pull"},
+        {"prefix": "github_", "provider": "GitHub", "format": "Usage report API, mapped by an adapter", "focus": "1.4 via adapter", "export": "Daily API pull"},
+        {"prefix": "saas_invoice", "provider": "SaaS vendors", "format": "Invoice files, mapped by an adapter", "focus": "1.4 via adapter", "export": "One file per invoice"}
+      ]
+    }
+  },
+  "frontend": {
+    "nav": {"items": {"readiness": "Data Readiness"}},
+    "readiness": {
+      "title": "Data Readiness & Accounting Discovery",
+      "status": {"ready": "Ready", "partial": "Partly ready", "gaps": "Gaps to close", "na": "No data"},
+      "scorecard": {
+        "title": "Readiness scorecard",
+        "overall": "Overall",
+        "section": "Section",
+        "score": "Score",
+        "status": "Status",
+        "measures": "What is measured"
+      },
+      "sections": {
+        "sources": {"label": "Source readiness", "measures": "Spend from feeds whose rows match the export manifest and carry an InvoiceId"},
+        "tags": {"label": "Tag readiness", "measures": "Average cost-weighted coverage of the required tags"},
+        "accounting": {"label": "Accounting readiness", "measures": "Ledger dollars placed by a regulation rule or a [POLICY] rule the controller signed off"},
+        "reconciliation": {"label": "Reconciliation readiness", "measures": "Invoices that tie within $1 or whose difference is labeled"},
+        "controls": {"label": "Controls", "measures": "Controls C-01 to C-11 that pass"}
+      },
+      "sources": {
+        "Source": "Feed",
+        "Provider": "Provider",
+        "Format": "Format",
+        "FocusVersion": "FOCUS version",
+        "InvoiceIdPresentPct": "InvoiceId present",
+        "ExportMode": "Export mode",
+        "MonthsAvailable": "Months",
+        "Rows": "Rows",
+        "ManifestRows": "Manifest rows",
+        "RowsMatch": "Rows match",
+        "CipFlaggedSpend": "CIP-flagged spend",
+        "yes": "yes",
+        "no": "no",
+        "total": "All feeds"
+      },
+      "tags": {
+        "keys": "Coverage by required tag",
+        "TagKey": "Tag",
+        "Requirement": "Required on",
+        "CoveragePct": "Coverage",
+        "ValidSpend": "Valid",
+        "UntaggedSpend": "Untagged",
+        "InvalidSpend": "Invalid",
+        "byEntity": "Coverage by operating company",
+        "byUnit": "Coverage by business unit",
+        "entity": "Company",
+        "unit": "Business unit",
+        "taggable": "Taggable spend",
+        "suspense": "Suspense",
+        "suspenseSub": "{share}% of AWS and Azure usage · owner {owner}",
+        "oldest": "Oldest item {days} days",
+        "cannotTag": "Cannot be tagged",
+        "cannotTagSub": "tax, credits, support, rounding and Marketplace; reported apart",
+        "none": "Tag compliance is not set up for this tenant.",
+        "link": "Open the tag panel"
+      },
+      "accounting": {
+        "total": "Ledger dollars",
+        "regulation": "Regulation rule",
+        "policySigned": "[POLICY] rule, signed off",
+        "policyAwaiting": "[POLICY] rule, awaiting sign-off",
+        "noRule": "No rule",
+        "unmapped": "Unmapped",
+        "mapped": "Mapped to a FERC account",
+        "byBasis": "Ledger dollars by rule basis",
+        "capital": "Capitalized with a valid work order",
+        "capitalSub": "{valid} of {total} requested for capital",
+        "workOrders": "Work orders with a threshold date",
+        "workOrdersSub": "{with} of {all} on file",
+        "byRule": "Dollars by rule",
+        "RuleId": "Rule",
+        "Basis": "Basis",
+        "Status": "Sign-off",
+        "Lines": "Lines",
+        "AllocatedCost": "Dollars",
+        "signed": "Signed off",
+        "awaiting": "Awaiting sign-off",
+        "noRules": "The ledger does not carry rule ids yet: mapped against unmapped only.",
+        "link": "Open the rule register"
+      },
+      "reconciliation": {
+        "invoices": "Invoices",
+        "invoicesSub": "billing months {periods}",
+        "tied": "Tie within $1",
+        "labeled": "Difference labeled",
+        "byReason": "Variance by reason",
+        "Reason": "Reason",
+        "Lines": "Lines",
+        "Amount": "Amount",
+        "none": "Every invoice line ties within $1.",
+        "link": "Open reconciliation"
+      },
+      "controls": {
+        "id": "Control",
+        "control": "What it checks",
+        "result": "Result",
+        "evidence": "Evidence",
+        "confidence": "Forecast confidence",
+        "link": "Open governance"
+      },
+      "checklist": {
+        "title": "Platform checklist",
+        "item": "Item",
+        "need": "What we need",
+        "state": "Status",
+        "toConfirm": "To confirm",
+        "items": [
+          ["Snowflake edition and region", "Enterprise for tag-based masking; Business Critical for PrivateLink and Tri-Secret Secure"],
+          ["PrivateLink", "Required or not, for the sandbox and production accounts"],
+          ["Git provider and OIDC", "Where the Client-Owned Codebase lives; CI signs in with OIDC, with no stored keys"],
+          ["External Access policy", "Packages are copied into the repository, so the Native Snowflake Pipeline needs no External Access Integration"],
+          ["CIP classification requested", "Your CIP program classifies the billing data; CostIQ flags and masks names on accounts it is asked to"],
+          ["M365 cloud", "Commercial, GCC or GCC High: Copilot usage reports from Graph run in the global cloud only"]
+        ]
+      },
+      "discovery": {
+        "title": "Proposed Discovery: Data Readiness & Accounting Discovery, 4 weeks",
+        "week": "Week",
+        "work": "Work",
+        "weeks": [
+          ["1", "Receive one closed month per cloud and profile each feed. Review the tag dictionary. Walk through current accounting with Regulated Accounting."],
+          ["2", "Draft the rule register against your chart of accounts, including five-digit subaccounts, and list the [POLICY] items for sign-off. Map the allocation factors to your service company's factor codes."],
+          ["3", "Load one closed month and the current open month per cloud into your Snowflake sandbox with the Native Snowflake Pipeline. Unbundle them, tie them to invoices and produce the scorecard."],
+          ["4", "Write the POC charter: scope, target test year, success criteria, security package (data path, roles, request for CIP classification) and the hand-over of the Client-Owned Codebase."]
+        ],
+        "outputsTitle": "Outputs",
+        "outputs": [
+          "Readiness scorecard",
+          "Rule register v0.9 mapped to your chart, with the [POLICY] items for sign-off",
+          "Tag standard with enforcement as code",
+          "One month unbundled to FERC accounts and tied to the invoices",
+          "POC charter"
+        ],
+        "criteriaTitle": "Criteria for going to POC",
+        "criteria": [
+          "AWS and Azure invoices tie per InvoiceId within $1, or the gap is labeled",
+          "Every [POLICY] rule has a named person to sign it off",
+          "Known gaps are listed (an Enterprise Agreement carries no InvoiceId; GovCloud is not in the FOCUS exports)"
+        ],
+        "decisionsTitle": "Decisions needed",
+        "decisions": [
+          "The data list below and the dates each item arrives",
+          "The proceeding and test year to target in the POC",
+          "Who signs off the [POLICY] rules",
+          "The Snowflake sandbox account and the roles the pipeline runs under"
+        ],
+        "inputsTitle": "Data list",
+        "number": "#",
+        "input": "Item",
+        "form": "Minimum form",
+        "inputs": [
+          ["1", "AWS FOCUS export: one closed month and the current month, with Manifest.json (FOCUS_1_2_AWS preferred; FOCUS_1_0_AWS or CUR 2.0 accepted)", "Parquet, or the column list and 1,000 masked rows"],
+          ["2", "AWS setup: export mode, payer accounts, invoice units, Marketplace and GovCloud use", "Screenshot or JSON"],
+          ["3", "AWS and Azure invoices for the same month; Azure reservation transactions", "PDF or CSV"],
+          ["4", "Azure agreement type (EA, MCA-E or MPA); FocusCost manifest and one partition; billing profile and invoice sections", "Files"],
+          ["5", "Tag dictionary; AWS tag policies and SCPs; Azure Policy assignments; accounts and subscriptions mapped to legal entities", "Files"],
+          ["6", "GL extract: 3 months of cloud and SaaS postings with FERC account, five-digit subaccount and chartfields", "CSV"],
+          ["7", "Service company billing detail for IT work orders (factor codes, benefiting locations)", "CSV"],
+          ["8", "Software and cloud capitalization policy since ASU 2025-06; property units and thresholds; depreciation rates for 351.2, 363.2 and 397.2", "Documents"],
+          ["9", "Cloud and software work orders with in-service dates", "CSV"],
+          ["10", "IT section of the Cost Allocation Manual; current Schedule XXI; the last two Form 60 filings", "Documents"],
+          ["11", "Snowflake edition, cloud and region; Git provider; OIDC for CI; External Access policy; PrivateLink", "Answers"],
+          ["12", "The CIP program's view on billing data (CIP-011 R1.1 method); CIP-related accounts and subscriptions", "Answers"],
+          ["13", "M365 cloud; report concealment policy; how Copilot licenses are assigned; seat count and renewal date", "Answers"]
+        ]
+      }
+    },
+    "ai": {
+      "reharvest": {
+        "title": "Copilot seats idle {threshold}+ days",
+        "idle": "Idle Copilot seats",
+        "idleSub": "{group} through a group, {direct} direct",
+        "grace": "In grace period",
+        "graceSub": "assigned in the last {days} days; held back",
+        "avoidable": "Avoidable a month",
+        "avoidableSub": "avoids new purchases; the bill drops at the renewal true-down",
+        "renewal": "Renewal true-down",
+        "renewalSub": "annual seat term",
+        "rule": "Idle: no activity for more than {threshold} days after a {buffer}-day data buffer, as of {asOf}. Group seats are released through the group; direct seats one by one.",
+        "seats": "Seats to reassign",
+        "showing": "First {n} of {total}",
+        "groups": "Idle seats by assignment group",
+        "group": "Group",
+        "UserPrincipal": "User",
+        "Department": "Department",
+        "AssignedVia": "Assigned via",
+        "DaysIdle": "Days idle",
+        "Status": "Status"
+      },
+      "tokens": {
+        "title": "Token cost check: cache tokens counted",
+        "missed": "Missed if only input and output are added",
+        "selected": "Selected period",
+        "month": "Billing month {month}",
+        "Application": "Application",
+        "Model": "Model",
+        "TotalCost": "Total cost",
+        "InputPlusOutputOnly": "Input + output only",
+        "MissedIfCacheIgnored": "Missed if cache ignored",
+        "CheckResult": "Check"
+      }
+    }
+  }
+}

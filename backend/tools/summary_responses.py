@@ -1,4 +1,4 @@
-"""Manage the saved AI summary responses in data/summary_responses.json (see costiq/summary.py, "Writers").
+"""Manage the saved AI summary responses of the active tenant, tenants/<COSTIQ_TENANT>/summary_responses.json (see costiq/summary.py, "Writers").
 
   python tools/summary_responses.py dump  OUT.json [--range mtd] [--persona cfo ...]
         the costiq summary and its fact list for each role, to write prose from

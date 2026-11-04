@@ -1,6 +1,6 @@
 """Add the R&D and clinical workloads and reference registers to a CostIQ sample DuckDB file.
 
-  python data/pharma.py sample/costiq_sample.duckdb
+  python tenants/pharma/sample.py sample/pharma/costiq_sample.duckdb   (data/build_sample.py runs it; pack.yaml `addons`)
 
 Idempotent: removes what it added before inserting again. Generated sample: entities, filings, vendors' terms
 and people are invented, and all figures are illustrative.
@@ -12,17 +12,19 @@ Adds
     during database lock DBL-PX301), a patient portal, a discovery GPU endpoint left idle after 20 Sep, genomics data,
     non-production EDC environments running 24x7, and Consumer Health insights.
   * Invoices for all of it (ServiceNow September is over-billed: a reconciliation exception) and refreshed budgets.
-  * ref_* registers (schema/costiq_pharma_schema.sql) with seeded issues so every pharma check has findings.
+  * ref_* registers (schema/costiq_regulatory_schema.sql and tenants/pharma/schema.sql) with seeded issues so every
+    pharma check has findings.
 """
 from __future__ import annotations
 import datetime as dt, hashlib, json, os, re, sys
 import duckdb
 
-ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))  # mvp/backend
+sys.path[:0] = [ROOT, os.path.join(ROOT, "data")]
+from sample_common import refresh_budgets  # noqa: E402  (shared budget rule; reads names.py BUDGET_FACTORS)
+from tenants.pharma.names import OPT_RD_ACCOUNT as RD_ACCOUNT, OPT_RD_SUB as RD_SUB  # noqa: E402  (shared with data/optimization.py)
 START, AS_OF = dt.date(2026, 7, 1), dt.date(2026, 10, 22)
 MONTHS = [dt.date(2026, m, 1) for m in (7, 8, 9, 10)]
-RD_ACCOUNT = ("aws-rd-8008", "R&D AWS")
-RD_SUB = ("888800008008", "pharma-rd-platform")
 RD_SOURCE, SAAS_SOURCE = "aws_rd_focus_export", "saas_invoice_filedrop"
 STUDY_EVENT = ("DBL-PX301", dt.date(2026, 9, 10), dt.date(2026, 9, 16))
 GPU_IDLE_FROM = dt.date(2026, 9, 20)
@@ -276,30 +278,12 @@ def insert_dicts(con, table, dicts):
     con.executemany(f"INSERT INTO {table} VALUES ({', '.join('?' * len(cols))})", [[d.get(c) for c in cols] for d in dicts])
 
 
-def refresh_budgets(con):
-    """Technology budgets by cost center: September actuals x a planning factor (same rule as generate_sample.py),
-    recomputed after each add-on so the budgets cover the R&D, clinical and AI stacks."""
-    con.execute("DELETE FROM cost_budget")
-    con.execute("""
-        INSERT INTO cost_budget
-        WITH base AS (
-          SELECT COALESCE(json_extract_string(AllocatedTags, '$.cost_center'), json_extract_string(Tags, '$.cost_center'),
-                          CASE WHEN ChargeCategory = 'Tax' THEN 'Shared Services' END, 'Corporate IT') AS CostCenter,
-                 SUM(EffectiveCost) AS Sep
-          FROM CostAndUsage WHERE BillingPeriodStart = TIMESTAMP '2026-09-01' GROUP BY 1
-        )
-        SELECT m.BudgetPeriodStart, b.CostCenter,
-               ROUND(b.Sep * CASE b.CostCenter WHEN 'Data & Analytics' THEN 0.97 WHEN 'Patient Data' THEN 1.0
-                                               WHEN 'Research & Discovery' THEN 0.98 ELSE 1.08 END, -2), 'USD'
-        FROM base b CROSS JOIN (SELECT DISTINCT BillingPeriodStart AS BudgetPeriodStart FROM CostAndUsage
-                                WHERE BillingPeriodStart >= TIMESTAMP '2026-07-01') m""")
-
-
 def apply(path):
     con = duckdb.connect(path)
-    text = re.sub(r"--[^\n]*", "", open(os.path.join(ROOT, "schema", "costiq_pharma_schema.sql")).read())
-    for stmt in [s.strip() for s in text.split(";") if s.strip()]:
-        con.execute(stmt)
+    for schema in (os.path.join(ROOT, "schema", "costiq_regulatory_schema.sql"), os.path.join(ROOT, "tenants", "pharma", "schema.sql")):
+        text = re.sub(r"--[^\n]*", "", open(schema, encoding="utf-8").read())
+        for stmt in [s.strip() for s in text.split(";") if s.strip()]:
+            con.execute(stmt)
     ref = reference_rows()
     for t, rows in ref.items():
         con.execute(f"DELETE FROM {t}")
@@ -347,5 +331,5 @@ def apply(path):
 
 
 if __name__ == "__main__":
-    for p in sys.argv[1:] or [os.path.join(ROOT, "sample", "costiq_sample.duckdb")]:
+    for p in sys.argv[1:] or [os.path.join(ROOT, "sample", "pharma", "costiq_sample.duckdb")]:
         apply(p)
