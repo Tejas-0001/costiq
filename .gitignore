@@ -8,3 +8,6 @@ Thumbs.db
 .env*
 !.env.example
 *.pem
+
+# Vercel CLI (vercel dev / vercel link)
+.vercel

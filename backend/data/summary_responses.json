@@ -1,0 +1,1296 @@
+{
+ "about": "AI summary prose saved per role and period; see costiq/summary.py and tools/summary_responses.py.",
+ "responses": {
+  "ai_program_owner:mtd": {
+   "key": "ai_program_owner:mtd",
+   "basis": {
+    "headline": "c5e8a1087aa6fee4",
+    "spend": "50ee77fbb4c5c020",
+    "gxp": "6b9772739d74caab",
+    "money": "4196ba81c49d1a97",
+    "ops": "2020b520576775c9"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/command?sec=Cost+centers",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f15": "Cost centers at risk: forecast within 3% of budget|3 more are|/command?sec=Cost+centers",
+    "f16": "AI share of spend, month to date|9.6%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, month to date|$98.2K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on the same days of September|up 3.1%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, month to date|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, month to date|$40.5K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/catalog/PH-07",
+    "f24": "Spend affected|$367K|/catalog/PH-07",
+    "f25": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f26": "Spend affected|$11.7K|/catalog/GV-02",
+    "f27": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f28": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f29": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f30": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f31": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f32": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f33": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f34": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f35": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f36": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f37": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f38": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f39": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f40": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f41": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19"
+   },
+   "headline": "AI is ⟦f16⟧ of October spend (⟦f17⟧, ⟦f18⟧ on the same days of September), while ⟦f32⟧ of savings awaits approval and ⟦f24⟧ of spend holds patient data on provider-managed keys.",
+   "sections": {
+    "spend": [
+     "AI spend is ⟦f17⟧ so far this month, ⟦f16⟧ of the total and ⟦f18⟧ on the same days of September, with ⟦f19⟧ the largest line at ⟦f20⟧.",
+     "Total October spend is ⟦f1⟧, ⟦f2⟧ on the same days of September, on course for ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ are forecast over budget, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧), and ⟦f15⟧ within 3% of budget.",
+     "Forecast confidence is ⟦f21⟧, as only ⟦f22⟧ of spend arrives through live adapters."
+    ],
+    "gxp": [
+     "⟦f24⟧ of spend runs where patient data is encrypted with provider-managed keys (itsm, edc-platform), flagged by ⟦f23⟧.",
+     "⟦f25⟧ flags a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f26⟧ of spend."
+    ],
+    "money": [
+     "The savings pipeline holds ⟦f27⟧ across ⟦f28⟧, yet only ⟦f29⟧ is approved and ⟦f30⟧ verified, so ⟦f31⟧ has reached the bill.",
+     "⟦f32⟧ is waiting on decisions, and the largest open action, ⟦f33⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f34⟧ on its own."
+    ],
+    "ops": [
+     "⟦f38⟧ has already been spent on waste across ⟦f39⟧, the largest being ⟦f40⟧, an idle capacity reservation (cr-0b2idle) at ⟦f41⟧ with no instance running.",
+     "⟦f35⟧ are unacknowledged, ⟦f36⟧, starting with ⟦f37⟧."
+    ]
+   }
+  },
+  "auditor:mtd": {
+   "key": "auditor:mtd",
+   "basis": {
+    "headline": "fdc2427f2a7f3688",
+    "spend": "4d41ca58b4920fc9",
+    "risk": "3a06f5825cdb8b20",
+    "gxp": "6b9772739d74caab",
+    "money": "952b7bc8537d7bc0",
+    "ops": "9a77cf8fcdae19cf"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/command?sec=Cost+centers",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f16": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f17": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f18": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f19": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f20": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f21": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f22": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f23": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f24": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f25": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f26": "Move CSR drafting agent off 50 PTU|OPT-006|None",
+    "f27": "Estimated monthly saving|$29.5K|None",
+    "f28": "Next filing (Research Ireland, IE)|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f29": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f30": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f31": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f32": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/catalog/PH-07",
+    "f33": "Spend affected|$367K|/catalog/PH-07",
+    "f34": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f35": "Spend affected|$11.7K|/catalog/GV-02",
+    "f36": "R&D credit eligible but not claimed|$481K a year|/command?sec=R%26D+credit+unlock",
+    "f37": "UK credit|$468K|/command?sec=R%26D+credit+unlock&hl=UK",
+    "f38": "Jurisdiction|UK|/command?sec=R%26D+credit+unlock&hl=UK",
+    "f39": "R&D credit claimed today|$173K a year|/command?sec=R%26D+credit+unlock",
+    "f40": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f41": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f42": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f43": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f44": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f45": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "Spend is under control at ⟦f9⟧ budget for October; audit attention belongs on the ⟦f18⟧ of deductions an examiner could challenge and the ⟦f36⟧ of R&D credit left unclaimed.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, and forecast to close at ⟦f7⟧ against ⟦f8⟧.",
+     "⟦f10⟧ are forecast over budget, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧), and confidence in the forecast is ⟦f16⟧ because only ⟦f17⟧ of spend arrives through live adapters."
+    ],
+    "risk": [
+     "An examiner could challenge ⟦f18⟧ of deductions across ⟦f19⟧, although ⟦f20⟧ of review-period spend is evidenced.",
+     "The exposure comes from inaction more than missing paperwork: the largest cause is ⟦f21⟧, at ⟦f22⟧.",
+     "The biggest single item is ⟦f23⟧ (Microsoft, Research Ireland) at ⟦f24⟧ in ⟦f25⟧, which approving ⟦f26⟧ would remove while saving ⟦f27⟧ a month.",
+     "⟦f28⟧ is the next filing, due in ⟦f29⟧ (⟦f30⟧), and carries ⟦f31⟧ of the risk."
+    ],
+    "gxp": [
+     "⟦f33⟧ of spend runs where patient data uses provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f32⟧.",
+     "⟦f34⟧ flags a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f35⟧ of spend."
+    ],
+    "money": [
+     "Eligible cloud and SaaS fees not yet claimed are worth ⟦f36⟧ of R&D credit, ⟦f37⟧ of it in the ⟦f38⟧, on top of ⟦f39⟧ claimed today."
+    ],
+    "ops": [
+     "⟦f43⟧ do not tie out to charges; the largest, ⟦f44⟧ from ServiceNow, exceeds the charge detail by ⟦f45⟧.",
+     "⟦f40⟧ remain unacknowledged, ⟦f41⟧, the first being ⟦f42⟧."
+    ]
+   }
+  },
+  "cfo:mtd": {
+   "key": "cfo:mtd",
+   "basis": {
+    "headline": "99317946ce4b42a4",
+    "spend": "637706c9764e001e",
+    "risk": "e9a752cec5d84553",
+    "gxp": "e8369f53d69e256c",
+    "money": "554705b9c5d7ac02",
+    "ops": "00eb75b841d51fc5"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f3": "Largest provider, month to date|SAP|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, month to date|$432K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, month to date|Corporate IT|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f6": "Its spend, month to date|$522K|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f15": "Cost centers at risk: forecast within 3% of budget|3 more are|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f16": "AI share of spend, month to date|9.6%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, month to date|$98.2K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on the same days of September|up 3.1%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, month to date|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, month to date|$40.5K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f24": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f25": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f26": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f27": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f28": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f29": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f30": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f31": "Move CSR drafting agent off 50 PTU|OPT-006|/optimization?focus=OPT-006&sec=Backlog",
+    "f32": "Estimated monthly saving|$29.5K|/optimization?focus=OPT-006&sec=Backlog",
+    "f34": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f35": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f36": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f37": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/compliance?sec=Checks&hl=PH-07",
+    "f38": "Spend affected|$367K|/compliance?sec=Checks&hl=PH-07",
+    "f39": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f40": "Spend affected|$11.7K|/catalog/GV-02",
+    "f41": "GxP system with an overdue review|Clinical trial analytics replica|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f42": "Days past the review date|21 days|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f43": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f44": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f45": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f46": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f47": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f48": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f49": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f50": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f51": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f52": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f53": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f54": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f55": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f56": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f57": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f58": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f59": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f60": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f61": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19",
+    "f62": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f63": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f64": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "October will land ⟦f9⟧ budget, but the bigger story is tax: ⟦f23⟧ of deductions is open to challenge and ⟦f43⟧ of R&D credit is going unclaimed.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ so far, ⟦f2⟧ on the same days of September, and on course to close at ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "That headroom hides pressure underneath: ⟦f10⟧ are running over, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧), and ⟦f15⟧ within 3% of budget.",
+     "⟦f3⟧ is the largest provider at ⟦f4⟧ and ⟦f5⟧ the largest cost center at ⟦f6⟧; AI makes up ⟦f16⟧ of the month (⟦f17⟧, ⟦f18⟧ on the same days of September), led by ⟦f19⟧ at ⟦f20⟧.",
+     "Read the forecast with care: confidence is ⟦f21⟧, because only ⟦f22⟧ of spend arrives through live adapters."
+    ],
+    "risk": [
+     "An examiner could challenge ⟦f23⟧ of deductions across ⟦f24⟧, even though ⟦f25⟧ of review-period spend is evidenced.",
+     "The gap is inaction rather than paperwork: the largest cause is ⟦f26⟧, worth ⟦f27⟧.",
+     "The largest single exposure, ⟦f28⟧ (Microsoft, Research Ireland) at ⟦f29⟧, disappears if ⟦f31⟧ is approved, which also saves ⟦f32⟧ a month.",
+     "It sits in ⟦f30⟧, due in ⟦f34⟧ (⟦f35⟧), which carries ⟦f36⟧ of the risk, so acting before that date takes more than half of that filing's exposure off the table."
+    ],
+    "gxp": [
+     "⟦f38⟧ of spend runs where patient data is encrypted with provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f37⟧.",
+     "Separately, ⟦f39⟧ shows a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f40⟧ of spend.",
+     "The validation review for ⟦f41⟧ is also ⟦f42⟧ overdue."
+    ],
+    "money": [
+     "The largest prize is the R&D credit: claiming eligible cloud and SaaS fees adds ⟦f43⟧, ⟦f44⟧ of it in the ⟦f45⟧, on top of ⟦f46⟧ claimed today.",
+     "The savings pipeline holds ⟦f47⟧ across ⟦f48⟧, but only ⟦f49⟧ is approved and ⟦f50⟧ verified, so just ⟦f51⟧ has reached the bill and ⟦f52⟧ is still waiting on a decision.",
+     "Because ⟦f26⟧ is also the largest cause of tax risk, each approval cuts cost and exposure together; the largest open action, ⟦f53⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f54⟧."
+    ],
+    "ops": [
+     "⟦f55⟧ are unacknowledged, ⟦f56⟧, starting with ⟦f57⟧.",
+     "⟦f58⟧ has already gone on waste across ⟦f59⟧, the largest being ⟦f60⟧, an idle capacity reservation (cr-0b2idle) that cost ⟦f61⟧ with no instance running.",
+     "On the payables side, ⟦f62⟧ do not tie out to charges; the largest, ⟦f63⟧ from ServiceNow, is ⟦f64⟧ over the charge detail."
+    ]
+   }
+  },
+  "cfo:today": {
+   "key": "cfo:today",
+   "basis": {
+    "headline": "583faf2946d1db32",
+    "spend": "0ffe4e7e73822150",
+    "risk": "e9a752cec5d84553",
+    "gxp": "e8369f53d69e256c",
+    "money": "554705b9c5d7ac02",
+    "ops": "00eb75b841d51fc5"
+   },
+   "facts": {
+    "f1": "Spend, Today (2026-10-22)|$11.5K|/command?sec=Spend%2C+today",
+    "f2": "Change on yesterday|up 4.4%|/command?sec=Spend%2C+today",
+    "f3": "Largest provider, today|AWS|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, today|$8.1K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, today|Research & Discovery|/command?sec=Cost+centers&hl=Research+%26+Discovery",
+    "f6": "Its spend, today|$3.6K|/command?sec=Cost+centers&hl=Research+%26+Discovery",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f16": "AI share of spend, today|39.9%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, today|$4.6K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on yesterday|up 8.9%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, today|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, today|$1.9K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f24": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f25": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f26": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f27": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f28": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f29": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f30": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f31": "Move CSR drafting agent off 50 PTU|OPT-006|/optimization?focus=OPT-006&sec=Backlog",
+    "f32": "Estimated monthly saving|$29.5K|/optimization?focus=OPT-006&sec=Backlog",
+    "f34": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f35": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f36": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f37": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/compliance?sec=Checks&hl=PH-07",
+    "f38": "Spend affected|$367K|/compliance?sec=Checks&hl=PH-07",
+    "f39": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f40": "Spend affected|$11.7K|/catalog/GV-02",
+    "f41": "GxP system with an overdue review|Clinical trial analytics replica|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f42": "Days past the review date|21 days|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f43": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f44": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f45": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f46": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f47": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f48": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f49": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f50": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f51": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f52": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f53": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f54": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f55": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f56": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f57": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f58": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f59": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f60": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f61": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19",
+    "f62": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f63": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f64": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "Today's spend is ⟦f1⟧, ⟦f2⟧ on yesterday; October lands ⟦f9⟧ budget, but ⟦f23⟧ of deductions is open to challenge and ⟦f43⟧ of R&D credit is unclaimed.",
+   "sections": {
+    "spend": [
+     "Spend today is ⟦f1⟧, ⟦f2⟧ on yesterday, with ⟦f3⟧ the largest provider at ⟦f4⟧ and ⟦f5⟧ the largest cost center at ⟦f6⟧.",
+     "AI is ⟦f16⟧ of that spend (⟦f17⟧, ⟦f18⟧ on yesterday), led by ⟦f19⟧ at ⟦f20⟧.",
+     "October is on course to close at ⟦f7⟧ against a ⟦f8⟧ budget, but ⟦f10⟧ are forecast over, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧).",
+     "Forecast confidence is ⟦f21⟧, as only ⟦f22⟧ of spend arrives through live adapters."
+    ],
+    "risk": [
+     "An examiner could challenge ⟦f23⟧ of deductions across ⟦f24⟧, even though ⟦f25⟧ of review-period spend is evidenced.",
+     "The gap is inaction rather than paperwork: the largest cause is ⟦f26⟧, worth ⟦f27⟧.",
+     "The largest single exposure, ⟦f28⟧ (Microsoft, Research Ireland) at ⟦f29⟧, disappears if ⟦f31⟧ is approved, which also saves ⟦f32⟧ a month.",
+     "It sits in ⟦f30⟧, due in ⟦f34⟧ (⟦f35⟧), which carries ⟦f36⟧ of the risk, so acting before that date takes more than half of that filing's exposure off the table."
+    ],
+    "gxp": [
+     "⟦f38⟧ of spend runs where patient data is encrypted with provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f37⟧.",
+     "Separately, ⟦f39⟧ shows a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f40⟧ of spend.",
+     "The validation review for ⟦f41⟧ is also ⟦f42⟧ overdue."
+    ],
+    "money": [
+     "The largest prize is the R&D credit: claiming eligible cloud and SaaS fees adds ⟦f43⟧, ⟦f44⟧ of it in the ⟦f45⟧, on top of ⟦f46⟧ claimed today.",
+     "The savings pipeline holds ⟦f47⟧ across ⟦f48⟧, but only ⟦f49⟧ is approved and ⟦f50⟧ verified, so just ⟦f51⟧ has reached the bill and ⟦f52⟧ is still waiting on a decision.",
+     "Because ⟦f26⟧ is also the largest cause of tax risk, each approval cuts cost and exposure together; the largest open action, ⟦f53⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f54⟧."
+    ],
+    "ops": [
+     "⟦f55⟧ are unacknowledged, ⟦f56⟧, starting with ⟦f57⟧.",
+     "⟦f58⟧ has already gone on waste across ⟦f59⟧, the largest being ⟦f60⟧, an idle capacity reservation (cr-0b2idle) that cost ⟦f61⟧ with no instance running.",
+     "On the payables side, ⟦f62⟧ do not tie out to charges; the largest, ⟦f63⟧ from ServiceNow, is ⟦f64⟧ over the charge detail."
+    ]
+   }
+  },
+  "cfo:wtd": {
+   "key": "cfo:wtd",
+   "basis": {
+    "headline": "065eec1b9a39b1f6",
+    "spend": "c33ef3ebc316ac5a",
+    "risk": "e9a752cec5d84553",
+    "gxp": "e8369f53d69e256c",
+    "money": "554705b9c5d7ac02",
+    "ops": "00eb75b841d51fc5"
+   },
+   "facts": {
+    "f1": "Spend, Week to date (2026-10-19 to 2026-10-22)|$44.8K|/command?sec=Spend%2C+week+to+date",
+    "f2": "Change on the same days last week|down 1.7%|/command?sec=Spend%2C+week+to+date",
+    "f3": "Largest provider, week to date|AWS|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, week to date|$31.8K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, week to date|Research & Discovery|/command?sec=Cost+centers&hl=Research+%26+Discovery",
+    "f6": "Its spend, week to date|$13.8K|/command?sec=Cost+centers&hl=Research+%26+Discovery",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f16": "AI share of spend, week to date|39.0%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, week to date|$17.4K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on the same days last week|down 8.4%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, week to date|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, week to date|$7.2K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f24": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f25": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f26": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f27": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f28": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f29": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f30": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f31": "Move CSR drafting agent off 50 PTU|OPT-006|/optimization?focus=OPT-006&sec=Backlog",
+    "f32": "Estimated monthly saving|$29.5K|/optimization?focus=OPT-006&sec=Backlog",
+    "f34": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f35": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f36": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f37": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/compliance?sec=Checks&hl=PH-07",
+    "f38": "Spend affected|$367K|/compliance?sec=Checks&hl=PH-07",
+    "f39": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f40": "Spend affected|$11.7K|/catalog/GV-02",
+    "f41": "GxP system with an overdue review|Clinical trial analytics replica|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f42": "Days past the review date|21 days|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f43": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f44": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f45": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f46": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f47": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f48": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f49": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f50": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f51": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f52": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f53": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f54": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f55": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f56": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f57": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f58": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f59": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f60": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f61": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19",
+    "f62": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f63": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f64": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "This week's spend is ⟦f1⟧, ⟦f2⟧ on the same days last week; October lands ⟦f9⟧ budget, but ⟦f23⟧ of deductions is open to challenge and ⟦f43⟧ of R&D credit is unclaimed.",
+   "sections": {
+    "spend": [
+     "Spend this week is ⟦f1⟧, ⟦f2⟧ on the same days last week, with ⟦f3⟧ the largest provider at ⟦f4⟧ and ⟦f5⟧ the largest cost center at ⟦f6⟧.",
+     "AI is ⟦f16⟧ of that spend (⟦f17⟧, ⟦f18⟧ on the same days last week), led by ⟦f19⟧ at ⟦f20⟧.",
+     "October is on course to close at ⟦f7⟧ against a ⟦f8⟧ budget, but ⟦f10⟧ are forecast over, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧).",
+     "Forecast confidence is ⟦f21⟧, as only ⟦f22⟧ of spend arrives through live adapters."
+    ],
+    "risk": [
+     "An examiner could challenge ⟦f23⟧ of deductions across ⟦f24⟧, even though ⟦f25⟧ of review-period spend is evidenced.",
+     "The gap is inaction rather than paperwork: the largest cause is ⟦f26⟧, worth ⟦f27⟧.",
+     "The largest single exposure, ⟦f28⟧ (Microsoft, Research Ireland) at ⟦f29⟧, disappears if ⟦f31⟧ is approved, which also saves ⟦f32⟧ a month.",
+     "It sits in ⟦f30⟧, due in ⟦f34⟧ (⟦f35⟧), which carries ⟦f36⟧ of the risk, so acting before that date takes more than half of that filing's exposure off the table."
+    ],
+    "gxp": [
+     "⟦f38⟧ of spend runs where patient data is encrypted with provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f37⟧.",
+     "Separately, ⟦f39⟧ shows a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f40⟧ of spend.",
+     "The validation review for ⟦f41⟧ is also ⟦f42⟧ overdue."
+    ],
+    "money": [
+     "The largest prize is the R&D credit: claiming eligible cloud and SaaS fees adds ⟦f43⟧, ⟦f44⟧ of it in the ⟦f45⟧, on top of ⟦f46⟧ claimed today.",
+     "The savings pipeline holds ⟦f47⟧ across ⟦f48⟧, but only ⟦f49⟧ is approved and ⟦f50⟧ verified, so just ⟦f51⟧ has reached the bill and ⟦f52⟧ is still waiting on a decision.",
+     "Because ⟦f26⟧ is also the largest cause of tax risk, each approval cuts cost and exposure together; the largest open action, ⟦f53⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f54⟧."
+    ],
+    "ops": [
+     "⟦f55⟧ are unacknowledged, ⟦f56⟧, starting with ⟦f57⟧.",
+     "⟦f58⟧ has already gone on waste across ⟦f59⟧, the largest being ⟦f60⟧, an idle capacity reservation (cr-0b2idle) that cost ⟦f61⟧ with no instance running.",
+     "On the payables side, ⟦f62⟧ do not tie out to charges; the largest, ⟦f63⟧ from ServiceNow, is ⟦f64⟧ over the charge detail."
+    ]
+   }
+  },
+  "cfo:yesterday": {
+   "key": "cfo:yesterday",
+   "basis": {
+    "headline": "4b348dce2ac40e31",
+    "spend": "ffc6f68c082ba015",
+    "risk": "e9a752cec5d84553",
+    "gxp": "e8369f53d69e256c",
+    "money": "554705b9c5d7ac02",
+    "ops": "00eb75b841d51fc5"
+   },
+   "facts": {
+    "f1": "Spend, Yesterday (2026-10-21)|$11.0K|/command?sec=Spend%2C+yesterday",
+    "f2": "Change on the day before|up 0.6%|/command?sec=Spend%2C+yesterday",
+    "f3": "Largest provider, yesterday|AWS|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, yesterday|$7.7K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, yesterday|Research & Discovery|/command?sec=Cost+centers&hl=Research+%26+Discovery",
+    "f6": "Its spend, yesterday|$3.3K|/command?sec=Cost+centers&hl=Research+%26+Discovery",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f16": "AI share of spend, yesterday|38.2%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, yesterday|$4.2K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on the day before|up 0.6%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, yesterday|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, yesterday|$1.7K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f24": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f25": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f26": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f27": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f28": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f29": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f30": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f31": "Move CSR drafting agent off 50 PTU|OPT-006|/optimization?focus=OPT-006&sec=Backlog",
+    "f32": "Estimated monthly saving|$29.5K|/optimization?focus=OPT-006&sec=Backlog",
+    "f34": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f35": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f36": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f37": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/compliance?sec=Checks&hl=PH-07",
+    "f38": "Spend affected|$367K|/compliance?sec=Checks&hl=PH-07",
+    "f39": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f40": "Spend affected|$11.7K|/catalog/GV-02",
+    "f41": "GxP system with an overdue review|Clinical trial analytics replica|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f42": "Days past the review date|21 days|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f43": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f44": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f45": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f46": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f47": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f48": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f49": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f50": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f51": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f52": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f53": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f54": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f55": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f56": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f57": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f58": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f59": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f60": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f61": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19",
+    "f62": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f63": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f64": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "Yesterday's spend was ⟦f1⟧, ⟦f2⟧ on the day before; October lands ⟦f9⟧ budget, but ⟦f23⟧ of deductions is open to challenge and ⟦f43⟧ of R&D credit is unclaimed.",
+   "sections": {
+    "spend": [
+     "Spend yesterday was ⟦f1⟧, ⟦f2⟧ on the day before, with ⟦f3⟧ the largest provider at ⟦f4⟧ and ⟦f5⟧ the largest cost center at ⟦f6⟧.",
+     "AI is ⟦f16⟧ of that spend (⟦f17⟧, ⟦f18⟧ on the day before), led by ⟦f19⟧ at ⟦f20⟧.",
+     "October is on course to close at ⟦f7⟧ against a ⟦f8⟧ budget, but ⟦f10⟧ are forecast over, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧).",
+     "Forecast confidence is ⟦f21⟧, as only ⟦f22⟧ of spend arrives through live adapters."
+    ],
+    "risk": [
+     "An examiner could challenge ⟦f23⟧ of deductions across ⟦f24⟧, even though ⟦f25⟧ of review-period spend is evidenced.",
+     "The gap is inaction rather than paperwork: the largest cause is ⟦f26⟧, worth ⟦f27⟧.",
+     "The largest single exposure, ⟦f28⟧ (Microsoft, Research Ireland) at ⟦f29⟧, disappears if ⟦f31⟧ is approved, which also saves ⟦f32⟧ a month.",
+     "It sits in ⟦f30⟧, due in ⟦f34⟧ (⟦f35⟧), which carries ⟦f36⟧ of the risk, so acting before that date takes more than half of that filing's exposure off the table."
+    ],
+    "gxp": [
+     "⟦f38⟧ of spend runs where patient data is encrypted with provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f37⟧.",
+     "Separately, ⟦f39⟧ shows a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f40⟧ of spend.",
+     "The validation review for ⟦f41⟧ is also ⟦f42⟧ overdue."
+    ],
+    "money": [
+     "The largest prize is the R&D credit: claiming eligible cloud and SaaS fees adds ⟦f43⟧, ⟦f44⟧ of it in the ⟦f45⟧, on top of ⟦f46⟧ claimed today.",
+     "The savings pipeline holds ⟦f47⟧ across ⟦f48⟧, but only ⟦f49⟧ is approved and ⟦f50⟧ verified, so just ⟦f51⟧ has reached the bill and ⟦f52⟧ is still waiting on a decision.",
+     "Because ⟦f26⟧ is also the largest cause of tax risk, each approval cuts cost and exposure together; the largest open action, ⟦f53⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f54⟧."
+    ],
+    "ops": [
+     "⟦f55⟧ are unacknowledged, ⟦f56⟧, starting with ⟦f57⟧.",
+     "⟦f58⟧ has already gone on waste across ⟦f59⟧, the largest being ⟦f60⟧, an idle capacity reservation (cr-0b2idle) that cost ⟦f61⟧ with no instance running.",
+     "On the payables side, ⟦f62⟧ do not tie out to charges; the largest, ⟦f63⟧ from ServiceNow, is ⟦f64⟧ over the charge detail."
+    ]
+   }
+  },
+  "cfo:ytd": {
+   "key": "cfo:ytd",
+   "basis": {
+    "headline": "27bd7fe525744edb",
+    "spend": "480d72616174d5a5",
+    "risk": "e9a752cec5d84553",
+    "gxp": "e8369f53d69e256c",
+    "money": "554705b9c5d7ac02",
+    "ops": "00eb75b841d51fc5"
+   },
+   "facts": {
+    "f1": "Spend, Year to date (2026-01-01 to 2026-10-22)|$4.38M|/command?sec=Spend%2C+year+to+date",
+    "f2": "Largest provider, year to date|SAP|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f3": "Its spend, year to date|$1.73M|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Largest cost center, year to date|Corporate IT|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f5": "Its spend, year to date|$2.10M|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f6": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f7": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f8": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f9": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f10": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f11": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f15": "AI share of spend, year to date|10.9%|/ai?sec=AI+spend+by+product",
+    "f16": "AI spend, year to date|$479K|/ai?sec=AI+spend+by+product",
+    "f17": "Largest AI product, year to date|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f18": "Its spend, year to date|$210K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f19": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f20": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f21": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f22": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f23": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f24": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f25": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f26": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f27": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f28": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f29": "Move CSR drafting agent off 50 PTU|OPT-006|/optimization?focus=OPT-006&sec=Backlog",
+    "f30": "Estimated monthly saving|$29.5K|/optimization?focus=OPT-006&sec=Backlog",
+    "f32": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f33": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f34": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f35": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/compliance?sec=Checks&hl=PH-07",
+    "f36": "Spend affected|$367K|/compliance?sec=Checks&hl=PH-07",
+    "f37": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f38": "Spend affected|$11.7K|/catalog/GV-02",
+    "f39": "GxP system with an overdue review|Clinical trial analytics replica|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f40": "Days past the review date|21 days|/board?sec=Inspection+readiness&hl=Clinical+trial+analytics+replica",
+    "f41": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f42": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f43": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f44": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f45": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f46": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f47": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f48": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f49": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f50": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f51": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f52": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f53": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f54": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f55": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f56": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f57": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f58": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f59": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19",
+    "f60": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f61": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f62": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "This year's spend is ⟦f1⟧ and October lands ⟦f8⟧ budget, but ⟦f21⟧ of deductions is open to challenge and ⟦f41⟧ of R&D credit is unclaimed.",
+   "sections": {
+    "spend": [
+     "Spend this year to date is ⟦f1⟧, with ⟦f2⟧ the largest provider at ⟦f3⟧ and ⟦f4⟧ the largest cost center at ⟦f5⟧.",
+     "AI accounts for ⟦f15⟧ of the year (⟦f16⟧), led by ⟦f17⟧ at ⟦f18⟧.",
+     "October is on course to close at ⟦f6⟧ against a ⟦f7⟧ budget, but ⟦f9⟧ are forecast over, led by ⟦f10⟧ at ⟦f11⟧ (⟦f12⟧ against ⟦f13⟧).",
+     "Forecast confidence is ⟦f19⟧, as only ⟦f20⟧ of spend arrives through live adapters."
+    ],
+    "risk": [
+     "An examiner could challenge ⟦f21⟧ of deductions across ⟦f22⟧, even though ⟦f23⟧ of review-period spend is evidenced.",
+     "The gap is inaction rather than paperwork: the largest cause is ⟦f24⟧, worth ⟦f25⟧.",
+     "The largest single exposure, ⟦f26⟧ (Microsoft, Research Ireland) at ⟦f27⟧, disappears if ⟦f29⟧ is approved, which also saves ⟦f30⟧ a month.",
+     "It sits in ⟦f28⟧, due in ⟦f32⟧ (⟦f33⟧), which carries ⟦f34⟧ of the risk, so acting before that date takes more than half of that filing's exposure off the table."
+    ],
+    "gxp": [
+     "⟦f36⟧ of spend runs where patient data is encrypted with provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f35⟧.",
+     "Separately, ⟦f37⟧ shows a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f38⟧ of spend.",
+     "The validation review for ⟦f39⟧ is also ⟦f40⟧ overdue."
+    ],
+    "money": [
+     "The largest prize is the R&D credit: claiming eligible cloud and SaaS fees adds ⟦f41⟧, ⟦f42⟧ of it in the ⟦f43⟧, on top of ⟦f44⟧ claimed today.",
+     "The savings pipeline holds ⟦f45⟧ across ⟦f46⟧, but only ⟦f47⟧ is approved and ⟦f48⟧ verified, so just ⟦f49⟧ has reached the bill and ⟦f50⟧ is still waiting on a decision.",
+     "Because ⟦f24⟧ is also the largest cause of tax risk, each approval cuts cost and exposure together; the largest open action, ⟦f51⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f52⟧."
+    ],
+    "ops": [
+     "⟦f53⟧ are unacknowledged, ⟦f54⟧, starting with ⟦f55⟧.",
+     "⟦f56⟧ has already gone on waste across ⟦f57⟧, the largest being ⟦f58⟧, an idle capacity reservation (cr-0b2idle) that cost ⟦f59⟧ with no instance running.",
+     "On the payables side, ⟦f60⟧ do not tie out to charges; the largest, ⟦f61⟧ from ServiceNow, is ⟦f62⟧ over the charge detail."
+    ]
+   }
+  },
+  "cloud_ops:mtd": {
+   "key": "cloud_ops:mtd",
+   "basis": {
+    "headline": "238a977587f8b154",
+    "spend": "5551bd3fb0d9c527",
+    "money": "7b1fa68b981885a4",
+    "ops": "cd1a00bd907fe53a"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$192K|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 2.1%|/command?sec=Spend%2C+month+to+date",
+    "f3": "Largest provider, month to date|Veeva|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, month to date|$95.2K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, month to date|Clinical Operations|/command?sec=Cost+centers&hl=Clinical+Operations",
+    "f6": "Its spend, month to date|$162K|/command?sec=Cost+centers&hl=Clinical+Operations",
+    "f7": "October forecast|$230K|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$244K|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$13.7K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|1 cost center|/command?sec=Cost+centers",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f15": "Savings identified|$20.7K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f16": "Actions in the tracker|8 actions|/optimization?sec=Backlog",
+    "f17": "Approved|$6.0K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f18": "Verified (measured)|$0|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f19": "Share of identified savings verified|0.0%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f20": "Savings identified but not approved|$14.7K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f21": "Schedule EDC dev to business hours|OPT-002|/optimization?focus=OPT-002&sec=Backlog",
+    "f22": "Estimated monthly saving|$6.0K a month|/optimization?focus=OPT-002&sec=Backlog",
+    "f23": "Unacknowledged alerts|1 alert|/alerts?sec=Fired+alerts",
+    "f24": "High-severity alerts|1 high severity|/alerts?sec=Fired+alerts",
+    "f25": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f26": "Already spent on waste|$3.9K|/anomalies?sec=Findings",
+    "f27": "Findings of money already spent|2 findings|/anomalies?sec=Findings",
+    "f28": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f29": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19"
+   },
+   "headline": "Your scope is on course to finish October ⟦f9⟧ budget, but ⟦f20⟧ of savings still awaits approval and ⟦f18⟧ has been verified so far.",
+   "sections": {
+    "spend": [
+     "October spend in your scope is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, on course for ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ is forecast over: ⟦f11⟧, at ⟦f13⟧ against ⟦f14⟧ (⟦f12⟧).",
+     "⟦f5⟧ is the largest cost center at ⟦f6⟧, and ⟦f3⟧ the largest provider at ⟦f4⟧."
+    ],
+    "money": [
+     "The pipeline holds ⟦f15⟧ across ⟦f16⟧; ⟦f17⟧ is approved but ⟦f18⟧ has been verified (⟦f19⟧), so nothing has reached the bill yet.",
+     "The largest open action is ⟦f21⟧, scheduling EDC dev to business hours, worth ⟦f22⟧; ⟦f20⟧ of the pipeline still needs approval."
+    ],
+    "ops": [
+     "⟦f26⟧ has already been spent on waste across ⟦f27⟧, nearly all of it on ⟦f28⟧, an idle capacity reservation (cr-0b2idle) at ⟦f29⟧ with no instance running.",
+     "⟦f23⟧ is open (⟦f24⟧): ⟦f25⟧."
+    ]
+   }
+  },
+  "finance_controller:mtd": {
+   "key": "finance_controller:mtd",
+   "basis": {
+    "headline": "fc52212a5363b51d",
+    "spend": "3ce7e7f170384e4b",
+    "gxp": "6b9772739d74caab",
+    "money": "77cf121f750be7f8",
+    "ops": "9a77cf8fcdae19cf"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f15": "Cost centers at risk: forecast within 3% of budget|3 more are|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f16": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f17": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f18": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/catalog/PH-07",
+    "f19": "Spend affected|$367K|/catalog/PH-07",
+    "f20": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f21": "Spend affected|$11.7K|/catalog/GV-02",
+    "f22": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f23": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f24": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f25": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f26": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f27": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f28": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f29": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f30": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f31": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "October lands ⟦f9⟧ budget, but controls need attention: ⟦f19⟧ of spend holds patient data on provider-managed keys and ⟦f22⟧ of R&D credit is going unclaimed.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, on course for ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ are forecast over budget, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧), and ⟦f15⟧ within 3% of budget.",
+     "Forecast confidence is ⟦f16⟧ because only ⟦f17⟧ of spend arrives through live adapters, so treat the close forecast as provisional."
+    ],
+    "gxp": [
+     "⟦f19⟧ of spend runs where patient data is encrypted with provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f18⟧.",
+     "⟦f20⟧ also shows a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f21⟧ of spend."
+    ],
+    "money": [
+     "Claiming eligible cloud and SaaS fees would add ⟦f22⟧ of R&D credit, ⟦f23⟧ of it in the ⟦f24⟧, on top of the ⟦f25⟧ claimed today."
+    ],
+    "ops": [
+     "On reconciliation, ⟦f29⟧ do not tie out to charges; the largest, ⟦f30⟧ from ServiceNow, bills ⟦f31⟧ more than the charge detail supports.",
+     "⟦f26⟧ are unacknowledged, ⟦f27⟧, led by ⟦f28⟧."
+    ]
+   }
+  },
+  "finops_analyst:mtd": {
+   "key": "finops_analyst:mtd",
+   "basis": {
+    "headline": "fdc2427f2a7f3688",
+    "spend": "637706c9764e001e",
+    "risk": "e9a752cec5d84553",
+    "money": "ef41fad114d22ded",
+    "ops": "2020b520576775c9"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f3": "Largest provider, month to date|SAP|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, month to date|$432K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, month to date|Corporate IT|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f6": "Its spend, month to date|$522K|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f15": "Cost centers at risk: forecast within 3% of budget|3 more are|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f16": "AI share of spend, month to date|9.6%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, month to date|$98.2K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on the same days of September|up 3.1%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, month to date|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, month to date|$40.5K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f24": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f25": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f26": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f27": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f28": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f29": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f30": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f31": "Move CSR drafting agent off 50 PTU|OPT-006|/optimization?focus=OPT-006&sec=Backlog",
+    "f32": "Estimated monthly saving|$29.5K|/optimization?focus=OPT-006&sec=Backlog",
+    "f33": "Next filing (Research Ireland, IE)|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f34": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f35": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f36": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f37": "R&D credit eligible but not claimed|$481K a year|/command?sec=R%26D+credit+unlock",
+    "f38": "UK credit|$468K|/command?sec=R%26D+credit+unlock&hl=UK",
+    "f39": "Jurisdiction|UK|/command?sec=R%26D+credit+unlock&hl=UK",
+    "f40": "R&D credit claimed today|$173K a year|/command?sec=R%26D+credit+unlock",
+    "f41": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f42": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f43": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f44": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f45": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f46": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f47": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f48": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f49": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f50": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f51": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f52": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f53": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f54": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f55": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19"
+   },
+   "headline": "Spend tracks ⟦f9⟧ budget, but unactioned savings are now a tax problem: ⟦f23⟧ of deductions could be challenged, while ⟦f37⟧ of R&D credit sits unclaimed.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, on course for ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ are forecast over budget, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧), and ⟦f15⟧ within 3% of budget.",
+     "⟦f3⟧ is the largest provider at ⟦f4⟧ and ⟦f5⟧ the largest cost center at ⟦f6⟧; AI is ⟦f16⟧ of spend (⟦f17⟧, ⟦f18⟧ on the same days of September), led by ⟦f19⟧ at ⟦f20⟧.",
+     "Forecast confidence is ⟦f21⟧; only ⟦f22⟧ of spend arrives through live adapters, the biggest drag on it."
+    ],
+    "risk": [
+     "⟦f23⟧ of deductions across ⟦f24⟧ could be challenged, and the largest cause is in your hands: ⟦f26⟧, worth ⟦f27⟧.",
+     "The biggest single exposure, ⟦f28⟧ (Microsoft, Research Ireland) at ⟦f29⟧ in ⟦f30⟧, goes away if ⟦f31⟧ is approved, which also saves ⟦f32⟧ a month.",
+     "⟦f33⟧ is due in ⟦f34⟧ (⟦f35⟧) and carries ⟦f36⟧ of the risk; ⟦f25⟧ of review-period spend is already evidenced."
+    ],
+    "money": [
+     "The pipeline holds ⟦f41⟧ across ⟦f42⟧, but only ⟦f43⟧ is approved and ⟦f44⟧ verified, so ⟦f45⟧ has reached the bill.",
+     "⟦f46⟧ still needs a decision, led by ⟦f47⟧ (scale the discovery GPU endpoint to zero when idle) at ⟦f48⟧.",
+     "Separately, claiming eligible cloud and SaaS fees would add ⟦f37⟧ of R&D credit, ⟦f38⟧ of it in the ⟦f39⟧, on top of ⟦f40⟧ claimed today."
+    ],
+    "ops": [
+     "⟦f52⟧ has already been spent on waste across ⟦f53⟧, the largest being ⟦f54⟧, an idle capacity reservation (cr-0b2idle) at ⟦f55⟧ with no instance running.",
+     "⟦f49⟧ are unacknowledged, ⟦f50⟧, the first being ⟦f51⟧."
+    ]
+   }
+  },
+  "fpa_analyst:mtd": {
+   "key": "fpa_analyst:mtd",
+   "basis": {
+    "headline": "0f7d8878e464e2bb",
+    "spend": "637706c9764e001e",
+    "ops": "7e0d2f51c36ff804"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f3": "Largest provider, month to date|SAP|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, month to date|$432K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, month to date|Corporate IT|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f6": "Its spend, month to date|$522K|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f15": "Cost centers at risk: forecast within 3% of budget|3 more are|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f16": "AI share of spend, month to date|9.6%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, month to date|$98.2K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on the same days of September|up 3.1%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, month to date|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, month to date|$40.5K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f24": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f25": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10"
+   },
+   "headline": "October is tracking ⟦f9⟧ budget overall, but the total masks ⟦f10⟧ forecast over, led by ⟦f11⟧ at ⟦f12⟧.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, and the run rate points to a ⟦f7⟧ close against a ⟦f8⟧ budget.",
+     "Underneath, ⟦f10⟧ are forecast over budget, led by ⟦f11⟧ (⟦f13⟧ against ⟦f14⟧, ⟦f12⟧), and ⟦f15⟧ within 3% of budget, so the headroom is thinner than the total suggests.",
+     "⟦f5⟧ is the largest cost center at ⟦f6⟧ and ⟦f3⟧ the largest provider at ⟦f4⟧; AI is ⟦f16⟧ of spend (⟦f17⟧, ⟦f18⟧ on the same days of September), led by ⟦f19⟧ at ⟦f20⟧.",
+     "Forecast confidence is ⟦f21⟧, held back because only ⟦f22⟧ of spend arrives through live adapters, so month-end actuals may still move."
+    ],
+    "ops": [
+     "⟦f23⟧ are unacknowledged, ⟦f24⟧, and the first is the same overrun: ⟦f25⟧."
+    ]
+   }
+  },
+  "fpa_partner:mtd": {
+   "key": "fpa_partner:mtd",
+   "basis": {
+    "headline": "ff0e3a2d38e48d9e",
+    "spend": "d71c2e63b556a41f",
+    "ops": "9d39bb4d2f25ca36"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$192K|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 2.1%|/command?sec=Spend%2C+month+to+date",
+    "f3": "Largest provider, month to date|Veeva|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, month to date|$95.2K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, month to date|Clinical Operations|/command?sec=Cost+centers&hl=Clinical+Operations",
+    "f6": "Its spend, month to date|$162K|/command?sec=Cost+centers&hl=Clinical+Operations",
+    "f7": "October forecast|$230K|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$244K|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$13.7K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|1 cost center|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f15": "AI share of spend, month to date|3.7%|/ai?sec=AI+spend+by+product",
+    "f16": "AI spend, month to date|$7.1K|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend change on the same days of September|up 0.7%|/ai?sec=AI+spend+by+product",
+    "f18": "Largest AI product, month to date|claude_code|/ai?sec=AI+spend+by+product&hl=claude_code",
+    "f19": "Its spend, month to date|$3.2K|/ai?sec=AI+spend+by+product&hl=claude_code",
+    "f20": "Unacknowledged alerts|1 alert|/alerts?sec=Fired+alerts",
+    "f21": "High-severity alerts|1 high severity|/alerts?sec=Fired+alerts",
+    "f22": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10"
+   },
+   "headline": "Your cost centers are on course to finish October ⟦f9⟧ budget, but ⟦f11⟧ is forecast at ⟦f12⟧ against its budget.",
+   "sections": {
+    "spend": [
+     "October spend across your cost centers is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, heading for ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ is forecast over budget: ⟦f11⟧, at ⟦f13⟧ against ⟦f14⟧ (⟦f12⟧).",
+     "⟦f5⟧ is the largest cost center at ⟦f6⟧ and ⟦f3⟧ the largest provider at ⟦f4⟧; AI is ⟦f15⟧ of spend (⟦f16⟧, ⟦f17⟧ on the same days of September), led by ⟦f18⟧ at ⟦f19⟧."
+    ],
+    "ops": [
+     "⟦f20⟧ is open (⟦f21⟧), and it is the same overrun: ⟦f22⟧."
+    ]
+   }
+  },
+  "gxp_compliance:mtd": {
+   "key": "gxp_compliance:mtd",
+   "basis": {
+    "headline": "38d0bf098e8e2ca5",
+    "gxp": "d7ed91814c19a452",
+    "risk": "3a06f5825cdb8b20",
+    "ops": "7e0d2f51c36ff804"
+   },
+   "facts": {
+    "f1": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f2": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f3": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f4": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f5": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f6": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f7": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f8": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f9": "Move CSR drafting agent off 50 PTU|OPT-006|None",
+    "f10": "Estimated monthly saving|$29.5K|None",
+    "f11": "Next filing (Research Ireland, IE)|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f12": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f13": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f14": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f15": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/compliance?sec=Checks&hl=PH-07",
+    "f16": "Spend affected|$367K|/compliance?sec=Checks&hl=PH-07",
+    "f17": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f18": "Spend affected|$11.7K|/catalog/GV-02",
+    "f19": "GxP system with an overdue review|Clinical trial analytics replica|/compliance?sec=Checks&hl=Clinical+trial+analytics+replica",
+    "f20": "Days past the review date|21 days|/compliance?sec=Checks&hl=Clinical+trial+analytics+replica",
+    "f21": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f22": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f23": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10"
+   },
+   "headline": "Patient data is the priority: ⟦f16⟧ of spend runs on provider-managed keys and a GxP validation review is ⟦f20⟧ overdue, alongside ⟦f1⟧ of deductions open to challenge.",
+   "sections": {
+    "gxp": [
+     "⟦f16⟧ of spend runs where patient data is encrypted with provider-managed rather than customer-managed keys (itsm, edc-platform), flagged by ⟦f15⟧.",
+     "⟦f17⟧ shows a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f18⟧ of spend.",
+     "The validation review for ⟦f19⟧ is ⟦f20⟧ past its date."
+    ],
+    "risk": [
+     "On the tax side, an examiner could challenge ⟦f1⟧ of deductions across ⟦f2⟧; ⟦f3⟧ of review-period spend is evidenced.",
+     "The largest cause is ⟦f4⟧ (⟦f5⟧), and the largest single exposure is ⟦f6⟧ at ⟦f7⟧ in ⟦f8⟧, which approving ⟦f9⟧ would remove while saving ⟦f10⟧ a month.",
+     "⟦f11⟧ is due in ⟦f12⟧ (⟦f13⟧) and carries ⟦f14⟧ of the risk."
+    ],
+    "ops": [
+     "⟦f21⟧ are unacknowledged, ⟦f22⟧, the first being ⟦f23⟧."
+    ]
+   }
+  },
+  "investor_relations:mtd": {
+   "key": "investor_relations:mtd",
+   "basis": {
+    "headline": "ea97a373279c7bfe",
+    "spend": "4d41ca58b4920fc9",
+    "money": "4196ba81c49d1a97",
+    "ops": "7e0d2f51c36ff804"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/command?sec=Cost+centers",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/command?sec=Cost+centers&hl=Data+%26+Analytics",
+    "f16": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f17": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f18": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f19": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f20": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f21": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f22": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f23": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f24": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f25": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f26": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f27": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f28": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10"
+   },
+   "headline": "October is on course to finish ⟦f9⟧ budget, with ⟦f23⟧ of further savings identified and waiting for approval.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, and on course to close at ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ are forecast over budget, led by ⟦f11⟧ at ⟦f12⟧, but the group total stays inside its budget.",
+     "Forecast confidence is ⟦f16⟧, as only ⟦f17⟧ of spend arrives through live adapters."
+    ],
+    "money": [
+     "The savings pipeline holds ⟦f18⟧ across ⟦f19⟧; ⟦f20⟧ is approved and ⟦f21⟧ verified, so ⟦f22⟧ has reached the bill.",
+     "The largest open action, ⟦f24⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f25⟧ on its own."
+    ],
+    "ops": [
+     "⟦f26⟧ are unacknowledged, ⟦f27⟧, the first being ⟦f28⟧."
+    ]
+   }
+  },
+  "pl_exec:mtd": {
+   "key": "pl_exec:mtd",
+   "basis": {
+    "headline": "21342397aeae9b4f",
+    "spend": "e594b856f2e5d225",
+    "ops": "c22b3fc586a4911e"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$162K|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 4.3%|/command?sec=Spend%2C+month+to+date",
+    "f3": "Largest provider, month to date|Veeva|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, month to date|$95.2K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "October forecast|$189K|/command?sec=Forecast+vs+budget",
+    "f6": "October budget|$209K|/command?sec=Forecast+vs+budget",
+    "f7": "Forecast minus budget|$19.6K under|/command?sec=Forecast+vs+budget",
+    "f8": "AI share of spend, month to date|3.5%|/ai?sec=AI+spend+by+product",
+    "f9": "AI spend, month to date|$5.6K|/ai?sec=AI+spend+by+product",
+    "f10": "AI spend change on the same days of September|up 11.0%|/ai?sec=AI+spend+by+product",
+    "f11": "Largest AI product, month to date|claude_code|/ai?sec=AI+spend+by+product&hl=claude_code",
+    "f12": "Its spend, month to date|$3.2K|/ai?sec=AI+spend+by+product&hl=claude_code",
+    "f13": "Already spent on waste|$3.6K|/anomalies?sec=Findings",
+    "f14": "Findings of money already spent|2 findings|/anomalies?sec=Findings",
+    "f15": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f16": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19"
+   },
+   "headline": "Your October is in good shape: spend is on course to finish ⟦f7⟧ budget.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, and on track to close at ⟦f5⟧ against a ⟦f6⟧ budget.",
+     "Every cost center is forecast within budget, and ⟦f3⟧ remains the largest provider at ⟦f4⟧.",
+     "AI is still a small line at ⟦f8⟧ of spend (⟦f9⟧), but it is growing, ⟦f10⟧ on the same days of September, with ⟦f11⟧ the largest product at ⟦f12⟧."
+    ],
+    "ops": [
+     "The one thing to tidy up is waste: ⟦f13⟧ has already been spent across ⟦f14⟧, almost all of it on ⟦f15⟧, an idle capacity reservation (cr-0b2idle) costing ⟦f16⟧ with no instance running."
+    ]
+   }
+  },
+  "tax_analyst:mtd": {
+   "key": "tax_analyst:mtd",
+   "basis": {
+    "headline": "99317946ce4b42a4",
+    "spend": "3ce7e7f170384e4b",
+    "risk": "3a06f5825cdb8b20",
+    "gxp": "d7ed91814c19a452",
+    "money": "77cf121f750be7f8",
+    "ops": "9a77cf8fcdae19cf"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f16": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f17": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f18": "Deduction at risk|$266K|/risk?sec=Deduction+at+risk",
+    "f19": "Open filings|3 open filings|/risk?sec=By+filing",
+    "f20": "Share of review-period spend evidenced|96.9%|/risk?sec=Deduction+at+risk",
+    "f21": "Largest cause of risk|known savings left unactioned for 60+ days|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f22": "Risk from this cause|$101K|/risk?sec=By+reason&hl=Known+savings+left+unactioned+for+60%2B+days",
+    "f23": "Largest single risk|aoai-ptu-discovery|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f24": "Its deduction at risk|$90.5K|/risk?sec=Largest+risks&hl=aoai-ptu-discovery",
+    "f25": "Filing it sits in|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f26": "Move CSR drafting agent off 50 PTU|OPT-006|None",
+    "f27": "Estimated monthly saving|$29.5K|None",
+    "f28": "Next filing (Research Ireland, IE)|IE-CT1-FY2026|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f29": "Days until the filing date|40 days|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f30": "Filing date of IE-CT1-FY2026|2026-12-01|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f31": "Deduction at risk in this filing|$173K|/risk?sec=By+filing&hl=IE-CT1-FY2026",
+    "f32": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/compliance?sec=Checks&hl=PH-07",
+    "f33": "Spend affected|$367K|/compliance?sec=Checks&hl=PH-07",
+    "f34": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f35": "Spend affected|$11.7K|/catalog/GV-02",
+    "f36": "GxP system with an overdue review|Clinical trial analytics replica|/compliance?sec=Checks&hl=Clinical+trial+analytics+replica",
+    "f37": "Days past the review date|21 days|/compliance?sec=Checks&hl=Clinical+trial+analytics+replica",
+    "f38": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f39": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f40": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f41": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f42": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f43": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f44": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f45": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f46": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f47": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "Two tax numbers matter this month: ⟦f18⟧ of deductions open to challenge and ⟦f38⟧ of R&D credit not yet claimed, while spend itself tracks ⟦f9⟧ budget.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, heading for ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ are forecast over budget, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧), and forecast confidence is ⟦f16⟧ with only ⟦f17⟧ of spend on live adapters."
+    ],
+    "risk": [
+     "⟦f18⟧ of deductions across ⟦f19⟧ could be challenged, even with ⟦f20⟧ of review-period spend evidenced.",
+     "The largest share traces to ⟦f21⟧ (⟦f22⟧), so the fix sits with cost owners rather than with documentation.",
+     "The largest single exposure is ⟦f23⟧ (Microsoft, Research Ireland) at ⟦f24⟧ in ⟦f25⟧; approving ⟦f26⟧ removes it and saves ⟦f27⟧ a month.",
+     "⟦f28⟧ is next, due in ⟦f29⟧ (⟦f30⟧), with ⟦f31⟧ of the risk, so it is the filing to prepare first."
+    ],
+    "gxp": [
+     "⟦f33⟧ of spend runs where patient data is encrypted with provider-managed keys (itsm, edc-platform), flagged by ⟦f32⟧.",
+     "⟦f34⟧ flags a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f35⟧ of spend.",
+     "The validation review for ⟦f36⟧ is ⟦f37⟧ overdue."
+    ],
+    "money": [
+     "Claiming eligible cloud and SaaS fees adds ⟦f38⟧ of R&D credit, almost all of it in the ⟦f40⟧ (⟦f39⟧), on top of ⟦f41⟧ claimed today."
+    ],
+    "ops": [
+     "⟦f45⟧ do not tie out to charges; the largest, ⟦f46⟧ from ServiceNow, is ⟦f47⟧ above the charge detail.",
+     "⟦f42⟧ are unacknowledged, ⟦f43⟧, starting with ⟦f44⟧."
+    ]
+   }
+  },
+  "tech_exec:mtd": {
+   "key": "tech_exec:mtd",
+   "basis": {
+    "headline": "c5e8a1087aa6fee4",
+    "spend": "637706c9764e001e",
+    "gxp": "6b9772739d74caab",
+    "money": "4196ba81c49d1a97",
+    "ops": "2020b520576775c9"
+   },
+   "facts": {
+    "f1": "Spend, Month to date (2026-10-01 to 2026-10-22)|$1.02M|/command?sec=Spend%2C+month+to+date",
+    "f2": "Change on the same days of September|down 1.7%|/command?sec=Spend%2C+month+to+date",
+    "f3": "Largest provider, month to date|SAP|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f4": "Its spend, month to date|$432K|/command?sec=Cloud+%26+SaaS+%2F+AI",
+    "f5": "Largest cost center, month to date|Corporate IT|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f6": "Its spend, month to date|$522K|/command?sec=Cost+centers&hl=Corporate+IT",
+    "f7": "October forecast|$1.12M|/command?sec=Forecast+vs+budget",
+    "f8": "October budget|$1.18M|/command?sec=Forecast+vs+budget",
+    "f9": "Forecast minus budget|$61.2K under|/command?sec=Forecast+vs+budget",
+    "f10": "Cost centers forecast over budget|4 cost centers|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f11": "Data & Analytics: forecast against budget|Data & Analytics|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f12": "Data & Analytics variance|+17.0%|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f13": "Data & Analytics forecast|$40.9K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f14": "Data & Analytics budget|$35.0K|/budgets?sec=Forecast+and+budget+by+cost+center&hl=Data+%26+Analytics",
+    "f15": "Cost centers at risk: forecast within 3% of budget|3 more are|/budgets?sec=Forecast+and+budget+by+cost+center",
+    "f16": "AI share of spend, month to date|9.6%|/ai?sec=AI+spend+by+product",
+    "f17": "AI spend, month to date|$98.2K|/ai?sec=AI+spend+by+product",
+    "f18": "AI spend change on the same days of September|up 3.1%|/ai?sec=AI+spend+by+product",
+    "f19": "Largest AI product, month to date|SageMaker endpoint|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f20": "Its spend, month to date|$40.5K|/ai?sec=AI+spend+by+product&hl=SageMaker+endpoint",
+    "f21": "Forecast confidence|68.4%|/command?sec=Forecast+confidence",
+    "f22": "Weakest confidence input|6.4%|/command?sec=Forecast+confidence",
+    "f23": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/catalog/PH-07",
+    "f24": "Spend affected|$367K|/catalog/PH-07",
+    "f25": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f26": "Spend affected|$11.7K|/catalog/GV-02",
+    "f27": "Savings identified|$127K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f28": "Actions in the tracker|16 actions|/optimization?sec=Backlog",
+    "f29": "Approved|$18.2K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f30": "Verified (measured)|$7.3K|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f31": "Share of identified savings verified|5.8%|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f32": "Savings identified but not approved|$109K a month|/optimization?sec=Savings+lifecycle+%28monthly%29",
+    "f33": "Scale discovery GPU endpoint to zero when idle|OPT-005|/optimization?focus=OPT-005&sec=Backlog",
+    "f34": "Estimated monthly saving|$49.0K a month|/optimization?focus=OPT-005&sec=Backlog",
+    "f35": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f36": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f37": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f38": "Already spent on waste|$7.0K|/anomalies?sec=Findings",
+    "f39": "Findings of money already spent|6 findings|/anomalies?sec=Findings",
+    "f40": "Idle capacity reservation (cr-0b2idle reserved with no instance running)|F-19|/anomalies?sec=Findings&hl=F-19",
+    "f41": "Amount already spent|$3.6K|/anomalies?sec=Findings&hl=F-19"
+   },
+   "headline": "October runs ⟦f9⟧ budget, but ⟦f32⟧ of identified savings is waiting for approval and ⟦f24⟧ of spend still holds patient data on provider-managed keys.",
+   "sections": {
+    "spend": [
+     "October spend is ⟦f1⟧ to date, ⟦f2⟧ on the same days of September, on course for ⟦f7⟧ against a ⟦f8⟧ budget.",
+     "⟦f10⟧ are forecast over budget, led by ⟦f11⟧ at ⟦f12⟧ (⟦f13⟧ against ⟦f14⟧), and ⟦f15⟧ within 3% of budget.",
+     "AI is ⟦f16⟧ of spend (⟦f17⟧, ⟦f18⟧ on the same days of September), with ⟦f19⟧ the largest AI line at ⟦f20⟧.",
+     "⟦f3⟧ is the largest provider at ⟦f4⟧ and ⟦f5⟧ the largest cost center at ⟦f6⟧; forecast confidence is ⟦f21⟧, as only ⟦f22⟧ of spend arrives through live adapters."
+    ],
+    "gxp": [
+     "⟦f24⟧ of spend runs where patient data is encrypted with provider-managed keys (itsm, edc-platform), flagged by ⟦f23⟧.",
+     "⟦f25⟧ flags a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f26⟧ of spend."
+    ],
+    "money": [
+     "The savings pipeline holds ⟦f27⟧ across ⟦f28⟧, yet only ⟦f29⟧ is approved and ⟦f30⟧ verified, so ⟦f31⟧ has reached the bill.",
+     "⟦f32⟧ is waiting on decisions, and the largest open action, ⟦f33⟧ (scale the discovery GPU endpoint to zero when idle), is worth ⟦f34⟧ on its own."
+    ],
+    "ops": [
+     "⟦f38⟧ has already been spent on waste across ⟦f39⟧, the largest being ⟦f40⟧, an idle capacity reservation (cr-0b2idle) at ⟦f41⟧ with no instance running.",
+     "⟦f35⟧ are unacknowledged, ⟦f36⟧, starting with ⟦f37⟧."
+    ]
+   }
+  },
+  "transfer_pricing:mtd": {
+   "key": "transfer_pricing:mtd",
+   "basis": {
+    "headline": "b7c870517451b402",
+    "gxp": "6b9772739d74caab",
+    "money": "77cf121f750be7f8",
+    "ops": "9a77cf8fcdae19cf"
+   },
+   "facts": {
+    "f1": "Patient data in cloud without customer-managed keys (itsm, edc-platform)|PH-07|/catalog/PH-07",
+    "f2": "Spend affected|$367K|/catalog/PH-07",
+    "f3": "Regulated workload served outside the US (genomics-data · 114 days)|GV-02|/catalog/GV-02",
+    "f4": "Spend affected|$11.7K|/catalog/GV-02",
+    "f5": "R&D credit eligible but not claimed|$481K a year|/tax?tab=credit&sec=Credit+unlock",
+    "f6": "UK credit|$468K|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f7": "Jurisdiction|UK|/tax?tab=credit&sec=Credit+unlock&hl=UK",
+    "f8": "R&D credit claimed today|$173K a year|/tax?tab=credit&sec=Claimed+today",
+    "f9": "Unacknowledged alerts|12 alerts|/alerts?sec=Fired+alerts",
+    "f10": "High-severity alerts|6 high severity|/alerts?sec=Fired+alerts",
+    "f11": "Cost center forecast over budget|Data & Analytics forecast $40,933 vs budget $35,000 for 2026-10|/alerts?sec=Fired+alerts&hl=Data+%26+Analytics+forecast+%2440%2C933+vs+budget+%2435%2C000+for+2026-10",
+    "f12": "Invoice lines that do not tie out|3 invoice lines|/reconciliation?sec=Invoice+lines",
+    "f13": "ServiceNow invoice, 2026-09|IND-snow-9103-202609-itsm|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm",
+    "f14": "Difference between invoice and charges|$14.2K|/reconciliation?sec=Invoice+lines&hl=IND-snow-9103-202609-itsm"
+   },
+   "headline": "The R&D credit is the opportunity in your scope: ⟦f5⟧ is unclaimed, ⟦f6⟧ of it in the ⟦f7⟧, while ⟦f2⟧ of spend holds patient data on provider-managed keys.",
+   "sections": {
+    "gxp": [
+     "⟦f2⟧ of spend runs where patient data is encrypted with provider-managed keys (itsm, edc-platform), flagged by ⟦f1⟧.",
+     "⟦f3⟧ flags a regulated workload served outside the US (genomics-data · 114 days), covering ⟦f4⟧ of spend."
+    ],
+    "money": [
+     "Claiming eligible cloud and SaaS fees would add ⟦f5⟧ of R&D credit, ⟦f6⟧ of it in the ⟦f7⟧, on top of ⟦f8⟧ claimed today."
+    ],
+    "ops": [
+     "⟦f12⟧ do not tie out to charges; the largest, ⟦f13⟧ from ServiceNow, is ⟦f14⟧ above the charge detail.",
+     "⟦f9⟧ are unacknowledged, ⟦f10⟧, led by ⟦f11⟧."
+    ]
+   }
+  }
+ }
+}

@@ -11,7 +11,7 @@ import { api, useApi } from "@/lib/api";
 export type Fact = { text: string; label: string; href: string | null; source: number };
 export type Source = { n: number; page: string; section: string; href: string | null };
 export type Summary = {
-  as_of: string; generated_at: string; writer: "costiq" | "claude"; model: string | null; note: string | null; period: PeriodInfo;
+  as_of: string; generated_at: string; writer: "costiq" | "saved"; model: string | null; note: string | null; period: PeriodInfo;
   headline: string;
   sections: { key: string; title: string; tone: "good" | "warn" | "bad" | "info"; state: string; sentences: string[] }[];
   actions: { kind: string; title: string; detail: string; value: string; href: string }[];
@@ -151,7 +151,7 @@ export function SummaryView() {
         <>
           <SummaryBody key={d.generated_at} d={d} />
           <p className="ais-foot">
-            {d.writer === "claude" ? `Written by Claude (${d.model}) from CostIQ's figures.` : "Written by CostIQ from the figures on the linked pages."}{" "}
+            Written from the figures on the linked pages.{" "}
             Every figure opens the panel or row it comes from. {d.note}
           </p>
         </>

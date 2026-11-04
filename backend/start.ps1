@@ -9,7 +9,7 @@ $py = Join-Path $root ".venv\Scripts\python.exe"
 if (-not (Test-Path $py)) {
     Write-Host "First run: creating the Python 3.12 environment..."
     uv venv --python 3.12 (Join-Path $root ".venv")
-    uv pip install --python $py -r (Join-Path $root "requirements.txt")
+    uv pip install --python $py -r (Join-Path $root "requirements.txt") -r (Join-Path $root "requirements-dev.txt")
 }
 
 $db = Join-Path $root "sample\costiq.duckdb"

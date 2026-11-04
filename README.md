@@ -18,7 +18,7 @@ Cost centers: Clinical Operations, Patient Data, Research & Discovery, Data & An
 ## Board Pack and Glossary
 
 - **Board Pack** (`/board`; CFO, Technology Executive, Internal Controller, Internal Audit, Investor Relations): spend and outlook, AI investment and value, compliance and controls risk, decisions, then nine life-sciences additions (programs and phases, R&D vs SG&A, AI value in R&D, inspection readiness, patient data exposure, AI regulation readiness, cyber, vendor concentration, GMP AI). A section that needs data CostIQ does not hold says which input is missing. Printable.
-- **AI Summary** (`/summary`, every role; also the agent's "Brief me"): a headline, what matters in spend, tax risk, GxP, savings and operations, and up to four next actions, for the signed-in role and scope. Every figure links to the panel or table row it comes from (the page scrolls to it and highlights it), and numbered chips list the source pages. Written by CostIQ by default; set `COSTIQ_SUMMARY_WRITER=claude` and `ANTHROPIC_API_KEY` to have Claude word it from the same figures (a draft that types its own figure is discarded).
+- **AI Summary** (`/summary`, every role; also the agent's "Brief me"): a headline, what matters in spend, tax risk, GxP, savings and operations, and up to four next actions, for the signed-in role and scope. Every figure links to the panel or table row it comes from (the page scrolls to it and highlights it), and numbered chips list the source pages. The wording comes from saved responses for every role (Month to date) and for the CFO in every period (`backend/data/summary_responses.json`); other combinations, and any section whose figures have changed since, use CostIQ's built-in writer. No model or API key is involved.
 - **Glossary** (`/glossary`, every role): terms, and how forecasts, run-rates, confidence, anomalies and savings estimates are calculated.
 
 ## Headline numbers (sample data)
@@ -75,12 +75,28 @@ cd mvp
 
 Sign-in: choose a role (Entra ID mode exists in the backend). The signed-in app starts at `/command`.
 
+## Deploy on Vercel
+
+`vercel.json` deploys both apps as one Vercel project with two [services](https://vercel.com/docs/services):
+
+| Service | Root | Public path | Notes |
+|---|---|---|---|
+| `frontend` | `frontend/` (Next.js) | `/(.*)`, everything | Binding to `backend` injects `COSTIQ_API_URL`; its `/api/*` route handler forwards calls with the persona header |
+| `backend` | `backend/` (FastAPI, `costiq.main:app`) | none, internal only | Build step `data/vercel_build.py` builds the sample database into the bundle |
+
+- The backend has no public route because demo sign-in trusts the `X-CostIQ-Persona` header. Only the frontend, through the binding, can reach it.
+- No environment variables or secrets are needed: the binding provides `COSTIQ_API_URL` (don't set it yourself), and the pseudonym key keeps its built-in default, which is fine for the generated sample.
+- Data: each backend instance works on its own copy of the sample in `/tmp`. Changes (approvals, acknowledgements, ledger entries) last until that instance is recycled, and instances don't share them. To keep changes, point `COSTIQ_DB_URL` at a PostgreSQL database loaded with the sample. The backend supports PostgreSQL, but these pages have only been tested on DuckDB.
+- Anyone with the URL can sign in as any role, so turn on Deployment Protection (Project Settings → Deployment Protection → Vercel Authentication) to limit who can open it.
+- Local run of both services: `vercel dev -L` from `mvp/` (needs `backend/sample/costiq.duckdb`; build it once with `backend\start.ps1 -Rebuild`).
+
 ## Layout
 
 ```
 mvp/
-  docker-compose.yml, start.ps1
+  docker-compose.yml, start.ps1, vercel.json
   backend/                  FastAPI + DuckDB (PostgreSQL via sqlglot)
+    requirements.txt        what the API needs at runtime; requirements-dev.txt adds the sample generator and pytest
     costiq/
       allocation.py           pool → entity → jurisdiction → GL account and cost class
       regulatory.py           tax filings, R&D credit schedule, allocation-policy workflow
@@ -89,12 +105,13 @@ mvp/
       data_requests.py        Examiner Request Responder
       optimization.py         savings lifecycle: identified → approved → implemented → verified
       board.py                Board Pack: 13 sections, each marked In CostIQ / Partial / Needs data
-      summary.py              AI summary: ranked facts, linked sources, optional Claude writer
+      summary.py              AI summary: ranked facts, linked sources, saved responses
       monitoring.py, alerts.py, adapters/
     registry/usecases/      145 executable use cases (YAML); PH-* are the pharma ones
     schema/                 FOCUS 1.4 + app, pharma and optimization schemas
     config/access.yaml      modules, 14 personas, actions, scopes
-    data/                   synthetic sample generator (pharma.py) and file-drop templates
+    data/                   synthetic sample generator (pharma.py), Vercel build step and file-drop templates
+    tools/summary_responses.py  dump facts, save and check the AI summary's saved responses
     tests/
   frontend/                 Next.js 16 + Tailwind v4 + Chart.js
 ```

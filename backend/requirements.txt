@@ -1,3 +1,4 @@
+# What the running API needs (the Vercel function bundle and the Docker image). Build and test tools are in requirements-dev.txt.
 # Copied from CostIQ/CostIQ/backend/requirements.txt (validated with DuckDB + PostgreSQL 16), plus MVP additions.
 fastapi==0.162.0
 uvicorn[standard]==0.54.0
@@ -9,8 +10,4 @@ psycopg-pool==3.3.3
 PyJWT[crypto]==2.15.0
 PyYAML==6.0.3
 httpx==0.28.1
-anthropic==2.4.0  # optional Claude writer for the AI summary (COSTIQ_SUMMARY_WRITER=claude)
 python-multipart
-pyarrow
-pandas
-pytest

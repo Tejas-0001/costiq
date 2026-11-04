@@ -127,15 +127,52 @@ def test_ai_summary_cites_facts_and_respects_role(client):
         assert len(d["actions"]) <= 4 and all(a["href"] for a in d["actions"])
     cfo = client.get("/api/summary", headers=H("cfo")).json()
     assert [s["key"] for s in cfo["sections"]] == ["spend", "risk", "gxp", "money", "ops"]
-    assert "budget" in cfo["headline"] and cfo["writer"] == "costiq"
+    assert "budget" in cfo["headline"] and cfo["writer"] in ("costiq", "saved")
     assert all(sec["state"] and sec["tone"] in ("good", "warn", "bad", "info") for sec in cfo["sections"])
     scoped = client.get("/api/summary", headers=H("pl_exec")).json()  # Clinical Operations only: no enterprise tax figures
     assert "risk" not in {s["key"] for s in scoped["sections"]}
-    # the Claude writer's guard: citations must exist and figures may only appear through citations
+    # the guard on written prose: citations must exist and figures may only appear through citations
     check = Summarizer._check
     assert check({"headline": "Spend is ⟦f1⟧.", "sections": [{"key": "spend", "sentences": ["Up ⟦f2⟧."]}]}, cfo) is None
     assert "uncited figure" in check({"headline": "Spend is $1.2M.", "sections": []}, cfo)
     assert "unknown citation" in check({"headline": "Spend is ⟦f999⟧.", "sections": []}, cfo)
+
+
+def test_saved_summary_is_used_per_section_while_its_facts_hold():
+    import copy
+    from costiq import summary as S
+    out = {"headline": "Spend is ⟦f1⟧.", "writer": "costiq", "facts": {
+        "f1": {"text": "$1.0M", "label": "Spend", "href": "/command", "source": 1},
+        "f2": {"text": "$5K", "label": "Waste", "href": "/anomalies", "source": 2}},
+        "sections": [{"key": "spend", "sentences": ["Spend is ⟦f1⟧."]}, {"key": "ops", "sentences": ["Waste is ⟦f2⟧."]}]}
+    saved = {"key": "t", "basis": S.basis(out), "facts": {k: S.fact_key(v) for k, v in out["facts"].items()},
+             "headline": "So far ⟦f1⟧ has gone out.", "sections": {"spend": ["Month to date: ⟦f1⟧."], "ops": ["⟦f2⟧ wasted."]}}
+    a = copy.deepcopy(out)
+    assert sorted(S.apply_saved(a, saved)) == ["headline", "ops", "spend"] and a["writer"] == "saved"
+    b = copy.deepcopy(out)
+    b["facts"]["f2"]["text"] = "$6K"  # the waste figure changed: that section keeps the built-in text
+    assert sorted(S.apply_saved(b, saved)) == ["headline", "spend"] and b["sections"][1]["sentences"] == ["Waste is ⟦f2⟧."]
+    c = copy.deepcopy(out)  # the same facts under other ids: saved citations are re-pointed
+    c["facts"] = {"f7": c["facts"]["f1"], "f8": c["facts"]["f2"]}
+    c["headline"], c["sections"][0]["sentences"], c["sections"][1]["sentences"] = "Spend is ⟦f7⟧.", ["Spend is ⟦f7⟧."], ["Waste is ⟦f8⟧."]
+    S.apply_saved(c, saved)
+    assert c["headline"] == "So far ⟦f7⟧ has gone out." and c["sections"][1]["sentences"] == ["⟦f8⟧ wasted."]
+    d = copy.deepcopy(out)  # saved text that types its own figure is refused outright
+    assert S.apply_saved(d, dict(saved, sections={"spend": ["So far $2M."]})) == [] and d["writer"] == "costiq"
+
+
+def test_saved_summaries_apply_to_the_built_sample(tmp_path):
+    """Every saved response applies in full to the sample as built, which is what a fresh deployment serves.
+    If this fails after a sample change, re-save the responses (tools/summary_responses.py)."""
+    import shutil, subprocess
+    root = os.path.join(os.path.dirname(__file__), "..")
+    fresh = tmp_path / "fresh.duckdb"
+    shutil.copyfile(os.path.join(root, "sample", "costiq.duckdb"), fresh)
+    env = {**os.environ, "COSTIQ_DB_URL": "duckdb:///" + str(fresh).replace("\\", "/"), "PYTHONIOENCODING": "utf-8"}
+    r = subprocess.run([sys.executable, os.path.join(root, "tools", "summary_responses.py"), "check"],
+                       env=env, cwd=root, capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 0, r.stdout[-2000:] + r.stderr[-2000:]
+    assert r.stdout.count(": ok") >= 18
 
 
 def test_period_selector_window_applies_across_pages(client):

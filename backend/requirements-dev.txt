@@ -1,0 +1,7 @@
+# Build and test tools, not needed by the running API: the sample database generator (data/generate_sample.py loads
+# its rows through pandas and pyarrow) and the test suite. Kept out of requirements.txt so the Vercel function bundle
+# stays under the 500 MB Python limit (pandas, pyarrow and numpy are about 320 MB).
+#   pip install -r requirements.txt -r requirements-dev.txt
+pandas
+pyarrow
+pytest

@@ -4,8 +4,8 @@
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt && useradd --uid 10001 --create-home costiq
+COPY requirements.txt requirements-dev.txt ./
+RUN pip install -r requirements.txt -r requirements-dev.txt && useradd --uid 10001 --create-home costiq
 COPY costiq costiq
 COPY config config
 COPY schema schema

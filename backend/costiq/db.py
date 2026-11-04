@@ -88,18 +88,31 @@ class DuckDB(Database):
 
     def __init__(self, url):
         super().__init__(url)
-        import duckdb
         path = urlparse(url).path or ":memory:"
         if url.startswith("duckdb:////"):
             path = "/" + url[len("duckdb:////"):]
         elif url.startswith("duckdb:///"):
             path = url[len("duckdb:///"):]
-        self.con = duckdb.connect(path)
-        self.ensure_views()
+        self.path = path
+        self._con = None
+        self._open = threading.Lock()
+
+    @property
+    def con(self):
+        """Opened on first use, not at import. Only one process may open a DuckDB file, and a dev server with reload
+        (`vercel dev`, `uvicorn --reload`) imports the app in its watcher process as well as in the worker."""
+        if self._con is None:
+            with self._open:
+                if self._con is None:
+                    import duckdb
+                    self._con = duckdb.connect(self.path)
+                    self.ensure_views()
+        return self._con
 
     def _execute(self, sql, params, limit, fetch=True):
+        con = self.con  # outside the lock: opening runs ensure_views, which comes back through here
         with self._lock:
-            cur = self.con.cursor()
+            cur = con.cursor()
             cur.execute(sql, params or None)
             if not fetch or cur.description is None:
                 return [], []

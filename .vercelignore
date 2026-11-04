@@ -1,0 +1,10 @@
+# Local-only files kept out of Vercel uploads. Vercel installs dependencies and builds the sample database itself.
+.env*
+.venv
+__pycache__
+.pytest_cache
+node_modules
+*.tsbuildinfo
+/frontend/.next
+/backend/sample
+.vercel

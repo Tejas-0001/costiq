@@ -8,15 +8,16 @@ exceptions. A figure is only linked to a page the caller can open.
 Sentences cite facts as ⟦f12⟧. The web app replaces each citation with the fact's figure, linked to its source, so a
 figure in the summary is always the figure on the page.
 
-Writers
-    costiq  (default) ranks the facts and writes the sentences from fixed templates: the same data gives the same text.
-    claude  opt-in: COSTIQ_SUMMARY_WRITER=claude and an Anthropic credential (ANTHROPIC_API_KEY or an `ant auth login`
-            profile). Claude rewrites the sentences from the fact list and may only cite facts; it never types a figure.
-            A draft that cites an unknown fact or states a number outside a citation is rejected, and the costiq text
-            is shown instead. Only the fact list (names and figures, no billing rows) is sent.
+Writers (nothing is sent outside CostIQ; there is no model call)
+    costiq  ranks the facts and writes the sentences from fixed templates: the same data gives the same text.
+    saved   prose written in advance for a set of roles and periods (data/summary_responses.json, managed with
+            tools/summary_responses.py). Saved text cites facts like the costiq text, so its figures stay live. The
+            headline and each section use their saved text only while the facts behind them are the ones it was
+            written for. A section whose facts changed (an approval, an acknowledged alert) shows the costiq text.
 """
 from __future__ import annotations
 import datetime as dt
+import hashlib
 import json
 import logging
 import os
@@ -139,8 +140,9 @@ class Summarizer:
                 log.warning("summary part %s failed: %s", part.__name__, e)
         out = self._assemble(b)
         out["period"] = win.as_dict()
-        if os.environ.get("COSTIQ_SUMMARY_WRITER", "costiq").lower() == "claude" and out["sections"]:
-            self._claude(out, persona_label)
+        saved = saved_responses().get(response_key(p, win.range))
+        if saved and out["sections"]:
+            apply_saved(out, saved)
         self._cache[key] = (time.time(), out)
         return out
 
@@ -461,79 +463,11 @@ class Summarizer:
             "facts": b.facts, "sources": sorted(b.sources.values(), key=lambda s: s["n"]),
         }
 
-    # ------------------------------------------------------------------ optional Claude writer
-    SCHEMA = {
-        "type": "object",
-        "properties": {
-            "headline": {"type": "string"},
-            "sections": {"type": "array", "items": {
-                "type": "object",
-                "properties": {"key": {"type": "string"}, "sentences": {"type": "array", "items": {"type": "string"}}},
-                "required": ["key", "sentences"], "additionalProperties": False}},
-        },
-        "required": ["headline", "sections"], "additionalProperties": False,
-    }
-    SYSTEM = (
-        "You write the AI summary at the top of CostIQ, the cloud and AI cost governance product used by a regulated "
-        "pharmaceutical group. The reader is the role named in the request. You get a list of facts, each with an id, its "
-        "exact figure or name, and what it means, grouped into sections with a first draft.\n"
-        "Rewrite the headline and each section so the reader sees at once what matters and why: lead with the largest or "
-        "most urgent point, and connect facts across sections where the facts connect them (for example a savings action "
-        "that also removes tax risk). Plain, specific business English; no hype, no hedging, no advice beyond the facts.\n"
-        "Cite every figure, name, identifier or date with its token, for example ⟦f3⟧. Never type a number yourself: the "
-        "token is replaced by the exact figure with a link to the page it comes from. Use only the tokens given. Keep the "
-        "section keys. The headline is one sentence of at most 35 words; each section has 1 to 4 sentences."
-    )
-
-    def _claude(self, out: dict, persona_label: str):
-        """Let Claude rewrite the prose; keep the costiq text if the draft fails any check."""
-        payload = {
-            "role": persona_label, "as_of": out["as_of"],
-            "facts": {k: {"figure": v["text"], "means": v["label"]} for k, v in out["facts"].items()},
-            "draft": {"headline": out["headline"], "sections": [{"key": s["key"], "title": s["title"], "sentences": s["sentences"]}
-                                                                for s in out["sections"]]},
-        }
-        model = os.environ.get("COSTIQ_SUMMARY_MODEL", "claude-opus-5-5")
-        try:
-            import anthropic
-            client = anthropic.Anthropic(timeout=60.0, max_retries=1)
-            resp = client.beta.messages.create(
-                model=model, max_tokens=4000, system=self.SYSTEM,
-                betas=["server-side-fallback-2026-07-01"], fallbacks="default",
-                output_config={"effort": "low", "format": {"type": "json_schema", "schema": self.SCHEMA}},
-                messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],
-            )
-        except ImportError:
-            out["note"] = "The Claude writer needs the anthropic package; showing CostIQ's own summary."
-            return
-        except Exception as e:  # network, credentials, rate limits: the costiq summary still stands
-            log.warning("claude summary failed: %s", e)
-            out["note"] = "Claude was unavailable; showing CostIQ's own summary."
-            return
-        if resp.stop_reason != "end_turn":
-            out["note"] = f"Claude stopped early ({resp.stop_reason}); showing CostIQ's own summary."
-            return
-        try:
-            draft = json.loads(next(b.text for b in resp.content if b.type == "text"))
-        except (StopIteration, ValueError):
-            out["note"] = "Claude's draft could not be read; showing CostIQ's own summary."
-            return
-        problem = self._check(draft, out)
-        if problem:
-            log.info("claude summary rejected: %s", problem)
-            out["note"] = f"Claude's draft was rejected ({problem}); showing CostIQ's own summary."
-            return
-        by_key = {s["key"]: s for s in draft["sections"]}
-        out["headline"] = draft["headline"]
-        for s in out["sections"]:
-            if by_key.get(s["key"], {}).get("sentences"):
-                s["sentences"] = by_key[s["key"]]["sentences"]
-        out["writer"], out["model"] = "claude", resp.model
-
+    # ------------------------------------------------------------------ guard for written prose
     @staticmethod
     def _check(draft: dict, out: dict) -> str | None:
         """Every citation must be a known fact, and no digit may appear outside a citation unless it is part of a
-        name or identifier in the facts (filing ids, action ids)."""
+        name or identifier in the facts (filing ids, action ids). Used on saved prose before it replaces the costiq text."""
         known = out["facts"]
         allowed = json.dumps([f["label"] for f in known.values()] + [f["text"] for f in known.values()], ensure_ascii=False)
         texts = [draft["headline"]] + [t for s in draft["sections"] for t in s["sentences"]]
@@ -549,3 +483,73 @@ class Summarizer:
                 if tok and tok not in allowed:
                     return f"uncited figure {tok}"
         return None
+
+
+# ---------------------------------------------------------------------------------------- saved responses
+RESPONSES = os.path.join(os.path.dirname(__file__), "..", "data", "summary_responses.json")
+_responses: dict | None = None
+
+
+def saved_responses() -> dict:
+    """Saved prose by response key (persona:range). Loaded once; a missing or unreadable file means none."""
+    global _responses
+    if _responses is None:
+        try:
+            with open(RESPONSES, encoding="utf-8") as fh:
+                _responses = json.load(fh)["responses"]
+        except (OSError, ValueError, KeyError) as e:
+            log.warning("saved summaries not loaded: %s", e)
+            _responses = {}
+    return _responses
+
+
+def response_key(p, rng: str) -> str:
+    return f"{'+'.join(p.personas)}:{rng}"
+
+
+def fact_key(f: dict) -> str:
+    """A fact's identity across builds: what it means, its figure and where it links (ids are only positions)."""
+    return f"{f['label']}|{f['text']}|{f['href']}"
+
+
+def basis(out: dict) -> dict:
+    """For the headline and each section: a hash of the facts its costiq text cites. Saved prose for a part is used
+    only while this hash is the one it was written against."""
+    def h(texts):
+        keys = sorted({fact_key(out["facts"][fid]) for t in texts for fid in CITE.findall(t) if fid in out["facts"]})
+        return hashlib.sha256("\n".join(keys).encode()).hexdigest()[:16]
+    return {"headline": h([out["headline"]]), **{s["key"]: h(s["sentences"]) for s in out["sections"]}}
+
+
+def apply_saved(out: dict, saved: dict) -> list[str]:
+    """Replace the costiq text with the saved text, part by part, where the part's facts are unchanged. Citations in
+    saved text are re-pointed to the current fact ids. Returns the parts that use saved text."""
+    now = basis(out)
+    by_key = {fact_key(f): fid for fid, f in out["facts"].items()}
+
+    def remap(text):
+        ids = {fid: by_key.get(saved["facts"].get(fid, "")) for fid in CITE.findall(text)}
+        if not all(ids.values()):
+            return None
+        return CITE.sub(lambda m: f"⟦{ids[m.group(1)]}⟧", text)
+
+    headline, sections, used = out["headline"], {}, []
+    for part, text in [("headline", [saved.get("headline")])] + list(saved.get("sections", {}).items()):
+        new = [remap(t) for t in text if t]
+        if new and all(new) and saved.get("basis", {}).get(part) == now.get(part):
+            if part == "headline":
+                headline = new[0]
+            else:
+                sections[part] = new
+            used.append(part)
+    draft = {"headline": headline, "sections": [{"key": k, "sentences": v} for k, v in sections.items()]}
+    problem = Summarizer._check(draft, out)
+    if problem:
+        log.warning("saved summary %s not used: %s", saved.get("key"), problem)
+        return []
+    if used:
+        out["headline"] = headline
+        for s in out["sections"]:
+            s["sentences"] = sections.get(s["key"], s["sentences"])
+        out["writer"] = "saved"
+    return used

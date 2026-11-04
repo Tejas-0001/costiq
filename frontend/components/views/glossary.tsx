@@ -35,7 +35,7 @@ const HOW: { t: string; eq?: string; d: string }[] = [
     eq: "Credit = annualized review-period recurring cloud and SaaS fees × the jurisdiction's credit rate",
     d: "Claimed where the group already claims these fees; unlock where they qualify but are not yet claimed." },
   { t: "AI summary",
-    d: "The AI Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, deduction at risk, unclaimed R&D credit, open savings, GxP findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages. If the Claude writer is switched on, Claude words the sentences from the same figures; it cannot type a figure itself, and a draft that states one is discarded." },
+    d: "The AI Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, deduction at risk, unclaimed R&D credit, open savings, GxP findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages. Saved wording is used while the figures behind it are unchanged; every figure in it is still read live from the linked page." },
   { t: "Ask CostIQ",
     d: "Your question is matched to one of the tested use cases by keyword ranking (BM25), parameters such as periods and providers are read from the text, and the use case runs in your scope. Nothing is generated; if nothing matches, CostIQ says so." },
 ];
