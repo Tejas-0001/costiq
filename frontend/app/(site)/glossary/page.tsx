@@ -5,6 +5,8 @@ import { cookies } from "next/headers";
 import { MMLockup } from "@/components/brand";
 import { PublicCopy } from "@/components/copy";
 import { GlossaryView } from "@/components/views/glossary";
+import { IndustryButton } from "@/components/site/industry";
+import { TENANT_COOKIE, tenantChoice } from "@/lib/tenants";
 import "../../landing.css";
 
 export const metadata: Metadata = { title: "CostIQ" };
@@ -16,6 +18,11 @@ async function Open() {
   return <Link href={signedIn ? "/command" : "/sign-in?next=%2Fcommand"} className="lp-open">{signedIn ? "Back to CostIQ" : "Sign in"}</Link>;
 }
 
+// The industry switch lives here (default industry: pharma).
+async function Industry() {
+  return <IndustryButton {...tenantChoice((await cookies()).get(TENANT_COOKIE)?.value)} />;
+}
+
 export default function GlossaryPage() {
   return (
     <div className="lp">
@@ -23,7 +30,7 @@ export default function GlossaryPage() {
         <Link href="/" className="lp-logo"><MMLockup sub="Cloud and AI cost governance for regulated industries" /></Link>
         <Suspense fallback={null}><Open /></Suspense>
       </header>
-      <main className="lp-wrap lp-gloss"><PublicCopy><GlossaryView /></PublicCopy></main>
+      <main className="lp-wrap lp-gloss"><PublicCopy><GlossaryView /></PublicCopy><Suspense fallback={null}><Industry /></Suspense></main>
     </div>
   );
 }

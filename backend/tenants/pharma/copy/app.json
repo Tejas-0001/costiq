@@ -11,16 +11,16 @@
           "Budgets, forecasts and executive decisions"
         ],
         [
-          "Regulatory & Compliance",
-          "ctl",
-          "shield",
-          "Tax, transfer pricing, GxP and patient data"
-        ],
-        [
           "Technology & Operations",
           "tech",
           "gear",
           "Spend, consumption and optimization"
+        ],
+        [
+          "Regulatory & Compliance",
+          "ctl",
+          "shield",
+          "Tax, transfer pricing, GxP and patient data"
         ],
         [
           "Board & Investor",
@@ -108,14 +108,14 @@
           "AWS, Azure, Google Cloud, Snowflake, and AI services such as Claude, OpenAI and Microsoft Copilot: usage, seats and credits side by side."
         ],
         [
-          "search",
-          "Answers you can audit",
-          "More than 115 ready-made analyses. Each figure shows the formula behind it, and every approval is recorded in a log that can’t be quietly edited."
-        ],
-        [
           "target",
           "A view for every role",
           "CFOs, technology leaders, FinOps analysts, internal controllers and auditors each see what their role needs. There are one-page summaries for the board and for regulators."
+        ],
+        [
+          "search",
+          "Answers you can audit",
+          "More than 115 ready-made analyses. Each figure shows the formula behind it, and every approval is recorded in a log that can’t be quietly edited."
         ],
         [
           "shield",
@@ -181,8 +181,8 @@
           "d": "Claimed where the group already claims these fees; unlock where they qualify but are not yet claimed."
         },
         {
-          "t": "AI summary",
-          "d": "The AI Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, deduction at risk, unclaimed R&D credit, open savings, GxP findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages. Saved wording is used while the figures behind it are unchanged; every figure in it is still read live from the linked page."
+          "t": "CostIQ summary",
+          "d": "The CostIQ Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, deduction at risk, unclaimed R&D credit, open savings, GxP findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages. Saved wording is used while the figures behind it are unchanged; every figure in it is still read live from the linked page."
         },
         {
           "t": "Ask CostIQ",

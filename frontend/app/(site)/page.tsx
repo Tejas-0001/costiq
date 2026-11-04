@@ -1,14 +1,13 @@
 import { Suspense } from "react";
 import { cookies } from "next/headers";
 import { Landing } from "@/components/site/landing";
-import { TENANT_COOKIE, tenantChoice } from "@/lib/tenants";
 import "../landing.css";
 
 // The landing is also the sign-in page; whether someone is already signed in is read from the http-only cookie here.
 async function Page() {
   const jar = await cookies();
   const signedIn = Boolean(jar.get("costiq_persona"));
-  return <Landing signedIn={signedIn} {...tenantChoice(jar.get(TENANT_COOKIE)?.value)} />;
+  return <Landing signedIn={signedIn} />;
 }
 
 export default function HomePage() {

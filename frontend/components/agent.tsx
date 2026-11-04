@@ -139,7 +139,7 @@ async function brief(r: Run) {
   await r.step("Writing the briefing");
   r.say(d.headline, d.facts);
   r.show({ kind: "summary", data: d });
-  r.act([{ label: "Open the AI Summary", href: "/summary" }], [r.w.t("agent.questions.risk"), "Where can we save the most?", "How much did we spend today?"]);
+  r.act([{ label: "Open the CostIQ Summary", href: "/summary" }], [r.w.t("agent.questions.risk"), "Where can we save the most?", "How much did we spend today?"]);
 }
 
 async function ask(r: Run, q: string) {

@@ -42,7 +42,7 @@
 .lp-hint { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 600; color: var(--mm-ink); }
 .lp-hint svg { color: var(--mm-blue); }
 .lp-groups { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.lp-group { border-radius: 10px; border-top: 4px solid; padding: 18px 12px 12px; }
+.lp-group { border-radius: 10px; padding: 18px 12px 12px; }
 .lp-group.wide { grid-column: 1 / -1; }
 .lp-group > header { display: flex; gap: 12px; align-items: flex-start; padding: 0 8px 14px; }
 .lp-group h3 { font-size: 17px; color: var(--mm-ink); margin: 0 0 3px; }
@@ -92,3 +92,4 @@
   background: #fff; color: var(--mm-blue); cursor: pointer; }
 .lp-industry button:hover { background: var(--mm-blue); color: #fff; }
 .lp-industry button:disabled { opacity: .6; cursor: progress; }
+.lp-gloss .lp-industry { margin: 40px 0 24px; font-size: 13px; color: var(--mm-muted); }

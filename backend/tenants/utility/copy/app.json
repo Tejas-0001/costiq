@@ -108,14 +108,14 @@
           "AWS, Azure, Google Cloud, Snowflake, and AI services such as Claude, OpenAI and Microsoft Copilot: usage, seats and credits side by side."
         ],
         [
-          "search",
-          "Answers you can audit",
-          "More than 150 ready-made analyses. Each figure shows the formula behind it, and every approval is recorded in a log that can’t be quietly edited."
-        ],
-        [
           "target",
           "A view for every role",
           "Controllers, regulatory accountants, CFOs, FinOps analysts and auditors each see what their role needs. There are one-page summaries for the board and for regulators."
+        ],
+        [
+          "search",
+          "Answers you can audit",
+          "More than 150 ready-made analyses. Each figure shows the formula behind it, and every approval is recorded in a log that can’t be quietly edited."
         ],
         [
           "shield",
@@ -201,8 +201,8 @@
           "d": "Over the contract term (62 months when none). Unlock covers jurisdictions where an order could allow deferral to 182.3 and none is on file; balances already deferred under an order earn their return today."
         },
         {
-          "t": "AI summary",
-          "d": "The AI Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, disallowance at risk, earnings unlock, open savings, NERC CIP and data findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages."
+          "t": "CostIQ summary",
+          "d": "The CostIQ Summary page, and the agent's briefing, are written from the figures on the pages your role can open. CostIQ ranks what matters (forecast against budget, disallowance at risk, earnings unlock, open savings, NERC CIP and data findings, alerts and invoice exceptions) and writes one sentence per point. Every figure links to the panel or row it comes from, and the numbered chips list the source pages."
         },
         {
           "t": "Ask CostIQ",

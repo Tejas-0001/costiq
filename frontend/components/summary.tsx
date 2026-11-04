@@ -134,7 +134,7 @@ export function SummaryView() {
     <div className="stack ais-page">
       <div className="page-head">
         <div>
-          <h1>AI Summary</h1>
+          <h1>CostIQ Summary</h1>
           <div className="ais-meta">{d ? `${d.period.label} · data as of ${d.as_of} · ${Object.keys(d.facts).length} figures from ${d.sources.length} pages`
             : "Reading the pages you can open…"}</div>
         </div>

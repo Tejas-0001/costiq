@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
-import { choosePersona, chooseTenant } from "@/app/actions";
+import { choosePersona } from "@/app/actions";
 import { MMLockup } from "@/components/brand";
 import { lookup, type Copy } from "@/components/copy";
 import { api } from "@/lib/api";
@@ -179,8 +179,7 @@ function GridArt() {
 }
 
 /** `signedIn` comes from the server (the session cookie is http-only). `roles` renders only the sign-in by role (the /sign-in page). */
-export function Landing({ signedIn = false, roles = false, tenants = [], tenant = "" }:
-  { signedIn?: boolean; roles?: boolean; tenants?: { key: string; label: string }[]; tenant?: string }) {
+export function Landing({ signedIn = false, roles = false }: { signedIn?: boolean; roles?: boolean }) {
   const [cfg, setCfg] = useState<Config | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
@@ -197,11 +196,6 @@ export function Landing({ signedIn = false, roles = false, tenants = [], tenant 
   (cfg?.personas ?? []).forEach((p) => { (groups[p.group] ??= []).push(p); });
   const names = [...lc.order.filter((g) => groups[g]), ...Object.keys(groups).filter((g) => !lc.order.includes(g))];
   const go = (key: string) => { setPicked(key); start(() => choosePersona(key, next)); };
-  // switching tenant signs out of the current tenant's role, then reloads so roles and wording come from the other API
-  const switchTo = (key: string) => { if (key !== tenant) start(async () => { await chooseTenant(key); window.location.reload(); }); };
-  const at = tenants.findIndex((t) => t.key === tenant);
-  const current = at >= 0 ? tenants[at] : undefined;
-  const other = tenants.length > 1 && current ? tenants[(at + 1) % tenants.length] : undefined;  // the footer button cycles
 
   return (
     <div className="lp">
@@ -214,7 +208,7 @@ export function Landing({ signedIn = false, roles = false, tenants = [], tenant 
       <section className="lp-hero">
         <div className="lp-wrap">
           <h1>Every cloud and AI dollar,<br /><span>explained and governed.</span></h1>
-          <p className="lp-lead">MM CostIQ is Miracle Minds&apos; cost management platform for organizations that answer to regulators and auditors.
+          <p className="lp-lead">MM CostIQ is our proprietary FinOps &amp; AI cost governance engine that answers to the CFO, Technology, Regulators and the Board.
             It brings bills from every cloud provider, AI model vendor and Copilot-style tool into one view built on FOCUS 1.0, the
             FinOps Foundation&apos;s open billing standard. Finance, technology, compliance and audit teams then work from the same numbers.
             CostIQ runs inside your own environment, so sensitive billing and operational data never leaves your control.</p>
@@ -284,11 +278,8 @@ export function Landing({ signedIn = false, roles = false, tenants = [], tenant 
 
       <footer className="lp-foot">
         <div className="lp-wrap">
-          <p className="lk"><Icon name="lock" size={14} /> Runs inside your environment. Sign-in uses your company login, and each person sees
-            only their own business units{hl?.as_of ? `. Data as of ${hl.as_of}` : ""}.</p>
-          <p><Link href={signedIn ? "/deploy" : "/sign-in?next=%2Fdeploy"}>Deployment planner</Link> · <Link href="/glossary">Glossary</Link>
-            {other && <> · <span className="lp-industry">Industry: <b>{current?.label}</b>
-              <button type="button" disabled={pending} onClick={() => switchTo(other.key)}>Change to {other.label}</button></span></>}</p>
+          <p className="lk"><Icon name="lock" size={14} /> Runs inside your environment{hl?.as_of ? `. Data as of ${hl.as_of}` : ""}.</p>
+          <p><Link href={signedIn ? "/deploy" : "/sign-in?next=%2Fdeploy"}>Deployment planner</Link> · <Link href="/glossary">Glossary</Link></p>
           <p className="by">MM CostIQ · Miracle Minds</p>
         </div>
       </footer>

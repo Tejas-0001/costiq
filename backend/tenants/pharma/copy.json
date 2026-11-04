@@ -149,7 +149,7 @@
         "intelligence": "Intelligence"
       },
       "items": {
-        "summary": "AI Summary",
+        "summary": "CostIQ Summary",
         "command": "Command Center",
         "board": "Board Pack",
         "explorer": "Spend Explorer",
